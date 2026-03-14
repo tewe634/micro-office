@@ -9,6 +9,7 @@ import com.microoffice.enums.NodeStatus;
 import com.microoffice.enums.NodeType;
 import com.microoffice.mapper.WorkNodeMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.List;
 public class NodeService {
 
     private final WorkNodeMapper nodeMapper;
+    private final JdbcTemplate jdbc;
     private final StringRedisTemplate redis;
 
     /** 创建节点 */
@@ -77,6 +79,10 @@ public class NodeService {
             next.setOwnerId(req.getAssignToUserId());
             next.setPrevNodeId(nodeId);
             return create(node.getThreadId(), next);
+        }
+        if ("COMPLETE_TASK".equals(req.getNextAction())) {
+            // 标记整个工作流完成
+            jdbc.update("UPDATE work_thread SET status = 'COMPLETED'::thread_status, updated_at = NOW() WHERE id = ?", node.getThreadId());
         }
         if ("POOL".equals(req.getNextAction()) && req.getPoolPositionId() != null) {
             CreateNodeRequest next = new CreateNodeRequest();

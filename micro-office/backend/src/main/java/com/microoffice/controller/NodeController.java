@@ -70,14 +70,80 @@ public class NodeController {
     }
 
     @PutMapping("/nodes/{id}/complete")
-    public ApiResponse<WorkNode> complete(@PathVariable Integer id, @RequestBody CompleteNodeRequest req) {
-        return ApiResponse.ok(nodeService.complete(id, req));
+    public ApiResponse<WorkNode> complete(@PathVariable Integer id, @RequestBody CompleteNodeRequest req, Authentication auth) {
+        Integer userId = (Integer) auth.getPrincipal();
+        WorkNode result = nodeService.complete(id, req);
+        // 自动记录操作日志
+        String userName = jdbc.queryForObject("SELECT name FROM sys_user WHERE id = ?", String.class, userId);
+        if ("ASSIGN".equals(req.getNextAction()) && req.getAssignToUserId() != null) {
+            String assigneeName = jdbc.queryForObject("SELECT name FROM sys_user WHERE id = ?", String.class, req.getAssignToUserId());
+            String nodeName = req.getCustomNodeName() != null ? req.getCustomNodeName() : "待处理";
+            jdbc.update("INSERT INTO node_message (node_id, author_id, content) VALUES (?, ?, ?)",
+                id, userId, "[系统] " + userName + " 完成节点并指派给 " + assigneeName + "（" + nodeName + "）");
+        } else if ("COMPLETE_TASK".equals(req.getNextAction())) {
+            jdbc.update("INSERT INTO node_message (node_id, author_id, content) VALUES (?, ?, ?)",
+                id, userId, "[系统] " + userName + " 完成节点并标记工作流完成");
+        }
+        return ApiResponse.ok(result);
     }
 
     @PutMapping("/nodes/{id}/cancel")
-    public ApiResponse<Void> cancel(@PathVariable Integer id) {
+    public ApiResponse<Void> cancel(@PathVariable Integer id, Authentication auth) {
+        Integer userId = (Integer) auth.getPrincipal();
         jdbc.update("UPDATE work_node SET status = 'CANCELLED', completed_at = NOW() WHERE id = ?", id);
+        String userName = jdbc.queryForObject("SELECT name FROM sys_user WHERE id = ?", String.class, userId);
+        jdbc.update("INSERT INTO node_message (node_id, author_id, content) VALUES (?, ?, ?)",
+            id, userId, "[系统] " + userName + " 取消了此节点");
         return ApiResponse.ok(null);
+    }
+
+    // 转派节点给其他人
+    @PutMapping("/nodes/{id}/transfer")
+    public ApiResponse<Void> transfer(@PathVariable Integer id, @RequestBody Map<String, Integer> body, Authentication auth) {
+        Integer userId = (Integer) auth.getPrincipal();
+        Integer targetId = body.get("targetUserId");
+        if (targetId == null) throw new RuntimeException("请选择转派目标");
+        String userName = jdbc.queryForObject("SELECT name FROM sys_user WHERE id = ?", String.class, userId);
+        String targetName = jdbc.queryForObject("SELECT name FROM sys_user WHERE id = ?", String.class, targetId);
+        jdbc.update("UPDATE work_node SET owner_id = ? WHERE id = ?", targetId, id);
+        jdbc.update("INSERT INTO node_message (node_id, author_id, content) VALUES (?, ?, ?)",
+            id, userId, "[系统] " + userName + " 将节点转派给 " + targetName);
+        return ApiResponse.ok(null);
+    }
+
+    // 在当前节点发起子工作流，自动关联到节点引用
+    @PostMapping("/nodes/{id}/spawn-thread")
+    public ApiResponse<Map<String, Object>> spawnThread(@PathVariable Integer id, @RequestBody Map<String, Object> body, Authentication auth) {
+        Integer userId = (Integer) auth.getPrincipal();
+        WorkNode node = nodeService.getById(id);
+        if (node == null) throw new RuntimeException("节点不存在");
+
+        // 创建子工作流
+        String title = (String) body.get("title");
+        String content = (String) body.get("content");
+        Integer objectId = body.get("objectId") != null ? ((Number) body.get("objectId")).intValue() : null;
+        Integer productId = body.get("productId") != null ? ((Number) body.get("productId")).intValue() : null;
+
+        // 继承父工作流的objectId/productId（如果子流程没指定）
+        if (objectId == null) objectId = jdbc.queryForObject("SELECT object_id FROM work_thread WHERE id = ?", Integer.class, node.getThreadId());
+        if (productId == null) productId = jdbc.queryForObject("SELECT product_id FROM work_thread WHERE id = ?", Integer.class, node.getThreadId());
+
+        jdbc.update("INSERT INTO work_thread (title, content, status, creator_id, object_id, product_id) VALUES (?, ?, 'ACTIVE'::thread_status, ?, ?, ?)",
+            title, content, userId, objectId, productId);
+        Integer newThreadId = jdbc.queryForObject("SELECT currval(pg_get_serial_sequence('work_thread','id'))", Integer.class);
+
+        // 自动关联到当前节点
+        jdbc.update("INSERT INTO node_reference (node_id, ref_type, ref_id, ref_label) VALUES (?, 'THREAD', ?, ?)",
+            id, newThreadId, "子工作流: " + title);
+
+        // 记录操作日志
+        String userName = jdbc.queryForObject("SELECT name FROM sys_user WHERE id = ?", String.class, userId);
+        jdbc.update("INSERT INTO node_message (node_id, author_id, content) VALUES (?, ?, ?)",
+            id, userId, "[系统] " + userName + " 发起子工作流「" + title + "」");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("threadId", newThreadId);
+        return ApiResponse.ok(result);
     }
 
     @PutMapping("/nodes/{id}/rollback")
