@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Card, Tabs, Row, Col, Statistic, Table, Tag, Select, Space } from 'antd';
-import { BarChartOutlined, ClockCircleOutlined, TeamOutlined } from '@ant-design/icons';
-import { dashboardApi, orgApi } from '../../api';
+import { Card, Tabs, Row, Col, Statistic, Table, Tag, Space } from 'antd';
+import { BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { dashboardApi } from '../../api';
 
 const periodOpts = [
   { value: 'today', label: '今天' },
@@ -9,33 +9,27 @@ const periodOpts = [
   { value: 'week', label: '本周' },
   { value: 'month', label: '本月' },
 ];
-
-const scopeOpts = [
-  { value: 'personal', label: '个人' },
-  { value: 'department', label: '部门' },
-  { value: 'region', label: '大区（销售）' },
-  { value: 'company', label: '公司' },
-];
-
 const typeMap: Record<string, string> = { CUSTOMER: '客户', SUPPLIER: '供应商', BANK: '银行', CARRIER: '承运商', THIRD_PARTY_PAY: '第三方支付', OTHER: '其他' };
+
+function PeriodTags({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Space>
+      {periodOpts.map(o => (
+        <Tag key={o.value} color={value === o.value ? 'blue' : 'default'}
+          style={{ cursor: 'pointer' }} onClick={() => onChange(o.value)}>{o.label}</Tag>
+      ))}
+    </Space>
+  );
+}
 
 function TimeSummary() {
   const [period, setPeriod] = useState('today');
   const [data, setData] = useState<any>(null);
-
   useEffect(() => { dashboardApi.time(period).then((r: any) => setData(r.data)); }, [period]);
 
   return (
     <>
-      <div style={{ marginBottom: 16 }}>
-        <Space>
-          <span>时间范围：</span>
-          {periodOpts.map(o => (
-            <Tag key={o.value} color={period === o.value ? 'blue' : 'default'}
-              style={{ cursor: 'pointer' }} onClick={() => setPeriod(o.value)}>{o.label}</Tag>
-          ))}
-        </Space>
-      </div>
+      <div style={{ marginBottom: 16 }}><PeriodTags value={period} onChange={setPeriod} /></div>
       {data && (
         <>
           <Row gutter={16}>
@@ -62,53 +56,53 @@ function TimeSummary() {
 }
 
 function OrgSummary() {
-  const [scope, setScope] = useState('personal');
-  const [orgId, setOrgId] = useState<number>();
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [scopes, setScopes] = useState<any[]>([]);
+  const [activeScope, setActiveScope] = useState<any>(null);
+  const [period, setPeriod] = useState('today');
   const [data, setData] = useState<any>(null);
 
-  useEffect(() => { orgApi.list().then((r: any) => setOrgs(r.data || [])).catch(() => {}); }, []);
-  useEffect(() => { dashboardApi.org(scope, orgId).then((r: any) => setData(r.data)); }, [scope, orgId]);
+  useEffect(() => {
+    dashboardApi.scopes().then((r: any) => {
+      const s = r.data || [];
+      setScopes(s);
+      if (s.length) setActiveScope(s[0]);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!activeScope) return;
+    dashboardApi.org(activeScope.key, activeScope.orgId, period).then((r: any) => setData(r.data));
+  }, [activeScope, period]);
+
+  const columns = [
+    { title: '姓名', dataIndex: 'name', width: 100 },
+    { title: '部门', dataIndex: 'org_name', width: 100 },
+    { title: '岗位', dataIndex: 'pos_name', width: 100 },
+    { title: '总工作数', dataIndex: 'total', width: 90, align: 'center' as const, sorter: (a: any, b: any) => a.total - b.total },
+    { title: '进行中', dataIndex: 'active', width: 80, align: 'center' as const, render: (v: number) => v > 0 ? <Tag color="blue">{v}</Tag> : 0 },
+    { title: '已完成', dataIndex: 'completed', width: 80, align: 'center' as const, render: (v: number) => v > 0 ? <Tag color="green">{v}</Tag> : 0 },
+  ];
 
   return (
     <>
-      <div style={{ marginBottom: 16 }}>
-        <Space>
-          <span>汇总范围：</span>
-          <Select value={scope} options={scopeOpts} onChange={v => setScope(v)} style={{ width: 140 }} />
-          {(scope === 'department' || scope === 'region') && (
-            <Select placeholder="选择组织" value={orgId} allowClear style={{ width: 160 }}
-              options={orgs.map(o => ({ value: o.id, label: o.name }))} onChange={v => setOrgId(v)} />
-          )}
-        </Space>
-      </div>
+      {scopes.length > 0 && (
+        <Tabs activeKey={activeScope?.key + (activeScope?.orgId || '')}
+          onChange={k => setActiveScope(scopes.find(s => s.key + (s.orgId || '') === k))}
+          items={scopes.map(s => ({ key: s.key + (s.orgId || ''), label: s.label }))} />
+      )}
+      <div style={{ marginBottom: 16 }}><PeriodTags value={period} onChange={setPeriod} /></div>
       {data && (
         <>
-          <Row gutter={16}>
-            <Col span={6}><Card><Statistic title={`${data.scope} - 总工作数`} value={data.totalThreads} /></Card></Col>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={6}><Card><Statistic title="人员数" value={data.userCount} /></Card></Col>
+            <Col span={6}><Card><Statistic title="总工作数" value={data.totalThreads} /></Card></Col>
             <Col span={6}><Card><Statistic title="进行中" value={data.activeThreads} valueStyle={{ color: '#1677ff' }} /></Card></Col>
             <Col span={6}><Card><Statistic title="已完成" value={data.completedThreads} valueStyle={{ color: '#3f8600' }} /></Card></Col>
-            <Col span={6}><Card><Statistic title="外部对象" value={data.externalObjects?.reduce((s: number, o: any) => s + o.count, 0) || 0} /></Card></Col>
           </Row>
-
-          {data.byUser?.length > 0 && (
-            <Card title={<><TeamOutlined /> 人员工作统计</>} size="small" style={{ marginTop: 16 }}>
-              <Table dataSource={data.byUser} rowKey="id" size="small" pagination={false}
-                columns={[
-                  { title: '姓名', dataIndex: 'name' },
-                  { title: '总工作数', dataIndex: 'total', align: 'center' },
-                  { title: '已完成', dataIndex: 'completed', align: 'center', render: (v: number) => <Tag color="green">{v}</Tag> },
-                ]} />
-            </Card>
-          )}
-
+          <Table dataSource={data.byUser} rowKey="id" size="small" columns={columns} pagination={false} />
           {data.externalObjects?.length > 0 && (
             <Card title="外部对象分布" size="small" style={{ marginTop: 16 }}>
-              <Space wrap>
-                {data.externalObjects.map((o: any) => (
-                  <Tag key={o.type} color="blue">{typeMap[o.type] || o.type}: {o.count}</Tag>
-                ))}
-              </Space>
+              <Space wrap>{data.externalObjects.map((o: any) => <Tag key={o.type} color="blue">{typeMap[o.type] || o.type}: {o.count}</Tag>)}</Space>
             </Card>
           )}
         </>

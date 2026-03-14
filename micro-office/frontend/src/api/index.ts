@@ -112,5 +112,6 @@ export const portalApi = {
 
 export const dashboardApi = {
   time: (period: string) => api.get('/dashboard/time', { params: { period } }),
-  org: (scope: string, orgId?: number) => api.get('/dashboard/org', { params: { scope, orgId } }),
+  scopes: () => api.get('/dashboard/scopes'),
+  org: (scope: string, orgId?: number, period?: string) => api.get('/dashboard/org', { params: { scope, orgId, period } }),
 };
