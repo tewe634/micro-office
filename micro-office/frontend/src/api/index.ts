@@ -85,4 +85,6 @@ export const adminApi = {
   templateNodes: (id: number) => api.get(`/admin/templates/${id}/nodes`),
   addTemplateNode: (id: number, data: any) => api.post(`/admin/templates/${id}/nodes`, data),
   deleteTemplate: (id: number) => api.delete(`/admin/templates/${id}`),
+  getPermissions: () => api.get('/admin/permissions'),
+  savePermissions: (data: Record<string, string[]>) => api.put('/admin/permissions', data),
 };

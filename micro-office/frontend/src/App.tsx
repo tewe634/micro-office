@@ -14,6 +14,7 @@ import TaskPoolPage from './pages/taskpool/TaskPoolPage';
 import ClockPage from './pages/clock/ClockPage';
 import AdminModulePage from './pages/admin/AdminModulePage';
 import AdminTemplatePage from './pages/admin/AdminTemplatePage';
+import AdminPermissionPage from './pages/admin/AdminPermissionPage';
 import { useAuthStore } from './store/auth';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -43,7 +44,8 @@ export default function App() {
             <Route path="products" element={<ProductPage />} />
             <Route path="taskpool" element={<TaskPoolPage />} />
             <Route path="clock" element={<ClockPage />} />
-            <Route path="admin" element={<Navigate to="/admin/modules" />} />
+            <Route path="admin" element={<Navigate to="/admin/permissions" />} />
+            <Route path="admin/permissions" element={<RoleRoute roles={['ADMIN']}><AdminPermissionPage /></RoleRoute>} />
             <Route path="admin/modules" element={<RoleRoute roles={['ADMIN']}><AdminModulePage /></RoleRoute>} />
             <Route path="admin/templates" element={<RoleRoute roles={['ADMIN']}><AdminTemplatePage /></RoleRoute>} />
           </Route>

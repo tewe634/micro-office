@@ -26,6 +26,10 @@ public class UserController {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", u.getId()); m.put("name", u.getName()); m.put("email", u.getEmail());
         m.put("role", u.getRole());
+        // 查询该角色的菜单权限
+        List<String> menus = jdbc.queryForList(
+            "SELECT menu_key FROM role_menu_permission WHERE role = ? ORDER BY menu_key", String.class, u.getRole());
+        m.put("menus", menus);
         return ApiResponse.ok(m);
     }
 

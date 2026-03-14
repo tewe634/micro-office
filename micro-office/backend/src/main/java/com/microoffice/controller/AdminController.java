@@ -7,8 +7,9 @@ import com.microoffice.entity.TemplateNode;
 import com.microoffice.service.ModuleConfigService;
 import com.microoffice.service.TemplateService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -16,6 +17,30 @@ import java.util.List;
 public class AdminController {
     private final ModuleConfigService moduleConfigService;
     private final TemplateService templateService;
+    private final JdbcTemplate jdbc;
+
+    // --- 角色权限配置 ---
+    @GetMapping("/permissions")
+    public ApiResponse<Map<String, List<String>>> listPermissions() {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT role, menu_key FROM role_menu_permission ORDER BY role, menu_key");
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            String role = (String) row.get("role");
+            result.computeIfAbsent(role, k -> new ArrayList<>()).add((String) row.get("menu_key"));
+        }
+        return ApiResponse.ok(result);
+    }
+
+    @PutMapping("/permissions")
+    public ApiResponse<Void> savePermissions(@RequestBody Map<String, List<String>> perms) {
+        jdbc.update("DELETE FROM role_menu_permission");
+        for (Map.Entry<String, List<String>> entry : perms.entrySet()) {
+            for (String menuKey : entry.getValue()) {
+                jdbc.update("INSERT INTO role_menu_permission (role, menu_key) VALUES (?, ?)", entry.getKey(), menuKey);
+            }
+        }
+        return ApiResponse.ok(null);
+    }
 
     // --- 模块配置 ---
     @GetMapping("/modules")
