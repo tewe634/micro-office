@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Checkbox, Button, message, Tag, Tabs, Select, Space } from 'antd';
+import { Card, Table, Checkbox, Button, message, Tag, Tabs, Select, Space, Divider } from 'antd';
 import { adminApi, userApi, orgApi, positionApi } from '../../api';
 
 const roles = [
@@ -75,14 +75,19 @@ function RolePermTab() {
   );
 }
 
-// ========== Tab 2: 人员权限 ==========
+// ========== Tab 2: 人员权限（模块 + 对象类型） ==========
 function UserPermTab() {
   const [users, setUsers] = useState<any[]>([]);
   const [orgs, setOrgs] = useState<any[]>([]);
   const [filterOrg, setFilterOrg] = useState<number>();
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  // 模块权限
   const [userMenus, setUserMenus] = useState<string[]>([]);
-  const [hasCustom, setHasCustom] = useState(false);
+  const [hasCustomMenus, setHasCustomMenus] = useState(false);
+  // 对象类型权限
+  const [userObjTypes, setUserObjTypes] = useState<string[]>([]);
+  const [hasCustomObjTypes, setHasCustomObjTypes] = useState(false);
+
   const [rolePerms, setRolePerms] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -95,37 +100,60 @@ function UserPermTab() {
 
   const selectUser = async (u: any) => {
     setSelectedUser(u);
-    const r: any = await adminApi.getUserMenus(u.id);
-    const custom = (r.data || []) as string[];
-    if (custom.length > 0) {
-      setUserMenus(custom); setHasCustom(true);
+    // 加载模块权限
+    const menuRes: any = await adminApi.getUserMenus(u.id);
+    const customMenus = (menuRes.data || []) as string[];
+    if (customMenus.length > 0) {
+      setUserMenus(customMenus); setHasCustomMenus(true);
     } else {
-      setUserMenus(rolePerms[u.role] || []); setHasCustom(false);
+      setUserMenus(rolePerms[u.role] || []); setHasCustomMenus(false);
+    }
+    // 加载对象类型权限
+    const objRes: any = await adminApi.getUserObjectTypes(u.id);
+    const customObj = (objRes.data || []) as string[];
+    if (customObj.length > 0) {
+      setUserObjTypes(customObj); setHasCustomObjTypes(true);
+    } else {
+      setUserObjTypes([]); setHasCustomObjTypes(false);
     }
   };
 
   const toggleMenu = (key: string, checked: boolean) => {
-    setHasCustom(true);
-    setUserMenus(prev => {
-      const list = [...prev];
-      if (checked && !list.includes(key)) list.push(key);
-      if (!checked) { const i = list.indexOf(key); if (i >= 0) list.splice(i, 1); }
-      return list;
-    });
+    setHasCustomMenus(true);
+    setUserMenus(prev => checked ? [...prev, key] : prev.filter(k => k !== key));
   };
 
-  const save = async () => {
+  const toggleObjType = (type: string, checked: boolean) => {
+    setHasCustomObjTypes(true);
+    setUserObjTypes(prev => checked ? [...prev, type] : prev.filter(t => t !== type));
+  };
+
+  const saveMenus = async () => {
     if (!selectedUser) return;
     setLoading(true);
     await adminApi.saveUserMenus(selectedUser.id, userMenus);
-    message.success(`${selectedUser.name} 的个人权限已保存`); setLoading(false);
+    message.success(`${selectedUser.name} 的模块权限已保存`); setLoading(false);
   };
 
-  const reset = async () => {
+  const resetMenus = async () => {
     if (!selectedUser) return;
     await adminApi.resetUserMenus(selectedUser.id);
-    setUserMenus(rolePerms[selectedUser.role] || []); setHasCustom(false);
-    message.success(`${selectedUser.name} 已恢复为角色默认权限`);
+    setUserMenus(rolePerms[selectedUser.role] || []); setHasCustomMenus(false);
+    message.success('已恢复角色默认模块权限');
+  };
+
+  const saveObjTypes = async () => {
+    if (!selectedUser) return;
+    setLoading(true);
+    await adminApi.saveUserObjectTypes(selectedUser.id, userObjTypes);
+    message.success(`${selectedUser.name} 的对象类型权限已保存`); setLoading(false);
+  };
+
+  const resetObjTypes = async () => {
+    if (!selectedUser) return;
+    await adminApi.resetUserObjectTypes(selectedUser.id);
+    setUserObjTypes([]); setHasCustomObjTypes(false);
+    message.success('已恢复岗位默认对象类型权限');
   };
 
   return (
@@ -147,8 +175,13 @@ function UserPermTab() {
       <div style={{ flex: 1 }}>
         {selectedUser ? (
           <>
-            <h4>{selectedUser.name} 的模块权限 {hasCustom ? <Tag color="orange">个人定制</Tag> : <Tag>角色默认</Tag>}</h4>
-            <Table dataSource={menus} rowKey="key" pagination={false} bordered size="middle"
+            <h4 style={{ marginBottom: 16 }}>{selectedUser.name} 的权限配置</h4>
+
+            {/* 模块权限 */}
+            <div style={{ marginBottom: 8 }}>
+              <b>功能模块</b> {hasCustomMenus ? <Tag color="orange">个人定制</Tag> : <Tag>角色默认</Tag>}
+            </div>
+            <Table dataSource={menus} rowKey="key" pagination={false} bordered size="small"
               columns={[
                 { title: '功能模块', dataIndex: 'label', width: 150 },
                 { title: '可见', width: 80, align: 'center', render: (_: any, record: any) => (
@@ -156,18 +189,37 @@ function UserPermTab() {
                 )},
               ]}
             />
-            <Space style={{ marginTop: 16 }}>
-              <Button type="primary" loading={loading} onClick={save}>保存个人权限</Button>
-              {hasCustom && <Button onClick={reset}>恢复角色默认</Button>}
+            <Space style={{ marginTop: 8, marginBottom: 24 }}>
+              <Button type="primary" size="small" loading={loading} onClick={saveMenus}>保存模块权限</Button>
+              {hasCustomMenus && <Button size="small" onClick={resetMenus}>恢复角色默认</Button>}
+            </Space>
+
+            <Divider />
+
+            {/* 对象类型权限 */}
+            <div style={{ marginBottom: 8 }}>
+              <b>外部对象类型</b> {hasCustomObjTypes ? <Tag color="orange">个人定制</Tag> : <Tag>岗位默认</Tag>}
+            </div>
+            <Table dataSource={objectTypes} rowKey="key" pagination={false} bordered size="small"
+              columns={[
+                { title: '对象类型', dataIndex: 'label', width: 150 },
+                { title: '可见', width: 80, align: 'center', render: (_: any, record: any) => (
+                  <Checkbox checked={userObjTypes.includes(record.key)} onChange={e => toggleObjType(record.key, e.target.checked)} />
+                )},
+              ]}
+            />
+            <Space style={{ marginTop: 8 }}>
+              <Button type="primary" size="small" loading={loading} onClick={saveObjTypes}>保存对象类型权限</Button>
+              {hasCustomObjTypes && <Button size="small" onClick={resetObjTypes}>恢复岗位默认</Button>}
             </Space>
           </>
-        ) : <p style={{ color: '#888', marginTop: 40 }}>← 点击左侧人员查看/编辑其模块权限</p>}
+        ) : <p style={{ color: '#888', marginTop: 40 }}>← 点击左侧人员查看/编辑其权限（模块 + 对象类型）</p>}
       </div>
     </div>
   );
 }
 
-// ========== Tab 3: 对象类型权限 ==========
+// ========== Tab 3: 岗位对象类型权限 ==========
 function ObjectTypePermTab() {
   const [positions, setPositions] = useState<any[]>([]);
   const [perms, setPerms] = useState<Record<string, string[]>>({});
@@ -176,7 +228,6 @@ function ObjectTypePermTab() {
   useEffect(() => {
     positionApi.list().then((r: any) => setPositions(r.data || []));
     adminApi.getPositionObjectTypes().then((r: any) => {
-      // API 返回 {posId: [types]}，key 是 number，转成 string
       const data = r.data || {};
       const mapped: Record<string, string[]> = {};
       for (const [k, v] of Object.entries(data)) mapped[String(k)] = v as string[];
@@ -202,10 +253,10 @@ function ObjectTypePermTab() {
 
   return (
     <>
-      <p style={{ color: '#888', marginBottom: 16 }}>配置每个岗位可以查看/管理的外部对象类型。用户根据其主岗位和辅助岗位汇总可见类型。</p>
+      <p style={{ color: '#888', marginBottom: 16 }}>配置每个岗位默认可见的外部对象类型。用户如果没有个人对象类型配置，则根据岗位汇总。</p>
       <Table dataSource={positions} rowKey="id" pagination={false} bordered size="middle"
         columns={[
-          { title: '岗位', width: 120, render: (_: any, r: any) => `${r.name} (${r.code})` },
+          { title: '岗位', width: 140, render: (_: any, r: any) => `${r.name} (${r.code})` },
           ...objectTypes.map(ot => ({
             title: ot.label, width: 90, align: 'center' as const,
             render: (_: any, record: any) => (
@@ -215,7 +266,7 @@ function ObjectTypePermTab() {
           })),
         ]}
       />
-      <Button type="primary" loading={loading} onClick={save} style={{ marginTop: 16 }}>保存对象类型权限</Button>
+      <Button type="primary" loading={loading} onClick={save} style={{ marginTop: 16 }}>保存岗位对象类型权限</Button>
     </>
   );
 }
@@ -226,7 +277,7 @@ export default function AdminPermissionPage() {
     <Card title="权限配置">
       <Tabs items={[
         { key: 'role', label: '角色模块权限', children: <RolePermTab /> },
-        { key: 'user', label: '人员模块权限', children: <UserPermTab /> },
+        { key: 'user', label: '人员权限', children: <UserPermTab /> },
         { key: 'object', label: '岗位对象类型', children: <ObjectTypePermTab /> },
       ]} />
     </Card>

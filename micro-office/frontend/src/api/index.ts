@@ -90,6 +90,9 @@ export const adminApi = {
   getUserMenus: (userId: number) => api.get(`/admin/user-permissions/${userId}`),
   saveUserMenus: (userId: number, menus: string[]) => api.put(`/admin/user-permissions/${userId}`, menus),
   resetUserMenus: (userId: number) => api.delete(`/admin/user-permissions/${userId}`),
+  getUserObjectTypes: (userId: number) => api.get(`/admin/user-object-types/${userId}`),
+  saveUserObjectTypes: (userId: number, types: string[]) => api.put(`/admin/user-object-types/${userId}`, types),
+  resetUserObjectTypes: (userId: number) => api.delete(`/admin/user-object-types/${userId}`),
   getPositionObjectTypes: () => api.get('/admin/position-object-types'),
   savePositionObjectTypes: (data: Record<string, string[]>) => api.put('/admin/position-object-types', data),
 };

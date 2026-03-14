@@ -37,12 +37,20 @@ public class UserController {
         m.put("menus", userMenus);
         m.put("hasCustomMenus", !jdbc.queryForList("SELECT 1 FROM user_menu_permission WHERE user_id = ? LIMIT 1", userId).isEmpty());
 
-        // 可见的外部对象类型：根据主岗位+辅助岗位汇总
-        List<String> objectTypes = jdbc.queryForList(
-            "SELECT DISTINCT object_type FROM position_object_type WHERE position_id IN " +
-            "(SELECT ? UNION SELECT position_id FROM user_position WHERE user_id = ?)",
-            String.class, u.getPrimaryPositionId(), userId);
+        // 可见的外部对象类型：优先个人配置，否则走岗位汇总
+        List<String> userObjTypes = jdbc.queryForList(
+            "SELECT object_type FROM user_object_type WHERE user_id = ? ORDER BY object_type", String.class, userId);
+        List<String> objectTypes;
+        if (!userObjTypes.isEmpty()) {
+            objectTypes = userObjTypes;
+        } else {
+            objectTypes = jdbc.queryForList(
+                "SELECT DISTINCT object_type FROM position_object_type WHERE position_id IN " +
+                "(SELECT ? UNION SELECT position_id FROM user_position WHERE user_id = ?)",
+                String.class, u.getPrimaryPositionId(), userId);
+        }
         m.put("objectTypes", objectTypes);
+        m.put("hasCustomObjectTypes", !userObjTypes.isEmpty());
 
         return ApiResponse.ok(m);
     }

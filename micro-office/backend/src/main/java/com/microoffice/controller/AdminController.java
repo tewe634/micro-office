@@ -65,6 +65,28 @@ public class AdminController {
         return ApiResponse.ok(null);
     }
 
+    // --- 用户个人对象类型权限 ---
+    @GetMapping("/user-object-types/{userId}")
+    public ApiResponse<List<String>> getUserObjectTypes(@PathVariable Integer userId) {
+        return ApiResponse.ok(jdbc.queryForList(
+            "SELECT object_type FROM user_object_type WHERE user_id = ? ORDER BY object_type", String.class, userId));
+    }
+
+    @PutMapping("/user-object-types/{userId}")
+    public ApiResponse<Void> saveUserObjectTypes(@PathVariable Integer userId, @RequestBody List<String> types) {
+        jdbc.update("DELETE FROM user_object_type WHERE user_id = ?", userId);
+        for (String t : types) {
+            jdbc.update("INSERT INTO user_object_type (user_id, object_type) VALUES (?, ?)", userId, t);
+        }
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/user-object-types/{userId}")
+    public ApiResponse<Void> resetUserObjectTypes(@PathVariable Integer userId) {
+        jdbc.update("DELETE FROM user_object_type WHERE user_id = ?", userId);
+        return ApiResponse.ok(null);
+    }
+
     // --- 岗位-对象类型权限 ---
     @GetMapping("/position-object-types")
     public ApiResponse<Map<Integer, List<String>>> listPositionObjectTypes() {
