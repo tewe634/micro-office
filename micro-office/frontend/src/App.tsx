@@ -3,6 +3,7 @@ import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
+import PortalPage from './pages/portal/PortalPage';
 import WorkbenchPage from './pages/workbench/WorkbenchPage';
 import ThreadListPage from './pages/thread/ThreadListPage';
 import ThreadDetailPage from './pages/thread/ThreadDetailPage';
@@ -15,16 +16,12 @@ import ClockPage from './pages/clock/ClockPage';
 import AdminModulePage from './pages/admin/AdminModulePage';
 import AdminTemplatePage from './pages/admin/AdminTemplatePage';
 import AdminPermissionPage from './pages/admin/AdminPermissionPage';
+import DashboardPage from './pages/dashboard/DashboardPage';
 import { useAuthStore } from './store/auth';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore(s => s.token);
   return token ? <>{children}</> : <Navigate to="/login" />;
-}
-
-function RoleRoute({ children, roles }: { children: React.ReactNode; roles: string[] }) {
-  const role = useAuthStore(s => s.role);
-  return roles.includes(role || '') ? <>{children}</> : <Navigate to="/workbench" />;
 }
 
 export default function App() {
@@ -34,20 +31,22 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
-            <Route index element={<Navigate to="/workbench" />} />
+            <Route index element={<Navigate to="/portal" />} />
+            <Route path="portal" element={<PortalPage />} />
             <Route path="workbench" element={<WorkbenchPage />} />
             <Route path="threads" element={<ThreadListPage />} />
             <Route path="threads/:id" element={<ThreadDetailPage />} />
-            <Route path="org" element={<RoleRoute roles={['ADMIN','HR']}><OrgPage /></RoleRoute>} />
-            <Route path="users" element={<RoleRoute roles={['ADMIN','HR']}><UserPage /></RoleRoute>} />
-            <Route path="objects" element={<RoleRoute roles={['ADMIN','SALES','PURCHASE','FINANCE']}><ObjectPage /></RoleRoute>} />
+            <Route path="org" element={<OrgPage />} />
+            <Route path="users" element={<UserPage />} />
+            <Route path="objects" element={<ObjectPage />} />
             <Route path="products" element={<ProductPage />} />
             <Route path="taskpool" element={<TaskPoolPage />} />
             <Route path="clock" element={<ClockPage />} />
             <Route path="admin" element={<Navigate to="/admin/permissions" />} />
-            <Route path="admin/permissions" element={<RoleRoute roles={['ADMIN']}><AdminPermissionPage /></RoleRoute>} />
-            <Route path="admin/modules" element={<RoleRoute roles={['ADMIN']}><AdminModulePage /></RoleRoute>} />
-            <Route path="admin/templates" element={<RoleRoute roles={['ADMIN']}><AdminTemplatePage /></RoleRoute>} />
+            <Route path="admin/permissions" element={<AdminPermissionPage />} />
+            <Route path="admin/modules" element={<AdminModulePage />} />
+            <Route path="admin/templates" element={<AdminTemplatePage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

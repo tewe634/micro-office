@@ -1,6 +1,6 @@
 import { Layout, Menu } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { HomeOutlined, AppstoreOutlined, TeamOutlined, UserOutlined, ContactsOutlined, ShoppingOutlined, InboxOutlined, ClockCircleOutlined, SettingOutlined } from '@ant-design/icons';
+import { HomeOutlined, AppstoreOutlined, TeamOutlined, UserOutlined, ContactsOutlined, ShoppingOutlined, InboxOutlined, ClockCircleOutlined, SettingOutlined, IdcardOutlined, BarChartOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../store/auth';
 import { useEffect, useState } from 'react';
 import { userApi } from '../api';
@@ -8,6 +8,7 @@ import { userApi } from '../api';
 const { Header, Sider, Content } = Layout;
 
 const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
+  '/portal': { icon: <IdcardOutlined />, label: '个人门户' },
   '/workbench': { icon: <HomeOutlined />, label: '工作台' },
   '/threads': { icon: <AppstoreOutlined />, label: '工作列表' },
   '/taskpool': { icon: <InboxOutlined />, label: '任务池' },
@@ -16,7 +17,11 @@ const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
   '/objects': { icon: <ContactsOutlined />, label: '外部对象' },
   '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
   '/clock': { icon: <ClockCircleOutlined />, label: '打卡' },
+  '/dashboard': { icon: <BarChartOutlined />, label: '数据汇总' },
 };
+
+// 菜单顺序
+const menuOrder = ['/portal', '/workbench', '/threads', '/taskpool', '/org', '/users', '/objects', '/products', '/clock', '/dashboard'];
 
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
@@ -41,11 +46,10 @@ export default function MainLayout() {
     });
   }, []);
 
-  const menuItems = Object.entries(menuDefs)
-    .filter(([key]) => allowedMenus.includes(key))
-    .map(([key, def]) => ({ key, icon: def.icon, label: def.label }));
+  const menuItems = menuOrder
+    .filter(key => allowedMenus.includes(key) && menuDefs[key])
+    .map(key => ({ key, icon: menuDefs[key].icon, label: menuDefs[key].label }));
 
-  // 系统管理作为子菜单
   if (allowedMenus.includes('/admin')) {
     menuItems.push({
       key: '/admin',

@@ -36,8 +36,11 @@ export const productApi = {
 };
 
 export const threadApi = {
+  list: (status?: string) => api.get('/threads', { params: { status } }),
   create: (data: any) => api.post('/threads', data),
   get: (id: number) => api.get(`/threads/${id}`),
+  update: (id: number, data: any) => api.put(`/threads/${id}`, data),
+  delete: (id: number) => api.delete(`/threads/${id}`),
 };
 
 export const nodeApi = {
@@ -50,6 +53,8 @@ export const nodeApi = {
 export const commentApi = {
   list: (threadId: number) => api.get(`/threads/${threadId}/comments`),
   create: (threadId: number, content: string) => api.post(`/threads/${threadId}/comments`, { content }),
+  update: (id: number, content: string) => api.put(`/comments/${id}`, { content }),
+  delete: (id: number) => api.delete(`/comments/${id}`),
 };
 
 export const taskpoolApi = {
@@ -64,6 +69,7 @@ export const workbenchApi = {
 export const clockApi = {
   punch: (type: string) => api.post('/clock/punch', { type }),
   today: () => api.get('/clock/today'),
+  history: (userId?: number, days?: number) => api.get('/clock/history', { params: { userId, days } }),
 };
 
 export const userApi = {
@@ -95,4 +101,16 @@ export const adminApi = {
   resetUserObjectTypes: (userId: number) => api.delete(`/admin/user-object-types/${userId}`),
   getPositionObjectTypes: () => api.get('/admin/position-object-types'),
   savePositionObjectTypes: (data: Record<string, string[]>) => api.put('/admin/position-object-types', data),
+};
+
+export const portalApi = {
+  get: () => api.get('/portal'),
+  addAchievement: (data: any) => api.post('/portal/achievements', data),
+  updateAchievement: (id: number, data: any) => api.put(`/portal/achievements/${id}`, data),
+  deleteAchievement: (id: number) => api.delete(`/portal/achievements/${id}`),
+};
+
+export const dashboardApi = {
+  time: (period: string) => api.get('/dashboard/time', { params: { period } }),
+  org: (scope: string, orgId?: number) => api.get('/dashboard/org', { params: { scope, orgId } }),
 };

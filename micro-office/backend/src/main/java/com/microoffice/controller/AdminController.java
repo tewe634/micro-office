@@ -141,6 +141,26 @@ public class AdminController {
         node.setTemplateId(id); return ApiResponse.ok(templateService.addNode(node));
     }
 
+    @PutMapping("/template-nodes/{nodeId}")
+    public ApiResponse<Void> updateTemplateNode(@PathVariable Integer nodeId, @RequestBody Map<String, Object> body) {
+        jdbc.update("UPDATE template_node SET name = ?, sort_order = ?, type = ?::node_type WHERE id = ?",
+            body.get("name"), body.get("sortOrder"), body.get("type"), nodeId);
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/template-nodes/{nodeId}")
+    public ApiResponse<Void> deleteTemplateNode(@PathVariable Integer nodeId) {
+        jdbc.update("DELETE FROM template_node WHERE id = ?", nodeId);
+        return ApiResponse.ok(null);
+    }
+
+    @PutMapping("/templates/{id}")
+    public ApiResponse<Void> updateTemplate(@PathVariable Integer id, @RequestBody Map<String, Object> body) {
+        jdbc.update("UPDATE workflow_template SET name = ?, description = ?, updated_at = NOW() WHERE id = ?",
+            body.get("name"), body.get("description"), id);
+        return ApiResponse.ok(null);
+    }
+
     @DeleteMapping("/templates/{id}")
     public ApiResponse<Void> deleteTemplate(@PathVariable Integer id) { templateService.delete(id); return ApiResponse.ok(null); }
 }
