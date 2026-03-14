@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Timeline, Tag, Input, Button, List, Modal, Space, message, Select, Descriptions, Popconfirm, Drawer, Form } from 'antd';
-import { LockOutlined, MessageOutlined, LinkOutlined, SendOutlined, SwapOutlined, CheckCircleOutlined, StopOutlined, FlagOutlined } from '@ant-design/icons';
+import { LockOutlined, MessageOutlined, LinkOutlined, SendOutlined, SwapOutlined, CheckCircleOutlined, StopOutlined, FlagOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { threadApi, nodeApi, userApi, objectApi, productApi } from '../../api';
 
 const statusMap: Record<string, { color: string; text: string }> = {
@@ -137,7 +137,7 @@ export default function ThreadDetailPage() {
   return (
     <Row gutter={24}>
       <Col span={16}>
-        <Card title={thread.title} extra={<Space>
+        <Card title={<Space><Button icon={<ArrowLeftOutlined />} type="text" onClick={() => nav('/workbench')} />  {thread.title}</Space>} extra={<Space>
           <Tag color={statusMap[thread.status]?.color}>{statusMap[thread.status]?.text || thread.status}</Tag>
           {isActive && (
             <Popconfirm title="确认取消此工作流？" onConfirm={async () => { await threadApi.update(Number(id), { status: 'CANCELLED' }); message.success('已取消'); load(); }}>

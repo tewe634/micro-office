@@ -36,10 +36,16 @@ export default function MainLayout() {
   const storedMenus = useAuthStore(s => s.menus);
   const [allowedMenus, setAllowedMenus] = useState<string[]>(storedMenus);
 
+  // 基础模块所有人都有
+  const baseMenus = ['/portal', '/workbench', '/clock', '/dashboard'];
+
   useEffect(() => {
     userApi.me().then((r: any) => {
       if (r.data?.role) setRole(r.data.role);
-      if (r.data?.menus) { setMenus(r.data.menus); setAllowedMenus(r.data.menus); }
+      if (r.data?.menus) {
+        const merged = [...new Set([...baseMenus, ...r.data.menus])];
+        setMenus(merged); setAllowedMenus(merged);
+      }
     });
   }, []);
 

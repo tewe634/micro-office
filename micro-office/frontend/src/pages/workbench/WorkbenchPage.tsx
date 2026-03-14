@@ -8,7 +8,7 @@ const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green'
 const statusLabel: Record<string, string> = { ACTIVE: '进行中', COMPLETED: '已完成', CANCELLED: '已取消', IN_PROGRESS: '进行中', PENDING_NEXT: '待处理' };
 
 export default function WorkbenchPage() {
-  const [data, setData] = useState<any>({ threads: [], todoNodes: [] });
+  const [data, setData] = useState<any>({ threads: [], todoNodes: [], counts: {} });
   const [view, setView] = useState('todo');
   const [modal, setModal] = useState(false);
   const [form] = Form.useForm();
@@ -31,7 +31,7 @@ export default function WorkbenchPage() {
       setObjects(o.data || []);
       setProducts(p.data || []);
       setTemplates(t.data || []);
-    } catch { /* ignore if no permission */ }
+    } catch { /* ignore */ }
     setModal(true);
   };
 
@@ -42,16 +42,17 @@ export default function WorkbenchPage() {
     load();
   };
 
+  const c = data.counts || {};
+
   return (
     <Card title="工作台" extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建工作流</Button>}>
       <Tabs activeKey={view} onChange={v => { setView(v); load(v); }} items={[
-        { key: 'todo', label: <Badge count={data.todoNodes?.length} size="small" offset={[8, 0]}>待办</Badge> },
-        { key: 'active', label: '进行中' },
-        { key: 'completed', label: '已完成' },
-        { key: 'cancelled', label: '已取消' },
+        { key: 'todo', label: <Badge count={c.todo} size="small" offset={[8, 0]}>待办</Badge> },
+        { key: 'active', label: <Badge count={c.active} size="small" offset={[8, 0]} color="blue">进行中</Badge> },
+        { key: 'completed', label: <Badge count={c.completed} size="small" offset={[8, 0]} color="green">已完成</Badge> },
+        { key: 'cancelled', label: <Badge count={c.cancelled} size="small" offset={[8, 0]} color="gray">已取消</Badge> },
       ]} />
 
-      {/* 待办节点 */}
       {view === 'todo' && (
         <List dataSource={data.todoNodes} locale={{ emptyText: '暂无待办' }} renderItem={(item: any) => (
           <List.Item actions={[<Button type="link" onClick={() => nav(`/threads/${item.thread_id}`)}>处理</Button>]}>
@@ -61,8 +62,7 @@ export default function WorkbenchPage() {
         )} />
       )}
 
-      {/* 工作流列表 */}
-      {view !== 'todo' && <List dataSource={data.threads} renderItem={(item: any) => (
+      {view !== 'todo' && <List dataSource={data.threads} locale={{ emptyText: '暂无数据' }} renderItem={(item: any) => (
         <List.Item actions={[<Button type="link" onClick={() => nav(`/threads/${item.id}`)}>查看</Button>]}>
           <List.Item.Meta
             title={<>{item.title} {item.object_name && <Tag color="orange">{item.object_name}</Tag>}</>}
