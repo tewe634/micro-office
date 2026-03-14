@@ -1,43 +1,93 @@
 import { useEffect, useState } from 'react';
-import { Tabs, List, Tag, Button, Card } from 'antd';
+import { Tabs, List, Tag, Button, Card, Modal, Form, Input, Select, Badge, message } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { workbenchApi } from '../../api';
+import { workbenchApi, threadApi, objectApi, productApi, adminApi } from '../../api';
+
+const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green', CANCELLED: 'default', IN_PROGRESS: 'processing', PENDING_NEXT: 'warning' };
+const statusLabel: Record<string, string> = { ACTIVE: '进行中', COMPLETED: '已完成', CANCELLED: '已取消', IN_PROGRESS: '进行中', PENDING_NEXT: '待处理' };
 
 export default function WorkbenchPage() {
-  const [activeData, setActiveData] = useState<any[]>([]);
-  const [doneData, setDoneData] = useState<any[]>([]);
-  const [todoData, setTodoData] = useState<any[]>([]);
+  const [data, setData] = useState<any>({ threads: [], todoNodes: [] });
+  const [view, setView] = useState('todo');
+  const [modal, setModal] = useState(false);
+  const [form] = Form.useForm();
+  const [objects, setObjects] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const nav = useNavigate();
 
-  const load = async (view: string, setter: Function) => {
-    const res: any = await workbenchApi.get(view);
-    setter(res.data.threads || res.data.nodes || []);
+  const load = async (v?: string) => {
+    const res: any = await workbenchApi.get(v || view);
+    setData(res.data);
   };
 
-  useEffect(() => { load('active', setActiveData); }, []);
+  useEffect(() => { load(); }, []);
 
-  const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green', IN_PROGRESS: 'processing', PENDING_NEXT: 'warning' };
+  const openCreate = async () => {
+    form.resetFields();
+    try {
+      const [o, p, t]: any[] = await Promise.all([objectApi.list(), productApi.list(), adminApi.listTemplates()]);
+      setObjects(o.data || []);
+      setProducts(p.data || []);
+      setTemplates(t.data || []);
+    } catch { /* ignore if no permission */ }
+    setModal(true);
+  };
 
-  const renderList = (data: any[], isNode = false) => (
-    <List dataSource={data} renderItem={(item: any) => (
-      <List.Item actions={[<Button type="link" onClick={() => nav(isNode ? `/threads/${item.threadId}` : `/threads/${item.id}`)}>查看</Button>]}>
-        <List.Item.Meta title={isNode ? item.name : item.title} description={isNode ? `负责人ID: ${item.ownerId}` : `创建时间: ${item.createdAt}`} />
-        <Tag color={statusColor[item.status]}>{item.status}</Tag>
-      </List.Item>
-    )} />
-  );
+  const createThread = async (values: any) => {
+    await threadApi.create(values);
+    message.success('工作流创建成功');
+    setModal(false);
+    load();
+  };
 
   return (
-    <Card title="工作台">
-      <Tabs items={[
-        { key: 'active', label: '进行中工作', children: renderList(activeData) },
-        { key: 'done', label: '已完成工作', children: renderList(doneData) },
-        { key: 'todo', label: '待办工作', children: renderList(todoData, true) },
-      ]} onChange={key => {
-        if (key === 'active') load('active', setActiveData);
-        if (key === 'done') load('done', setDoneData);
-        if (key === 'todo') load('todo', setTodoData);
-      }} />
+    <Card title="工作台" extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建工作流</Button>}>
+      <Tabs activeKey={view} onChange={v => { setView(v); load(v); }} items={[
+        { key: 'todo', label: <Badge count={data.todoNodes?.length} size="small" offset={[8, 0]}>待办</Badge> },
+        { key: 'active', label: '进行中' },
+        { key: 'completed', label: '已完成' },
+        { key: 'cancelled', label: '已取消' },
+      ]} />
+
+      {/* 待办节点 */}
+      {view === 'todo' && (
+        <List dataSource={data.todoNodes} locale={{ emptyText: '暂无待办' }} renderItem={(item: any) => (
+          <List.Item actions={[<Button type="link" onClick={() => nav(`/threads/${item.thread_id}`)}>处理</Button>]}>
+            <List.Item.Meta title={<><Tag color={statusColor[item.status]}>{statusLabel[item.status]}</Tag> {item.name}</>}
+              description={item.thread_title} />
+          </List.Item>
+        )} />
+      )}
+
+      {/* 工作流列表 */}
+      {view !== 'todo' && <List dataSource={data.threads} renderItem={(item: any) => (
+        <List.Item actions={[<Button type="link" onClick={() => nav(`/threads/${item.id}`)}>查看</Button>]}>
+          <List.Item.Meta
+            title={<>{item.title} {item.object_name && <Tag color="orange">{item.object_name}</Tag>}</>}
+            description={`${item.creator_name} · ${new Date(item.created_at).toLocaleString('zh-CN')}`} />
+          <Tag color={statusColor[item.status]}>{statusLabel[item.status]}</Tag>
+        </List.Item>
+      )} />}
+
+      <Modal title="新建工作流" open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={500}>
+        <Form form={form} onFinish={createThread} layout="vertical">
+          <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="content" label="描述"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="templateId" label="流程模板">
+            <Select allowClear placeholder="选择模板" options={templates.map(t => ({ value: t.id, label: t.name }))} />
+          </Form.Item>
+          <Form.Item name="objectId" label="关联外部对象">
+            <Select allowClear showSearch optionFilterProp="label" placeholder="选择对象"
+              options={objects.map(o => ({ value: o.id, label: `[${o.type}] ${o.name}` }))} />
+          </Form.Item>
+          <Form.Item name="productId" label="关联产品">
+            <Select allowClear showSearch optionFilterProp="label" placeholder="选择产品"
+              options={products.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Card>
   );
 }

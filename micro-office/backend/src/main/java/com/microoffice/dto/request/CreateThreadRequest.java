@@ -10,4 +10,5 @@ public class CreateThreadRequest {
     private String content;
     private Integer objectId;
     private Integer templateId;
+    private Integer productId;
 }

@@ -16,6 +16,7 @@ public class WorkThread {
     private Integer creatorId;
     private Integer objectId;
     private Integer templateId;
+    private Integer productId;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

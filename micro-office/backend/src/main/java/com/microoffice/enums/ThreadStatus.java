@@ -1,5 +1,5 @@
 package com.microoffice.enums;
 
 public enum ThreadStatus {
-    ACTIVE, COMPLETED, ARCHIVED
+    ACTIVE, COMPLETED, ARCHIVED, CANCELLED
 }

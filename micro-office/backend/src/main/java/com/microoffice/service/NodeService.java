@@ -46,6 +46,11 @@ public class NodeService {
         return node;
     }
 
+    /** 获取单个节点 */
+    public WorkNode getById(Integer id) {
+        return nodeMapper.selectById(id);
+    }
+
     /** 获取工作下所有节点 */
     public List<WorkNode> listByThread(Integer threadId) {
         return nodeMapper.selectList(new LambdaQueryWrapper<WorkNode>()

@@ -23,6 +23,7 @@ public class ThreadService {
         t.setCreatorId(creatorId);
         t.setObjectId(req.getObjectId());
         t.setTemplateId(req.getTemplateId());
+        t.setProductId(req.getProductId());
         threadMapper.insert(t);
         return t;
     }

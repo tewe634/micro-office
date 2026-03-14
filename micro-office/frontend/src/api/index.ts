@@ -36,7 +36,7 @@ export const productApi = {
 };
 
 export const threadApi = {
-  list: (status?: string) => api.get('/threads', { params: { status } }),
+  list: (status?: string, objectId?: number) => api.get('/threads', { params: { status, objectId } }),
   create: (data: any) => api.post('/threads', data),
   get: (id: number) => api.get(`/threads/${id}`),
   update: (id: number, data: any) => api.put(`/threads/${id}`, data),
@@ -46,8 +46,15 @@ export const threadApi = {
 export const nodeApi = {
   list: (threadId: number) => api.get(`/threads/${threadId}/nodes`),
   create: (threadId: number, data: any) => api.post(`/threads/${threadId}/nodes`, data),
+  get: (id: number) => api.get(`/nodes/${id}`),
+  assign: (id: number, assigneeId: number) => api.put(`/nodes/${id}/assign`, { assigneeId }),
   complete: (id: number, data: any) => api.put(`/nodes/${id}/complete`, data),
+  cancel: (id: number) => api.put(`/nodes/${id}/cancel`),
   rollback: (id: number, targetNodeId: number) => api.put(`/nodes/${id}/rollback`, null, { params: { targetNodeId } }),
+  messages: (id: number) => api.get(`/nodes/${id}/messages`),
+  addMessage: (id: number, data: any) => api.post(`/nodes/${id}/messages`, data),
+  addReference: (id: number, data: any) => api.post(`/nodes/${id}/references`, data),
+  removeReference: (id: number, refId: number) => api.delete(`/nodes/${id}/references/${refId}`),
 };
 
 export const commentApi = {
@@ -55,11 +62,6 @@ export const commentApi = {
   create: (threadId: number, content: string) => api.post(`/threads/${threadId}/comments`, { content }),
   update: (id: number, content: string) => api.put(`/comments/${id}`, { content }),
   delete: (id: number) => api.delete(`/comments/${id}`),
-};
-
-export const taskpoolApi = {
-  list: (positionId: number) => api.get('/taskpool', { params: { positionId } }),
-  claim: (nodeId: number) => api.post(`/taskpool/${nodeId}/claim`),
 };
 
 export const workbenchApi = {
