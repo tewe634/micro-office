@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Tabs, Row, Col, Statistic, Table, Tag, Space } from 'antd';
-import { BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { BarChartOutlined } from '@ant-design/icons';
 import { dashboardApi } from '../../api';
 
 const periodOpts = [
@@ -11,51 +11,7 @@ const periodOpts = [
 ];
 const typeMap: Record<string, string> = { CUSTOMER: '客户', SUPPLIER: '供应商', BANK: '银行', CARRIER: '承运商', THIRD_PARTY_PAY: '第三方支付', OTHER: '其他' };
 
-function PeriodTags({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <Space>
-      {periodOpts.map(o => (
-        <Tag key={o.value} color={value === o.value ? 'blue' : 'default'}
-          style={{ cursor: 'pointer' }} onClick={() => onChange(o.value)}>{o.label}</Tag>
-      ))}
-    </Space>
-  );
-}
-
-function TimeSummary() {
-  const [period, setPeriod] = useState('today');
-  const [data, setData] = useState<any>(null);
-  useEffect(() => { dashboardApi.time(period).then((r: any) => setData(r.data)); }, [period]);
-
-  return (
-    <>
-      <div style={{ marginBottom: 16 }}><PeriodTags value={period} onChange={setPeriod} /></div>
-      {data && (
-        <>
-          <Row gutter={16}>
-            <Col span={6}><Card><Statistic title="创建工作" value={data.threadsCreated} /></Card></Col>
-            <Col span={6}><Card><Statistic title="完成工作" value={data.threadsCompleted} valueStyle={{ color: '#3f8600' }} /></Card></Col>
-            <Col span={6}><Card><Statistic title="完成节点" value={data.nodesCompleted} /></Card></Col>
-            <Col span={6}><Card><Statistic title="评论数" value={data.commentsCount} /></Card></Col>
-          </Row>
-          {data.clockRecords?.length > 0 && (
-            <Card title={<><ClockCircleOutlined /> 打卡记录</>} size="small" style={{ marginTop: 16 }}>
-              <Space wrap>
-                {data.clockRecords.map((r: any, i: number) => (
-                  <Tag key={i} color={r.type === 'CLOCK_IN' ? 'green' : 'red'}>
-                    {r.type === 'CLOCK_IN' ? '上班' : '下班'} {new Date(r.clock_time).toLocaleTimeString('zh-CN')}
-                  </Tag>
-                ))}
-              </Space>
-            </Card>
-          )}
-        </>
-      )}
-    </>
-  );
-}
-
-function OrgSummary() {
+export default function DashboardPage() {
   const [scopes, setScopes] = useState<any[]>([]);
   const [activeScope, setActiveScope] = useState<any>(null);
   const [period, setPeriod] = useState('today');
@@ -84,13 +40,20 @@ function OrgSummary() {
   ];
 
   return (
-    <>
+    <Card title={<><BarChartOutlined /> 数据汇总</>}>
       {scopes.length > 0 && (
         <Tabs activeKey={activeScope?.key + (activeScope?.orgId || '')}
           onChange={k => setActiveScope(scopes.find(s => s.key + (s.orgId || '') === k))}
           items={scopes.map(s => ({ key: s.key + (s.orgId || ''), label: s.label }))} />
       )}
-      <div style={{ marginBottom: 16 }}><PeriodTags value={period} onChange={setPeriod} /></div>
+      <div style={{ marginBottom: 16 }}>
+        <Space>
+          {periodOpts.map(o => (
+            <Tag key={o.value} color={period === o.value ? 'blue' : 'default'}
+              style={{ cursor: 'pointer' }} onClick={() => setPeriod(o.value)}>{o.label}</Tag>
+          ))}
+        </Space>
+      </div>
       {data && (
         <>
           <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -107,17 +70,6 @@ function OrgSummary() {
           )}
         </>
       )}
-    </>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <Card title={<><BarChartOutlined /> 数据汇总</>}>
-      <Tabs items={[
-        { key: 'time', label: '时间维度', children: <TimeSummary /> },
-        { key: 'org', label: '组织维度', children: <OrgSummary /> },
-      ]} />
     </Card>
   );
 }
