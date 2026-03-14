@@ -16,6 +16,8 @@ public class ExternalObject {
     private String phone;
     private String address;
     private String remark;
+    private Integer orgId;
+    private Integer ownerId;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

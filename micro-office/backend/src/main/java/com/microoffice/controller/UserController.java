@@ -25,11 +25,25 @@ public class UserController {
         if (u == null) throw new RuntimeException("用户不存在");
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", u.getId()); m.put("name", u.getName()); m.put("email", u.getEmail());
-        m.put("role", u.getRole());
-        // 查询该角色的菜单权限
-        List<String> menus = jdbc.queryForList(
-            "SELECT menu_key FROM role_menu_permission WHERE role = ? ORDER BY menu_key", String.class, u.getRole());
-        m.put("menus", menus);
+        m.put("role", u.getRole()); m.put("orgId", u.getOrgId()); m.put("primaryPositionId", u.getPrimaryPositionId());
+
+        // 菜单权限：优先个人配置，否则走角色默认
+        List<String> userMenus = jdbc.queryForList(
+            "SELECT menu_key FROM user_menu_permission WHERE user_id = ? ORDER BY menu_key", String.class, userId);
+        if (userMenus.isEmpty()) {
+            userMenus = jdbc.queryForList(
+                "SELECT menu_key FROM role_menu_permission WHERE role = ? ORDER BY menu_key", String.class, u.getRole());
+        }
+        m.put("menus", userMenus);
+        m.put("hasCustomMenus", !jdbc.queryForList("SELECT 1 FROM user_menu_permission WHERE user_id = ? LIMIT 1", userId).isEmpty());
+
+        // 可见的外部对象类型：根据主岗位+辅助岗位汇总
+        List<String> objectTypes = jdbc.queryForList(
+            "SELECT DISTINCT object_type FROM position_object_type WHERE position_id IN " +
+            "(SELECT ? UNION SELECT position_id FROM user_position WHERE user_id = ?)",
+            String.class, u.getPrimaryPositionId(), userId);
+        m.put("objectTypes", objectTypes);
+
         return ApiResponse.ok(m);
     }
 

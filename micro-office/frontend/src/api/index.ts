@@ -87,4 +87,9 @@ export const adminApi = {
   deleteTemplate: (id: number) => api.delete(`/admin/templates/${id}`),
   getPermissions: () => api.get('/admin/permissions'),
   savePermissions: (data: Record<string, string[]>) => api.put('/admin/permissions', data),
+  getUserMenus: (userId: number) => api.get(`/admin/user-permissions/${userId}`),
+  saveUserMenus: (userId: number, menus: string[]) => api.put(`/admin/user-permissions/${userId}`, menus),
+  resetUserMenus: (userId: number) => api.delete(`/admin/user-permissions/${userId}`),
+  getPositionObjectTypes: () => api.get('/admin/position-object-types'),
+  savePositionObjectTypes: (data: Record<string, string[]>) => api.put('/admin/position-object-types', data),
 };

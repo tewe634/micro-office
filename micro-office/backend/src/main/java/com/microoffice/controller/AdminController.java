@@ -42,6 +42,53 @@ public class AdminController {
         return ApiResponse.ok(null);
     }
 
+    // --- 用户个人菜单权限 ---
+    @GetMapping("/user-permissions/{userId}")
+    public ApiResponse<List<String>> getUserMenus(@PathVariable Integer userId) {
+        List<String> menus = jdbc.queryForList(
+            "SELECT menu_key FROM user_menu_permission WHERE user_id = ? ORDER BY menu_key", String.class, userId);
+        return ApiResponse.ok(menus);
+    }
+
+    @PutMapping("/user-permissions/{userId}")
+    public ApiResponse<Void> saveUserMenus(@PathVariable Integer userId, @RequestBody List<String> menuKeys) {
+        jdbc.update("DELETE FROM user_menu_permission WHERE user_id = ?", userId);
+        for (String key : menuKeys) {
+            jdbc.update("INSERT INTO user_menu_permission (user_id, menu_key) VALUES (?, ?)", userId, key);
+        }
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/user-permissions/{userId}")
+    public ApiResponse<Void> resetUserMenus(@PathVariable Integer userId) {
+        jdbc.update("DELETE FROM user_menu_permission WHERE user_id = ?", userId);
+        return ApiResponse.ok(null);
+    }
+
+    // --- 岗位-对象类型权限 ---
+    @GetMapping("/position-object-types")
+    public ApiResponse<Map<Integer, List<String>>> listPositionObjectTypes() {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT position_id, object_type FROM position_object_type ORDER BY position_id");
+        Map<Integer, List<String>> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            Integer posId = (Integer) row.get("position_id");
+            result.computeIfAbsent(posId, k -> new ArrayList<>()).add((String) row.get("object_type"));
+        }
+        return ApiResponse.ok(result);
+    }
+
+    @PutMapping("/position-object-types")
+    public ApiResponse<Void> savePositionObjectTypes(@RequestBody Map<String, List<String>> data) {
+        jdbc.update("DELETE FROM position_object_type");
+        for (Map.Entry<String, List<String>> entry : data.entrySet()) {
+            int posId = Integer.parseInt(entry.getKey());
+            for (String type : entry.getValue()) {
+                jdbc.update("INSERT INTO position_object_type (position_id, object_type) VALUES (?, ?)", posId, type);
+            }
+        }
+        return ApiResponse.ok(null);
+    }
+
     // --- 模块配置 ---
     @GetMapping("/modules")
     public ApiResponse<List<ModuleConfig>> listModules() { return ApiResponse.ok(moduleConfigService.list()); }

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Checkbox, Button, message, Tag } from 'antd';
-import { adminApi } from '../../api';
+import { Card, Table, Checkbox, Button, message, Tag, Tabs, Select, Space } from 'antd';
+import { adminApi, userApi, orgApi, positionApi } from '../../api';
 
 const roles = [
-  { key: 'ADMIN', label: '管理员' },
-  { key: 'HR', label: '人事' },
-  { key: 'SALES', label: '销售' },
-  { key: 'PURCHASE', label: '采购' },
-  { key: 'FINANCE', label: '财务' },
-  { key: 'STAFF', label: '普通员工' },
+  { key: 'ADMIN', label: '管理员', color: 'red' },
+  { key: 'HR', label: '人事', color: 'purple' },
+  { key: 'SALES', label: '销售', color: 'cyan' },
+  { key: 'PURCHASE', label: '采购', color: 'geekblue' },
+  { key: 'FINANCE', label: '财务', color: 'gold' },
+  { key: 'STAFF', label: '普通员工', color: 'default' },
 ];
 
 const menus = [
@@ -23,14 +23,21 @@ const menus = [
   { key: '/admin', label: '系统管理' },
 ];
 
-export default function AdminPermissionPage() {
+const objectTypes = [
+  { key: 'CUSTOMER', label: '客户' },
+  { key: 'SUPPLIER', label: '供应商' },
+  { key: 'CARRIER', label: '承运商' },
+  { key: 'BANK', label: '银行' },
+  { key: 'THIRD_PARTY_PAY', label: '第三方支付' },
+  { key: 'OTHER', label: '其他' },
+];
+
+// ========== Tab 1: 角色权限 ==========
+function RolePermTab() {
   const [perms, setPerms] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    const r: any = await adminApi.getPermissions();
-    setPerms(r.data || {});
-  };
+  const load = async () => { const r: any = await adminApi.getPermissions(); setPerms(r.data || {}); };
   useEffect(() => { load(); }, []);
 
   const toggle = (role: string, menuKey: string, checked: boolean) => {
@@ -44,40 +51,184 @@ export default function AdminPermissionPage() {
 
   const save = async () => {
     setLoading(true);
-    try {
-      await adminApi.savePermissions(perms);
-      message.success('权限配置已保存，用户刷新页面后生效');
-    } catch { message.error('保存失败'); }
-    setLoading(false);
+    await adminApi.savePermissions(perms);
+    message.success('角色权限已保存'); setLoading(false);
   };
 
-  const columns = [
-    { title: '功能模块', dataIndex: 'label', width: 120, fixed: 'left' as const },
-    ...roles.map(r => ({
-      title: <Tag color={r.key === 'ADMIN' ? 'red' : 'blue'}>{r.label}</Tag>,
-      dataIndex: r.key,
-      width: 100,
-      align: 'center' as const,
-      render: (_: any, record: any) => (
-        <Checkbox
-          checked={(perms[r.key] || []).includes(record.key)}
-          onChange={e => toggle(r.key, record.key, e.target.checked)}
-        />
-      ),
-    })),
-  ];
+  return (
+    <>
+      <p style={{ color: '#888', marginBottom: 16 }}>配置每个角色默认可见的功能模块。用户如果没有个人权限配置，则使用角色默认权限。</p>
+      <Table dataSource={menus} rowKey="key" pagination={false} bordered size="middle"
+        columns={[
+          { title: '功能模块', dataIndex: 'label', width: 120 },
+          ...roles.map(r => ({
+            title: <Tag color={r.color}>{r.label}</Tag>, width: 100, align: 'center' as const,
+            render: (_: any, record: any) => (
+              <Checkbox checked={(perms[r.key] || []).includes(record.key)}
+                onChange={e => toggle(r.key, record.key, e.target.checked)} />
+            ),
+          })),
+        ]}
+      />
+      <Button type="primary" loading={loading} onClick={save} style={{ marginTop: 16 }}>保存角色权限</Button>
+    </>
+  );
+}
+
+// ========== Tab 2: 人员权限 ==========
+function UserPermTab() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<any[]>([]);
+  const [filterOrg, setFilterOrg] = useState<number>();
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [userMenus, setUserMenus] = useState<string[]>([]);
+  const [hasCustom, setHasCustom] = useState(false);
+  const [rolePerms, setRolePerms] = useState<Record<string, string[]>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    orgApi.list().then((r: any) => setOrgs(r.data || []));
+    adminApi.getPermissions().then((r: any) => setRolePerms(r.data || {}));
+  }, []);
+
+  useEffect(() => { userApi.list(filterOrg).then((r: any) => setUsers(r.data || [])); }, [filterOrg]);
+
+  const selectUser = async (u: any) => {
+    setSelectedUser(u);
+    const r: any = await adminApi.getUserMenus(u.id);
+    const custom = (r.data || []) as string[];
+    if (custom.length > 0) {
+      setUserMenus(custom); setHasCustom(true);
+    } else {
+      setUserMenus(rolePerms[u.role] || []); setHasCustom(false);
+    }
+  };
+
+  const toggleMenu = (key: string, checked: boolean) => {
+    setHasCustom(true);
+    setUserMenus(prev => {
+      const list = [...prev];
+      if (checked && !list.includes(key)) list.push(key);
+      if (!checked) { const i = list.indexOf(key); if (i >= 0) list.splice(i, 1); }
+      return list;
+    });
+  };
+
+  const save = async () => {
+    if (!selectedUser) return;
+    setLoading(true);
+    await adminApi.saveUserMenus(selectedUser.id, userMenus);
+    message.success(`${selectedUser.name} 的个人权限已保存`); setLoading(false);
+  };
+
+  const reset = async () => {
+    if (!selectedUser) return;
+    await adminApi.resetUserMenus(selectedUser.id);
+    setUserMenus(rolePerms[selectedUser.role] || []); setHasCustom(false);
+    message.success(`${selectedUser.name} 已恢复为角色默认权限`);
+  };
 
   return (
-    <Card title="角色权限配置" extra={<Button type="primary" loading={loading} onClick={save}>保存配置</Button>}>
-      <p style={{ color: '#888', marginBottom: 16 }}>勾选表示该角色可以看到对应的功能模块，保存后用户刷新页面即生效。</p>
-      <Table
-        dataSource={menus}
-        columns={columns}
-        rowKey="key"
-        pagination={false}
-        bordered
-        size="middle"
+    <div style={{ display: 'flex', gap: 24 }}>
+      <div style={{ width: 320 }}>
+        <Select allowClear placeholder="按组织筛选" style={{ width: '100%', marginBottom: 12 }}
+          options={orgs.map(o => ({ value: o.id, label: o.name }))} onChange={v => setFilterOrg(v)} />
+        <Table dataSource={users} rowKey="id" size="small" pagination={{ pageSize: 10 }}
+          onRow={r => ({ onClick: () => selectUser(r), style: { cursor: 'pointer', background: selectedUser?.id === r.id ? '#e6f4ff' : undefined } })}
+          columns={[
+            { title: '姓名', dataIndex: 'name', width: 80 },
+            { title: '角色', dataIndex: 'role', width: 80, render: (v: string) => {
+              const r = roles.find(x => x.key === v);
+              return <Tag color={r?.color}>{r?.label || v}</Tag>;
+            }},
+          ]}
+        />
+      </div>
+      <div style={{ flex: 1 }}>
+        {selectedUser ? (
+          <>
+            <h4>{selectedUser.name} 的模块权限 {hasCustom ? <Tag color="orange">个人定制</Tag> : <Tag>角色默认</Tag>}</h4>
+            <Table dataSource={menus} rowKey="key" pagination={false} bordered size="middle"
+              columns={[
+                { title: '功能模块', dataIndex: 'label', width: 150 },
+                { title: '可见', width: 80, align: 'center', render: (_: any, record: any) => (
+                  <Checkbox checked={userMenus.includes(record.key)} onChange={e => toggleMenu(record.key, e.target.checked)} />
+                )},
+              ]}
+            />
+            <Space style={{ marginTop: 16 }}>
+              <Button type="primary" loading={loading} onClick={save}>保存个人权限</Button>
+              {hasCustom && <Button onClick={reset}>恢复角色默认</Button>}
+            </Space>
+          </>
+        ) : <p style={{ color: '#888', marginTop: 40 }}>← 点击左侧人员查看/编辑其模块权限</p>}
+      </div>
+    </div>
+  );
+}
+
+// ========== Tab 3: 对象类型权限 ==========
+function ObjectTypePermTab() {
+  const [positions, setPositions] = useState<any[]>([]);
+  const [perms, setPerms] = useState<Record<string, string[]>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    positionApi.list().then((r: any) => setPositions(r.data || []));
+    adminApi.getPositionObjectTypes().then((r: any) => {
+      // API 返回 {posId: [types]}，key 是 number，转成 string
+      const data = r.data || {};
+      const mapped: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(data)) mapped[String(k)] = v as string[];
+      setPerms(mapped);
+    });
+  }, []);
+
+  const toggle = (posId: number, type: string, checked: boolean) => {
+    const key = String(posId);
+    setPerms(prev => {
+      const list = [...(prev[key] || [])];
+      if (checked && !list.includes(type)) list.push(type);
+      if (!checked) { const i = list.indexOf(type); if (i >= 0) list.splice(i, 1); }
+      return { ...prev, [key]: list };
+    });
+  };
+
+  const save = async () => {
+    setLoading(true);
+    await adminApi.savePositionObjectTypes(perms);
+    message.success('岗位对象类型权限已保存'); setLoading(false);
+  };
+
+  return (
+    <>
+      <p style={{ color: '#888', marginBottom: 16 }}>配置每个岗位可以查看/管理的外部对象类型。用户根据其主岗位和辅助岗位汇总可见类型。</p>
+      <Table dataSource={positions} rowKey="id" pagination={false} bordered size="middle"
+        columns={[
+          { title: '岗位', width: 120, render: (_: any, r: any) => `${r.name} (${r.code})` },
+          ...objectTypes.map(ot => ({
+            title: ot.label, width: 90, align: 'center' as const,
+            render: (_: any, record: any) => (
+              <Checkbox checked={(perms[String(record.id)] || []).includes(ot.key)}
+                onChange={e => toggle(record.id, ot.key, e.target.checked)} />
+            ),
+          })),
+        ]}
       />
+      <Button type="primary" loading={loading} onClick={save} style={{ marginTop: 16 }}>保存对象类型权限</Button>
+    </>
+  );
+}
+
+// ========== 主页面 ==========
+export default function AdminPermissionPage() {
+  return (
+    <Card title="权限配置">
+      <Tabs items={[
+        { key: 'role', label: '角色模块权限', children: <RolePermTab /> },
+        { key: 'user', label: '人员模块权限', children: <UserPermTab /> },
+        { key: 'object', label: '岗位对象类型', children: <ObjectTypePermTab /> },
+      ]} />
     </Card>
   );
 }
