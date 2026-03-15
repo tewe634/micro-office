@@ -78,11 +78,16 @@ export const clockApi = {
 
 export const userApi = {
   me: () => api.get('/users/me'),
+  lookups: () => api.get('/users/me/lookups'),
   list: (orgId?: number) => api.get('/users', { params: { orgId } }),
   get: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
+};
+
+export const templateApi = {
+  list: () => api.get('/templates'),
 };
 
 export const adminApi = {

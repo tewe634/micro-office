@@ -36,13 +36,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/auth/**").permitAll()
                 // 基础模块: 所有登录用户可访问
-                .requestMatchers("/api/users/me").authenticated()
+                .requestMatchers("/api/users/me", "/api/users/me/**").authenticated()
                 .requestMatchers("/api/portal/**").authenticated()
                 .requestMatchers("/api/workbench/**").authenticated()
                 .requestMatchers("/api/clock/**").authenticated()
                 .requestMatchers("/api/dashboard/**").authenticated()
                 .requestMatchers("/api/threads/**").authenticated()
                 .requestMatchers("/api/nodes/**").authenticated()
+                .requestMatchers("/api/templates/**").authenticated()
                 // 组织架构 + 人员管理: HR 和 ADMIN
                 .requestMatchers("/api/orgs/**").hasAnyRole("HR", "ADMIN")
                 .requestMatchers("/api/users/**").hasAnyRole("HR", "ADMIN")

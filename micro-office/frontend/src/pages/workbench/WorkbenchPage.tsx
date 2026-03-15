@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tabs, List, Tag, Button, Card, Modal, Form, Input, Select, Badge, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { workbenchApi, threadApi, objectApi, productApi, adminApi } from '../../api';
+import { workbenchApi, threadApi, objectApi, productApi, templateApi } from '../../api';
 
 const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green', CANCELLED: 'default', IN_PROGRESS: 'processing', PENDING_NEXT: 'warning' };
 const statusLabel: Record<string, string> = { ACTIVE: '进行中', COMPLETED: '已完成', CANCELLED: '已取消', IN_PROGRESS: '进行中', PENDING_NEXT: '待处理' };
@@ -26,12 +26,10 @@ export default function WorkbenchPage() {
 
   const openCreate = async () => {
     form.resetFields();
-    try {
-      const [o, p, t]: any[] = await Promise.all([objectApi.list(), productApi.list(), adminApi.listTemplates()]);
-      setObjects(o.data || []);
-      setProducts(p.data || []);
-      setTemplates(t.data || []);
-    } catch { /* ignore */ }
+    const [o, p, t] = await Promise.allSettled([objectApi.list(), productApi.list(), templateApi.list()]);
+    setObjects(o.status === 'fulfilled' ? (o.value as any).data || [] : []);
+    setProducts(p.status === 'fulfilled' ? (p.value as any).data || [] : []);
+    setTemplates(t.status === 'fulfilled' ? (t.value as any).data || [] : []);
     setModal(true);
   };
 

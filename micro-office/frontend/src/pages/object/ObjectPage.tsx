@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag } from 'antd';
-import { objectApi, orgApi, userApi } from '../../api';
+import { objectApi, userApi } from '../../api';
 
 const allTypeOptions = [
   { value: 'CUSTOMER', label: '客户' },
@@ -81,15 +81,16 @@ export default function ObjectPage() {
   useEffect(() => {
     userApi.me().then((r: any) => {
       const types = r.data?.objectTypes || [];
-      // ADMIN 角色如果没配岗位对象类型，默认显示全部
       if (types.length === 0 && r.data?.role === 'ADMIN') {
         setObjectTypes(allTypeOptions.map(o => o.value));
       } else {
         setObjectTypes(types);
       }
     });
-    orgApi.list().then((r: any) => setOrgs(r.data || [])).catch(() => {});
-    userApi.list().then((r: any) => setUsers(r.data || [])).catch(() => {});
+    userApi.lookups().then((r: any) => {
+      setOrgs(r.data?.orgs || []);
+      setUsers(r.data?.users || []);
+    }).catch(() => {});
   }, []);
 
   const visibleTypes = allTypeOptions.filter(o => objectTypes.includes(o.value));

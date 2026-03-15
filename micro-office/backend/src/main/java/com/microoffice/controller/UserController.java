@@ -18,6 +18,15 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbc;
 
+    // 公共查询：所有登录用户可用，返回组织和用户的id+name（用于下拉选择）
+    @GetMapping("/me/lookups")
+    public ApiResponse<Map<String, Object>> lookups() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("orgs", jdbc.queryForList("SELECT id, name, parent_id FROM organization ORDER BY sort_order, id"));
+        result.put("users", jdbc.queryForList("SELECT id, name, org_id FROM sys_user ORDER BY id"));
+        return ApiResponse.ok(result);
+    }
+
     @GetMapping("/me")
     public ApiResponse<Map<String, Object>> me() {
         Integer userId = (Integer) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();

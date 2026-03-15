@@ -42,7 +42,7 @@ export default function ThreadDetailPage() {
     setNodes(t.data.nodes || []);
   };
 
-  useEffect(() => { load(); userApi.list().then((r: any) => setUsers(r.data || [])).catch(() => {}); }, [id]);
+  useEffect(() => { load(); userApi.lookups().then((r: any) => setUsers(r.data?.users || [])).catch(() => {}); }, [id]);
 
   const openNodeDetail = async (node: any) => {
     if (!node.canView) { message.warning('无权查看此节点详情'); return; }
