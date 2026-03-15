@@ -6,6 +6,7 @@ import com.microoffice.entity.WorkThread;
 import com.microoffice.enums.ThreadStatus;
 import com.microoffice.mapper.WorkThreadMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -14,6 +15,7 @@ import java.util.List;
 public class ThreadService {
 
     private final WorkThreadMapper threadMapper;
+    private final JdbcTemplate jdbc;
 
     public WorkThread create(CreateThreadRequest req, Integer creatorId) {
         WorkThread t = new WorkThread();
@@ -25,6 +27,10 @@ public class ThreadService {
         t.setTemplateId(req.getTemplateId());
         t.setProductId(req.getProductId());
         threadMapper.insert(t);
+        String nodeName = req.getFirstNodeName() != null && !req.getFirstNodeName().isBlank() ? req.getFirstNodeName() : "发起处理";
+        Integer ownerId = req.getAssignToUserId() != null ? req.getAssignToUserId() : creatorId;
+        jdbc.update("INSERT INTO work_node (thread_id, name, type, status, owner_id) VALUES (?, ?, 'TASK'::node_type, 'IN_PROGRESS'::node_status, ?)",
+                t.getId(), nodeName, ownerId);
         return t;
     }
 

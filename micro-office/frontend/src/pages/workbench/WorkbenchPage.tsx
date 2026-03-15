@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tabs, List, Tag, Button, Card, Modal, Form, Input, Select, Badge, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { workbenchApi, threadApi, objectApi, productApi, templateApi } from '../../api';
+import { workbenchApi, threadApi, objectApi, productApi, templateApi, userApi } from '../../api';
 
 const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green', CANCELLED: 'default', IN_PROGRESS: 'processing', PENDING_NEXT: 'warning' };
 const statusLabel: Record<string, string> = { ACTIVE: '进行中', COMPLETED: '已完成', CANCELLED: '已取消', IN_PROGRESS: '进行中', PENDING_NEXT: '待处理' };
@@ -15,6 +15,7 @@ export default function WorkbenchPage() {
   const [objects, setObjects] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const nav = useNavigate();
 
   const load = async (v?: string) => {
@@ -26,10 +27,11 @@ export default function WorkbenchPage() {
 
   const openCreate = async () => {
     form.resetFields();
-    const [o, p, t] = await Promise.allSettled([objectApi.list(), productApi.list(), templateApi.list()]);
+    const [o, p, t, u] = await Promise.allSettled([objectApi.list(), productApi.list(), templateApi.list(), userApi.lookups()]);
     setObjects(o.status === 'fulfilled' ? (o.value as any).data || [] : []);
     setProducts(p.status === 'fulfilled' ? (p.value as any).data || [] : []);
     setTemplates(t.status === 'fulfilled' ? (t.value as any).data || [] : []);
+    setUsers(u.status === 'fulfilled' ? (u.value as any).data?.users || [] : []);
     setModal(true);
   };
 
@@ -83,6 +85,10 @@ export default function WorkbenchPage() {
           <Form.Item name="productId" label="关联产品">
             <Select allowClear showSearch optionFilterProp="label" placeholder="选择产品"
               options={products.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
+          </Form.Item>
+          <Form.Item name="assignToUserId" label="指派处理人">
+            <Select allowClear showSearch optionFilterProp="label" placeholder="不选则指派给自己"
+              options={users.map(u => ({ value: u.id, label: u.name }))} />
           </Form.Item>
         </Form>
       </Modal>

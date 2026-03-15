@@ -11,4 +11,6 @@ public class CreateThreadRequest {
     private Integer objectId;
     private Integer templateId;
     private Integer productId;
+    private Integer assignToUserId;
+    private String firstNodeName;
 }
