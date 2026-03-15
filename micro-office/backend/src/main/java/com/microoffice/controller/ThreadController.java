@@ -86,8 +86,10 @@ public class ThreadController {
                 } catch (Exception ignored) {}
             }
             node.put("canView", canView);
+            node.put("isOwner", ownerId != null && ownerId.equals(userId));
         }
 
+        thread.put("currentUserId", userId);
         thread.put("nodes", nodes);
         return ApiResponse.ok(thread);
     }

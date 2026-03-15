@@ -180,7 +180,7 @@ export default function ThreadDetailPage() {
                   ) : (
                     <Tag icon={<LockOutlined />} color="default">无权查看</Tag>
                   )}
-                  {n.status === 'IN_PROGRESS' && n.canView && isActive && (<>
+                  {n.status === 'IN_PROGRESS' && n.isOwner && isActive && (<>
                     <Button size="small" type="primary" icon={<CheckCircleOutlined />}
                       onClick={() => { setAssignModal(n.id); setAssignUser(undefined); setAssignNodeName(''); }}>完成并指派</Button>
                     <Button size="small" icon={<SendOutlined />}
