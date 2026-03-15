@@ -95,9 +95,14 @@ public class ThreadController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Void> update(@PathVariable Integer id, @RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> update(@PathVariable Integer id, @RequestBody Map<String, Object> body, Authentication auth) {
+        Integer userId = (Integer) auth.getPrincipal();
         WorkThread t = threadMapper.selectById(id);
         if (t == null) throw new RuntimeException("工作不存在");
+        // 取消工作流只有创建者可以操作
+        if (body.containsKey("status") && "CANCELLED".equals(body.get("status")) && !t.getCreatorId().equals(userId)) {
+            throw new RuntimeException("只有创建者可以取消工作流");
+        }
         if (body.containsKey("title")) t.setTitle((String) body.get("title"));
         if (body.containsKey("content")) t.setContent((String) body.get("content"));
         if (body.containsKey("status")) t.setStatus(com.microoffice.enums.ThreadStatus.valueOf((String) body.get("status")));

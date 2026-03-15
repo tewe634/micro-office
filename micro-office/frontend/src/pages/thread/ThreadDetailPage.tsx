@@ -139,7 +139,7 @@ export default function ThreadDetailPage() {
       <Col span={16}>
         <Card title={<Space><Button icon={<ArrowLeftOutlined />} type="text" onClick={() => nav('/workbench')} />  {thread.title}</Space>} extra={<Space>
           <Tag color={statusMap[thread.status]?.color}>{statusMap[thread.status]?.text || thread.status}</Tag>
-          {isActive && (
+          {isActive && thread.currentUserId === thread.creator_id && (
             <Popconfirm title="确认取消此工作流？" onConfirm={async () => { await threadApi.update(Number(id), { status: 'CANCELLED' }); message.success('已取消'); load(); }}>
               <Button size="small" danger>取消工作流</Button>
             </Popconfirm>
