@@ -51,7 +51,7 @@ public class SecurityConfig {
                 // 系统管理: 仅 ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // 外部对象: SALES, PURCHASE, FINANCE, ADMIN
-                .requestMatchers("/api/objects/**").hasAnyRole("SALES", "PURCHASE", "FINANCE", "ADMIN")
+                .requestMatchers("/api/objects/**").authenticated()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
