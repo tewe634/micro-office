@@ -132,6 +132,12 @@ public class NodeController {
             title, content, userId, objectId, productId);
         Integer newThreadId = jdbc.queryForObject("SELECT currval(pg_get_serial_sequence('work_thread','id'))", Integer.class);
 
+        // 自动创建第一个节点
+        Integer assignTo = body.get("assignToUserId") != null ? ((Number) body.get("assignToUserId")).intValue() : userId;
+        String nodeName = body.get("firstNodeName") != null ? (String) body.get("firstNodeName") : "发起处理";
+        jdbc.update("INSERT INTO work_node (thread_id, name, type, status, owner_id) VALUES (?, ?, 'TASK'::node_type, 'IN_PROGRESS'::node_status, ?)",
+            newThreadId, nodeName, assignTo);
+
         // 自动关联到当前节点
         jdbc.update("INSERT INTO node_reference (node_id, ref_type, ref_id, ref_label) VALUES (?, 'THREAD', ?, ?)",
             id, newThreadId, "子工作流: " + title);

@@ -259,6 +259,13 @@ export default function ThreadDetailPage() {
         <Form form={spawnForm} onFinish={handleSpawn} layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="content" label="描述"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item name="assignToUserId" label="指派处理人" rules={[{ required: true, message: '请选择处理人' }]}>
+            <Select showSearch optionFilterProp="label" placeholder="选择处理人"
+              options={users.map(u => ({ value: u.id, label: u.name }))} />
+          </Form.Item>
+          <Form.Item name="firstNodeName" label="任务名称">
+            <Input placeholder="默认：发起处理" />
+          </Form.Item>
         </Form>
       </Modal>
 
