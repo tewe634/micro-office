@@ -1,0 +1,6 @@
+ALTER TABLE position ADD COLUMN IF NOT EXISTS level INT DEFAULT 99;
+
+UPDATE position SET level = 1 WHERE code = 'BOSS';
+UPDATE position SET level = 2 WHERE code IN ('SALES_DIR', 'SYS_ADMIN');
+UPDATE position SET level = 3 WHERE code IN ('SALES_MGR', 'DEPT_MGR');
+UPDATE position SET level = 4 WHERE code IN ('SALES_REP', 'BIZ_SPEC', 'PURCHASE_SPEC', 'WAREHOUSE_SPEC', 'ACCOUNTANT', 'HR_SPEC', 'SUPPORT_SPEC');

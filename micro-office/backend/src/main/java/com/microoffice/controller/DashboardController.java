@@ -45,14 +45,14 @@ public class DashboardController {
         tabs.add(Map.of("key", "personal", "label", "个人"));
 
         Map<String, Object> user = jdbc.queryForMap(
-            "SELECT su.org_id, su.primary_position_id, su.role, COALESCE(p.code,'') AS pos_code " +
+            "SELECT su.org_id, su.primary_position_id, su.role, COALESCE(p.code,'') AS pos_code, COALESCE(p.level,99) AS pos_level " +
             "FROM sys_user su LEFT JOIN position p ON p.id = su.primary_position_id WHERE su.id = ?", userId);
         Integer orgId = (Integer) user.get("org_id");
         String role = (String) user.get("role");
         String posCode = (String) user.get("pos_code");
-        // 管理层岗位 code
-        boolean isMgr = Set.of("BOSS","SALES_DIR","SALES_MGR","DEPT_MGR","SYS_ADMIN").contains(posCode);
-        boolean isDirector = Set.of("BOSS","SALES_DIR").contains(posCode);
+        int posLevel = ((Number) user.get("pos_level")).intValue();
+        boolean isMgr = posLevel <= 3; // 经理及以上
+        boolean isDirector = posLevel <= 2; // 总监及以上
 
         if (orgId != null) {
             String orgName = jdbc.queryForObject("SELECT name FROM organization WHERE id = ?", String.class, orgId);

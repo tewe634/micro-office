@@ -30,11 +30,11 @@ export default function MainLayout() {
   const nav = useNavigate();
   const loc = useLocation();
   const logout = useAuthStore(s => s.logout);
-  const role = useAuthStore(s => s.role);
   const setRole = useAuthStore(s => s.setRole);
   const setMenus = useAuthStore(s => s.setMenus);
   const storedMenus = useAuthStore(s => s.menus);
   const [allowedMenus, setAllowedMenus] = useState<string[]>(storedMenus);
+  const [userName, setUserName] = useState('');
 
   // 基础模块所有人都有
   const baseMenus = ['/portal', '/workbench', '/clock', '/dashboard'];
@@ -42,6 +42,7 @@ export default function MainLayout() {
   useEffect(() => {
     userApi.me().then((r: any) => {
       if (r.data?.role) setRole(r.data.role);
+      if (r.data?.name) setUserName(r.data.name);
       if (r.data?.menus) {
         const merged = [...new Set([...baseMenus, ...r.data.menus])];
         setMenus(merged); setAllowedMenus(merged);
@@ -74,7 +75,7 @@ export default function MainLayout() {
       </Sider>
       <Layout>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
-          <span style={{ color: '#888', fontSize: 13 }}>{role || ''}</span>
+          <span style={{ color: '#888', fontSize: 13 }}>你好，{userName}</span>
           <a onClick={() => { logout(); nav('/login'); }}>退出登录</a>
         </Header>
         <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8 }}>

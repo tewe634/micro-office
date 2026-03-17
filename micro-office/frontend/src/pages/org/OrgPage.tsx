@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Tree, Table, Button, Modal, Form, Input, InputNumber, Space, message, Popconfirm } from 'antd';
+import { Card, Tree, Table, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import { orgApi, positionApi } from '../../api';
 
@@ -7,6 +7,15 @@ function buildTree(list: any[], parentId: number | null = null): DataNode[] {
   return list.filter(i => i.parentId === parentId).map(i => ({
     key: i.id, title: i.name, children: buildTree(list, i.id),
   }));
+}
+
+function buildTreeSelect(list: any[], parentId: number | null = null, excludeId?: number): any[] {
+  return list
+    .filter(i => i.parentId === parentId && i.id !== excludeId)
+    .map(i => ({
+      value: i.id, title: i.name,
+      children: buildTreeSelect(list, i.id, excludeId),
+    }));
 }
 
 export default function OrgPage() {
@@ -23,6 +32,15 @@ export default function OrgPage() {
   const loadPositions = async () => { const r: any = await positionApi.list(); setPositions(r.data || []); };
   useEffect(() => { loadOrgs(); loadPositions(); }, []);
 
+  const openOrgModal = (org?: any) => {
+    setEditOrg(org || null);
+    orgForm.resetFields();
+    if (org) {
+      orgForm.setFieldsValue({ name: org.name, parentId: org.parentId, sortOrder: org.sortOrder });
+    }
+    setOrgModal(true);
+  };
+
   const saveOrg = async (values: any) => {
     if (editOrg) { await orgApi.update(editOrg.id, values); } else { await orgApi.create(values); }
     message.success('保存成功'); setOrgModal(false); orgForm.resetFields(); setEditOrg(null); loadOrgs();
@@ -35,12 +53,12 @@ export default function OrgPage() {
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size="large">
-      <Card title="组织架构" extra={<Button type="primary" onClick={() => { setEditOrg(null); orgForm.resetFields(); setOrgModal(true); }}>新增组织</Button>}>
+      <Card title="组织架构" extra={<Button type="primary" onClick={() => openOrgModal()}>新增组织</Button>}>
         <Tree treeData={buildTree(orgs)} defaultExpandAll showLine
           titleRender={(node: any) => (
             <Space>
               {node.title as string}
-              <Button size="small" type="link" onClick={() => { const o = orgs.find(i => i.id === node.key); setEditOrg(o); orgForm.setFieldsValue(o); setOrgModal(true); }}>编辑</Button>
+              <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
               <Popconfirm title="确认删除？" onConfirm={async () => { await orgApi.delete(node.key as number); message.success('已删除'); loadOrgs(); }}>
                 <Button size="small" type="link" danger>删除</Button>
               </Popconfirm>
@@ -65,10 +83,17 @@ export default function OrgPage() {
         ]} />
       </Card>
 
-      <Modal title={editOrg ? '编辑组织' : '新增组织'} open={orgModal} onCancel={() => setOrgModal(false)} onOk={() => orgForm.submit()}>
+      <Modal title={editOrg ? '编辑组织' : '新增组织'} open={orgModal} onCancel={() => setOrgModal(false)} onOk={() => orgForm.submit()} destroyOnClose>
         <Form form={orgForm} onFinish={saveOrg} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="parentId" label="上级组织ID"><InputNumber style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="parentId" label="上级部门">
+            <TreeSelect
+              treeData={buildTreeSelect(orgs, null, editOrg?.id)}
+              placeholder="无（顶级部门）"
+              allowClear
+              treeDefaultExpandAll
+            />
+          </Form.Item>
           <Form.Item name="sortOrder" label="排序"><InputNumber style={{ width: '100%' }} /></Form.Item>
         </Form>
       </Modal>

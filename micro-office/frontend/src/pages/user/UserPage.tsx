@@ -1,24 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
-import { useAuthStore } from '../../store/auth';
 
-const roleOptions = [
-  { value: 'ADMIN', label: '管理员' },
-  { value: 'HR', label: '人事' },
-  { value: 'SALES', label: '销售' },
-  { value: 'PURCHASE', label: '采购' },
-  { value: 'FINANCE', label: '财务' },
-  { value: 'STAFF', label: '普通员工' },
-];
-
-const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', STAFF: 'default' };
+const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
 export default function UserPage() {
-  const myRole = useAuthStore(s => s.role);
   const [users, setUsers] = useState<any[]>([]);
   const [orgs, setOrgs] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [filterOrg, setFilterOrg] = useState<number>();
   const [modal, setModal] = useState(false);
   const [pwdModal, setPwdModal] = useState<{ open: boolean; userId: number | null; name: string }>({ open: false, userId: null, name: '' });
@@ -29,8 +19,9 @@ export default function UserPage() {
   const loadUsers = async () => { const r: any = await userApi.list(filterOrg); setUsers(r.data || []); };
   const loadOrgs = async () => { const r: any = await orgApi.list(); setOrgs(r.data || []); };
   const loadPositions = async () => { const r: any = await positionApi.list(); setPositions(r.data || []); };
+  const loadRoles = async () => { const r: any = await userApi.lookups(); setRoles(r.data?.roles || []); };
 
-  useEffect(() => { loadOrgs(); loadPositions(); }, []);
+  useEffect(() => { loadOrgs(); loadPositions(); loadRoles(); }, []);
   useEffect(() => { loadUsers(); }, [filterOrg]);
 
   const save = async (values: any) => {
@@ -67,7 +58,7 @@ export default function UserPage() {
         { title: '姓名', dataIndex: 'name', width: 80 },
         { title: '邮箱', dataIndex: 'email', width: 180 },
         { title: '手机', dataIndex: 'phone', width: 120 },
-        { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roleOptions.find(r => r.value === v)?.label || v}</Tag> },
+        { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roles.find(r => r.code === v)?.name || v}</Tag> },
         { title: '所属组织', dataIndex: 'orgId', width: 100, render: (v: number) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
         { title: '主岗位', dataIndex: 'primaryPositionId', width: 100, render: (v: number) => v ? <Tag color="green">{posName(v)}</Tag> : '-' },
         { title: '辅助岗位', dataIndex: 'extraPositionIds', render: (ids: number[]) =>
@@ -90,11 +81,9 @@ export default function UserPage() {
           {!edit && <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>}
           {!edit && <Form.Item name="password" label="密码" extra="不填默认123456"><Input.Password /></Form.Item>}
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
-          {myRole === 'ADMIN' && (
-            <Form.Item name="role" label="角色" initialValue="STAFF">
-              <Select options={roleOptions} />
-            </Form.Item>
-          )}
+          <Form.Item name="role" label="角色">
+            <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: r.name }))} />
+          </Form.Item>
           <Form.Item name="orgId" label="所属组织">
             <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>

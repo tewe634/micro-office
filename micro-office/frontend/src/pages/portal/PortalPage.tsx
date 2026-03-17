@@ -64,11 +64,11 @@ export default function PortalPage() {
           <Card title={<><TeamOutlined /> 对内关系网</>} size="small">
             <div style={{ marginBottom: 8 }}><b>上级</b></div>
             {data.superiors?.length ? (
-              <Space wrap>{data.superiors.map((s: any) => <Tag key={s.id} color="purple">{s.name}</Tag>)}</Space>
+              <Space wrap>{data.superiors.map((s: any) => <Tag key={s.id} color="purple">{s.name}{s.pos_name ? `（${s.pos_name}）` : ''}</Tag>)}</Space>
             ) : <p style={{ color: '#888' }}>无</p>}
             <div style={{ marginTop: 12, marginBottom: 8 }}><b>下级</b></div>
             {data.subordinates?.length ? (
-              <Space wrap>{data.subordinates.map((s: any) => <Tag key={s.id} color="cyan">{s.name}</Tag>)}</Space>
+              <Space wrap>{data.subordinates.map((s: any) => <Tag key={s.id} color="cyan">{s.name}{s.pos_name ? `（${s.pos_name}）` : ''}</Tag>)}</Space>
             ) : <p style={{ color: '#888' }}>无</p>}
           </Card>
         </Col>

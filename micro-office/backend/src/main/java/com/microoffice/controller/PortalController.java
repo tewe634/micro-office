@@ -51,16 +51,50 @@ public class PortalController {
             result.put("positionRanking", ranking);
         }
 
-        // 关系网 - 上级（同组织更高岗位）
-        List<Map<String, Object>> superiors = jdbc.queryForList(
-            "SELECT id, name, primary_position_id FROM sys_user WHERE org_id = ? AND id != ? AND primary_position_id < ?",
-            u.getOrgId(), userId, u.getPrimaryPositionId() != null ? u.getPrimaryPositionId() : 999);
+        // 关系网 - 上级：同组织中岗位级别更高的人 + 父组织中的人
+        Integer myLevel = u.getPrimaryPositionId() != null
+            ? jdbc.queryForObject("SELECT COALESCE(level,99) FROM position WHERE id = ?", Integer.class, u.getPrimaryPositionId())
+            : 99;
+        List<Map<String, Object>> superiors = new ArrayList<>();
+        // 同组织、岗位级别更高
+        if (u.getOrgId() != null) {
+            superiors.addAll(jdbc.queryForList(
+                "SELECT su.id, su.name, p.name AS pos_name FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.org_id = ? AND su.id != ? AND COALESCE(p.level,99) < ?",
+                u.getOrgId(), userId, myLevel));
+            // 父组织链上的人（向上递归）
+            superiors.addAll(jdbc.queryForList(
+                "WITH RECURSIVE parent_orgs AS (" +
+                "  SELECT parent_id FROM organization WHERE id = ? " +
+                "  UNION ALL " +
+                "  SELECT o.parent_id FROM organization o JOIN parent_orgs po ON o.id = po.parent_id" +
+                ") SELECT su.id, su.name, p.name AS pos_name FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.org_id IN (SELECT parent_id FROM parent_orgs WHERE parent_id IS NOT NULL) " +
+                "AND su.id != ?", u.getOrgId(), userId));
+        }
         result.put("superiors", superiors);
 
-        // 关系网 - 下级
-        List<Map<String, Object>> subordinates = jdbc.queryForList(
-            "SELECT id, name, primary_position_id FROM sys_user WHERE org_id = ? AND id != ? AND primary_position_id > ?",
-            u.getOrgId(), userId, u.getPrimaryPositionId() != null ? u.getPrimaryPositionId() : 0);
+        // 关系网 - 下级：同组织中岗位级别更低的人 + 子组织中的人
+        List<Map<String, Object>> subordinates = new ArrayList<>();
+        if (u.getOrgId() != null) {
+            subordinates.addAll(jdbc.queryForList(
+                "SELECT su.id, su.name, p.name AS pos_name FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.org_id = ? AND su.id != ? AND COALESCE(p.level,99) > ?",
+                u.getOrgId(), userId, myLevel));
+            // 子组织链下的人（向下递归）
+            subordinates.addAll(jdbc.queryForList(
+                "WITH RECURSIVE child_orgs AS (" +
+                "  SELECT id FROM organization WHERE parent_id = ? " +
+                "  UNION ALL " +
+                "  SELECT o.id FROM organization o JOIN child_orgs co ON o.parent_id = co.id" +
+                ") SELECT su.id, su.name, p.name AS pos_name FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.org_id IN (SELECT id FROM child_orgs) AND su.id != ?",
+                u.getOrgId(), userId));
+        }
         result.put("subordinates", subordinates);
 
         // 关系网 - 关联的外部对象

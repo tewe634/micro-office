@@ -24,6 +24,7 @@ public class UserController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("orgs", jdbc.queryForList("SELECT id, name, parent_id FROM organization ORDER BY sort_order, id"));
         result.put("users", jdbc.queryForList("SELECT id, name, org_id FROM sys_user ORDER BY id"));
+        result.put("roles", jdbc.queryForList("SELECT code, name FROM sys_role ORDER BY sort_order"));
         return ApiResponse.ok(result);
     }
 
@@ -104,7 +105,7 @@ public class UserController {
         u.setPasswordHash(passwordEncoder.encode(pwd));
         u.setOrgId(body.get("orgId") != null ? ((Number) body.get("orgId")).intValue() : null);
         u.setPrimaryPositionId(body.get("primaryPositionId") != null ? ((Number) body.get("primaryPositionId")).intValue() : null);
-        u.setRole(body.get("role") != null ? (String) body.get("role") : "STAFF");
+        u.setRole(body.get("role") != null ? (String) body.get("role") : deriveRole(u.getPrimaryPositionId(), u.getOrgId()));
         userMapper.insert(u);
         // 辅助岗位
         saveExtraPositions(u.getId(), body);
@@ -121,7 +122,11 @@ public class UserController {
         if (body.containsKey("phone")) u.setPhone((String) body.get("phone"));
         if (body.containsKey("orgId")) u.setOrgId(body.get("orgId") != null ? ((Number) body.get("orgId")).intValue() : null);
         if (body.containsKey("primaryPositionId")) u.setPrimaryPositionId(body.get("primaryPositionId") != null ? ((Number) body.get("primaryPositionId")).intValue() : null);
-        if (body.containsKey("role")) u.setRole((String) body.get("role"));
+        if (body.containsKey("role")) {
+            u.setRole((String) body.get("role"));
+        } else if (body.containsKey("primaryPositionId") || body.containsKey("orgId")) {
+            u.setRole(deriveRole(u.getPrimaryPositionId(), u.getOrgId()));
+        }
         // 修改密码
         if (body.containsKey("password") && body.get("password") != null && !((String) body.get("password")).isBlank()) {
             u.setPasswordHash(passwordEncoder.encode((String) body.get("password")));
@@ -150,5 +155,22 @@ public class UserController {
                     userId, ((Number) pid).intValue());
             }
         }
+    }
+
+    private String deriveRole(Integer positionId, Integer orgId) {
+        String posRole = null;
+        if (positionId != null) {
+            posRole = jdbc.queryForObject(
+                "SELECT default_role FROM position WHERE id = ?", String.class, positionId);
+        }
+        // 岗位有明确角色且不是通用的 STAFF → 直接用
+        if (posRole != null && !"STAFF".equals(posRole)) return posRole;
+        // 否则用组织的 default_role
+        if (orgId != null) {
+            String orgRole = jdbc.queryForObject(
+                "SELECT default_role FROM organization WHERE id = ?", String.class, orgId);
+            if (orgRole != null) return orgRole;
+        }
+        return posRole != null ? posRole : "STAFF";
     }
 }
