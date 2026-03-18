@@ -24,6 +24,22 @@ public class DataScopeService {
     public List<String> getScopeOrgIds(String userId) {
         SysUser user = userMapper.selectById(userId);
         if (user == null || user.getOrgId() == null) return List.of();
+
+        Integer isRoot = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM organization WHERE id = ? AND parent_id IS NULL",
+            Integer.class,
+            user.getOrgId()
+        );
+
+        if (isRoot != null && isRoot > 0) {
+            return jdbc.queryForList(
+                "SELECT id FROM organization WHERE id = ? OR parent_id = ? ORDER BY sort_order, id",
+                String.class,
+                user.getOrgId(),
+                user.getOrgId()
+            );
+        }
+
         return jdbc.queryForList(
             "WITH RECURSIVE sub AS (" +
                 "SELECT id FROM organization WHERE id = ? " +
