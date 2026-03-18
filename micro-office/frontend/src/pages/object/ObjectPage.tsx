@@ -11,19 +11,18 @@ const allTypeOptions = [
   { value: 'OTHER', label: '其他' },
 ];
 
-function ObjectTable({ type, orgs, users }: { type: string; orgs: any[]; users: any[] }) {
+function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: any[]; users: any[]; departments: any[] }) {
   const [data, setData] = useState<any[]>([]);
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
-  const [filterOrg, setFilterOrg] = useState<string | undefined>();
   const [filterDept, setFilterDept] = useState<string | undefined>();
   const [form] = Form.useForm();
 
   const load = async () => {
-    const r: any = await objectApi.list(type, filterOrg, filterDept);
+    const r: any = await objectApi.list(type, filterDept);
     setData((r.data || []).filter((o: any) => o.type === type));
   };
-  useEffect(() => { load(); }, [type, filterOrg, filterDept]);
+  useEffect(() => { load(); }, [type, filterDept]);
 
   const save = async (values: any) => {
     const payload = { ...values, type };
@@ -37,10 +36,8 @@ function ObjectTable({ type, orgs, users }: { type: string; orgs: any[]; users: 
   return (
     <>
       <Space style={{ marginBottom: 12 }}>
-        <Select allowClear placeholder="筛选所属组织" style={{ width: 160 }} onChange={setFilterOrg}
-          options={orgs.map(o => ({ value: o.id, label: o.name }))} />
-        <Select allowClear placeholder="筛选所属部门" style={{ width: 160 }} onChange={setFilterDept}
-          options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+        <Select allowClear placeholder="按所属部门筛选" style={{ width: 180 }} onChange={setFilterDept}
+          options={departments.map(o => ({ value: o.id, label: o.name }))} />
         <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
           新增{allTypeOptions.find(o => o.value === type)?.label}
         </Button>
@@ -92,6 +89,7 @@ export default function ObjectPage() {
   const [objectTypes, setObjectTypes] = useState<string[]>([]);
   const [orgs, setOrgs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
 
   useEffect(() => {
     userApi.me().then((r: any) => {
@@ -106,6 +104,9 @@ export default function ObjectPage() {
       setOrgs(r.data?.orgs || []);
       setUsers(r.data?.users || []);
     }).catch(() => {});
+    objectApi.departments().then((r: any) => {
+      setDepartments(r.data || []);
+    }).catch(() => {});
   }, []);
 
   const visibleTypes = allTypeOptions.filter(o => objectTypes.includes(o.value));
@@ -119,7 +120,7 @@ export default function ObjectPage() {
       <Tabs items={visibleTypes.map(t => ({
         key: t.value,
         label: t.label,
-        children: <ObjectTable type={t.value} orgs={orgs} users={users} />,
+        children: <ObjectTable type={t.value} orgs={orgs} users={users} departments={departments} />,
       }))} />
     </Card>
   );

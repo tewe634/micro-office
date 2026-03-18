@@ -21,7 +21,8 @@ export const positionApi = {
 };
 
 export const objectApi = {
-  list: (type?: string, orgId?: string, deptId?: string) => api.get('/objects', { params: { type, orgId, deptId } }),
+  list: (type?: string, deptId?: string) => api.get('/objects', { params: { type, deptId } }),
+  departments: () => api.get('/objects/departments'),
   get: (id: number) => api.get(`/objects/${id}`),
   create: (data: any) => api.post('/objects', data),
   update: (id: number, data: any) => api.put(`/objects/${id}`, data),

@@ -35,6 +35,19 @@ public class ObjectController {
             String.class, userId, userId);
     }
 
+    @GetMapping("/departments")
+    public ApiResponse<List<Map<String, Object>>> departments(Authentication auth) {
+        String userId = (String) auth.getPrincipal();
+        List<String> orgIds = dataScopeService.getScopeOrgIds(userId);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT id, name, parent_id FROM organization WHERE id = ANY(?::varchar[]) ORDER BY sort_order, id",
+            (Object) orgIds.toArray(new String[0])
+        );
+        return ApiResponse.ok(rows.stream()
+            .filter(r -> r.get("parent_id") != null)
+            .collect(Collectors.toList()));
+    }
+
     @GetMapping
     public ApiResponse<List<ExternalObject>> list(@RequestParam(required = false) ObjectType type,
                                                    @RequestParam(required = false) String orgId,
