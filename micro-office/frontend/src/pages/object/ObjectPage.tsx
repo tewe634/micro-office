@@ -42,7 +42,9 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
           新增{allTypeOptions.find(o => o.value === type)?.label}
         </Button>
       </Space>
-      <Table dataSource={data} rowKey="id" showSorterTooltip={false} columns={[
+      <Table dataSource={data} rowKey="id" showSorterTooltip={false}
+        scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 46px - 16px - 56px)' }}
+        columns={[
         { title: '序号', key: 'index', width: 60, render: (_: any, __: any, index: number) => index + 1 },
         { title: '名称', dataIndex: 'name' },
         { title: '联系人', dataIndex: 'contact' },
@@ -116,12 +118,14 @@ export default function ObjectPage() {
   }
 
   return (
-    <Card title="外部对象管理">
-      <Tabs items={visibleTypes.map(t => ({
-        key: t.value,
-        label: t.label,
-        children: <ObjectTable type={t.value} orgs={orgs} users={users} departments={departments} />,
-      }))} />
+    <Card title="外部对象管理" styles={{ body: { padding: 0 } }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: 1, minHeight: 0, padding: 24 }}>
+        <Tabs items={visibleTypes.map(t => ({
+          key: t.value,
+          label: t.label,
+          children: <ObjectTable type={t.value} orgs={orgs} users={users} departments={departments} />,
+        }))} />
+      </div>
     </Card>
   );
 }

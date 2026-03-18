@@ -52,8 +52,9 @@ export default function OrgPage() {
   };
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="large">
-      <Card title="组织架构" extra={<Button type="primary" onClick={() => openOrgModal()}>新增组织</Button>}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+      <Card title="组织架构" styles={{ body: { padding: 0 } }} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }} extra={<Button type="primary" onClick={() => openOrgModal()}>新增组织</Button>}>
+        <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: 'auto' }}>
         <Tree treeData={buildTree(orgs)} defaultExpandAll showLine
           titleRender={(node: any) => (
             <Space>
@@ -65,11 +66,15 @@ export default function OrgPage() {
             </Space>
           )}
         />
+        </div>
       </Card>
 
-      <Card title="岗位管理" extra={<Button type="primary" onClick={() => { setEditPos(null); posForm.resetFields(); setPosModal(true); }}>新增岗位</Button>}>
-        <Table dataSource={positions} rowKey="id" pagination={false} columns={[
-          { title: 'ID', dataIndex: 'id', width: 60 },
+      <Card title="岗位管理" styles={{ body: { padding: 0 } }} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }} extra={<Button type="primary" onClick={() => { setEditPos(null); posForm.resetFields(); setPosModal(true); }}>新增岗位</Button>}>
+        <div style={{ flex: 1, minHeight: 0, padding: 24 }}>
+        <Table dataSource={positions} rowKey="id" pagination={false} showSorterTooltip={false}
+          scroll={{ y: 'calc(50vh - 64px)' }}
+          columns={[
+          { title: '序号', key: 'index', width: 60, sorter: (_a: any, _b: any) => 0, render: (_: any, __: any, index: number) => index + 1 },
           { title: '岗位名称', dataIndex: 'name' },
           { title: '编码', dataIndex: 'code' },
           { title: '操作', render: (_: any, r: any) => (
@@ -81,6 +86,7 @@ export default function OrgPage() {
             </Space>
           )},
         ]} />
+        </div>
       </Card>
 
       <Modal title={editOrg ? '编辑组织' : '新增组织'} open={orgModal} onCancel={() => setOrgModal(false)} onOk={() => orgForm.submit()} destroyOnClose>
@@ -105,6 +111,6 @@ export default function OrgPage() {
           <Form.Item name="parentId" label="上级岗位ID"><InputNumber style={{ width: '100%' }} /></Form.Item>
         </Form>
       </Modal>
-    </Space>
+    </div>
   );
 }

@@ -45,7 +45,7 @@ export default function UserPage() {
   };
 
   return (
-    <Card title="人员管理" extra={
+    <Card title="人员管理" styles={{ body: { padding: 0 } }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }} extra={
       <Space>
         <Select allowClear placeholder="按组织筛选" style={{ width: 160 }}
           options={orgs.map(o => ({ value: o.id, label: o.name }))}
@@ -53,8 +53,13 @@ export default function UserPage() {
         <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增人员</Button>
       </Space>
     }>
-      <Table dataSource={users} rowKey="id" columns={[
-        { title: 'ID', dataIndex: 'id', width: 50 },
+      <div style={{ padding: 24, paddingBottom: 0 }} />
+      <div style={{ flex: 1, minHeight: 0, padding: 24, paddingTop: 0 }}>
+      <Table dataSource={users} rowKey="id" showSorterTooltip={false}
+        scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 56px - 16px - 56px)' }}
+        columns={[
+        { title: '序号', key: 'index', width: 60, sorter: (_a: any, _b: any) => 0, render: (_: any, __: any, index: number) => index + 1 },
+        { title: '工号', dataIndex: 'empNo', width: 110, sorter: (a: any, b: any) => parseInt((a.empNo||'').replace(/\D/g,''))||0 - (parseInt((b.empNo||'').replace(/\D/g,''))||0) },
         { title: '姓名', dataIndex: 'name', width: 80 },
         { title: '邮箱', dataIndex: 'email', width: 180 },
         { title: '手机', dataIndex: 'phone', width: 120 },
@@ -74,6 +79,7 @@ export default function UserPage() {
           </Space>
         )},
       ]} />
+      </div>
 
       <Modal title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
         <Form form={form} onFinish={save} layout="vertical">
