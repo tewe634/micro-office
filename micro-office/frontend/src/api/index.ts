@@ -81,6 +81,7 @@ export const userApi = {
   me: () => api.get('/users/me'),
   lookups: () => api.get('/users/me/lookups'),
   list: (orgId?: number) => api.get('/users', { params: { orgId } }),
+  page: (params?: { current?: number; size?: number; orgId?: string | number }) => api.get('/users/page', { params }),
   get: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),

@@ -63,6 +63,21 @@ public class UserController {
         return ApiResponse.ok(m);
     }
 
+    @GetMapping("/page")
+    public ApiResponse<com.microoffice.dto.response.PageResponse<Map<String, Object>>> page(
+        @RequestParam(defaultValue = "1") long current,
+        @RequestParam(defaultValue = "20") long size,
+        @RequestParam(required = false) String orgId
+    ) {
+        // 复用现有 list 逻辑先拿到全量结果，再分页切片（保证业务规则不变）
+        List<Map<String, Object>> all = list(orgId).getData();
+        long total = all.size();
+        int from = (int) Math.max(0, (current - 1) * size);
+        int to = (int) Math.min(total, from + size);
+        List<Map<String, Object>> records = from >= to ? new ArrayList<>() : all.subList(from, to);
+        return ApiResponse.ok(new com.microoffice.dto.response.PageResponse<>(current, size, total, records));
+    }
+
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) String orgId) {
         String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
