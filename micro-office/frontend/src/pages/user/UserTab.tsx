@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
@@ -57,22 +58,25 @@ export default function UserTab() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
-        <Select allowClear placeholder="按组织筛选" style={{ width: 200 }}
-          options={orgs.map(o => ({ value: o.id, label: o.name }))}
-          onChange={v => setFilterOrg(v)} />
-        <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增人员</Button>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          <Table
-            dataSource={users}
-            rowKey="id"
-            pagination={false}
-            scroll={{ x: true }}
-            columns={[
+    <>
+    <FixedTablePage
+      top={
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Select allowClear placeholder="按组织筛选" style={{ width: 220 }}
+            options={orgs.map(o => ({ value: o.id, label: o.name }))}
+            onChange={v => setFilterOrg(v)} />
+          <Space>
+            <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>
+          </Space>
+        </div>
+      }
+      table={
+        <Table
+          dataSource={users}
+          rowKey="id"
+          pagination={false}
+          scroll={{ x: true }}
+          columns={[
             { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
             { title: '工号', dataIndex: 'empNo', width: 110 },
             { title: '姓名', dataIndex: 'name', width: 90 },
@@ -93,19 +97,18 @@ export default function UserTab() {
             )},
           ]}
         />
-        </div>
-        <div style={{ paddingTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-          <Pagination
-            current={current}
-            pageSize={size}
-            total={total}
-            showSizeChanger
-            showTotal={(t) => `共 ${t} 条`}
-            onChange={(page, pageSize) => loadUsers(page, pageSize, filterOrg)}
-          />
-        </div>
-      </div>
-
+      }
+      pagination={
+        <Pagination
+          current={current}
+          pageSize={size}
+          total={total}
+          showSizeChanger
+          showTotal={(t) => `共 ${t} 条`}
+          onChange={(page, pageSize) => loadUsers(page, pageSize, filterOrg)}
+        />
+      }
+    />
       <Modal title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
@@ -137,6 +140,6 @@ export default function UserTab() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </>
   );
 }

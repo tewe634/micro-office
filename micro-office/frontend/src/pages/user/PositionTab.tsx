@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination } from 'antd';
 import { positionApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 
 export default function PositionTab() {
   const [data, setData] = useState<any[]>([]);
@@ -33,18 +34,15 @@ export default function PositionTab() {
 
   return (
     <>
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增岗位</Button>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          <Table
-            dataSource={data}
-            rowKey="id"
-            pagination={false}
-            scroll={{ x: true }}
-            columns={[
+    <FixedTablePage
+      top={<div style={{ display: 'flex', justifyContent: 'flex-end' }}><Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button></div>}
+      table={
+        <Table
+          dataSource={data}
+          rowKey="id"
+          pagination={false}
+          scroll={{ x: true }}
+          columns={[
           { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
           { title: '岗位名称', dataIndex: 'name' },
           { title: '编码', dataIndex: 'code', width: 220 },
@@ -58,19 +56,18 @@ export default function PositionTab() {
           )},
         ]}
       />
-        </div>
-        <div style={{ paddingTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-          <Pagination
-            current={current}
-            pageSize={size}
-            total={total}
-            showSizeChanger
-            showTotal={(t) => `共 ${t} 条`}
-            onChange={(page, pageSize) => load(page, pageSize)}
-          />
-        </div>
-      </div>
-
+      }
+      pagination={
+        <Pagination
+          current={current}
+          pageSize={size}
+          total={total}
+          showSizeChanger
+          showTotal={(t) => `共 ${t} 条`}
+          onChange={(page, pageSize) => load(page, pageSize)}
+        />
+      }
+    />
       <Modal title={edit ? '编辑岗位' : '新增岗位'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
