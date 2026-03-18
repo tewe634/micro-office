@@ -1,19 +1,28 @@
 package com.microoffice.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.microoffice.entity.Product;
 import com.microoffice.mapper.ProductMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.List;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductMapper mapper;
 
-    public List<Product> list() { return mapper.selectList(null); }
-    public Product getById(Integer id) { return mapper.selectById(id); }
+    public Page<Product> list(long current, long size, String categoryCode, String code, String name) {
+        LambdaQueryWrapper<Product> q = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(categoryCode)) q.eq(Product::getCategoryCode, categoryCode);
+        if (StringUtils.hasText(code)) q.like(Product::getCode, code);
+        if (StringUtils.hasText(name)) q.like(Product::getName, name);
+        q.orderByAsc(Product::getCode);
+        return mapper.selectPage(new Page<>(current, size), q);
+    }
+    public Product getById(String id) { return mapper.selectById(id); }
     public Product create(Product p) { mapper.insert(p); return p; }
     public void update(Product p) { mapper.updateById(p); }
-    public void delete(Integer id) { mapper.deleteById(id); }
+    public void delete(String id) { mapper.deleteById(id); }
 }
