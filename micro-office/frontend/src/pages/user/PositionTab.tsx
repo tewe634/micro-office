@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination } from 'antd';
 import { positionApi } from '../../api';
 
 export default function PositionTab() {
@@ -37,19 +37,14 @@ export default function PositionTab() {
         <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增岗位</Button>
       </div>
 
-      <Table
-        dataSource={data}
-        rowKey="id"
-        pagination={{
-          current,
-          pageSize: size,
-          total,
-          showSizeChanger: true,
-          showTotal: (t) => `共 ${t} 条`,
-          onChange: (page, pageSize) => load(page, pageSize),
-        }}
-        scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 56px - 16px - 56px)' }}
-        columns={[
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <Table
+            dataSource={data}
+            rowKey="id"
+            pagination={false}
+            scroll={{ x: true }}
+            columns={[
           { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
           { title: '岗位名称', dataIndex: 'name' },
           { title: '编码', dataIndex: 'code', width: 220 },
@@ -63,6 +58,18 @@ export default function PositionTab() {
           )},
         ]}
       />
+        </div>
+        <div style={{ paddingTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+          <Pagination
+            current={current}
+            pageSize={size}
+            total={total}
+            showSizeChanger
+            showTotal={(t) => `共 ${t} 条`}
+            onChange={(page, pageSize) => load(page, pageSize)}
+          />
+        </div>
+      </div>
 
       <Modal title={edit ? '编辑岗位' : '新增岗位'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
