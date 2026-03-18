@@ -20,7 +20,14 @@ function HomeRedirect() {
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore(s => s.token);
-  return token ? <>{children}</> : <Navigate to="/login" />;
+  return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function MenuRouteGuard({ menuKey, children }: { menuKey: string; children: React.ReactNode }) {
+  const menus = useAuthStore(s => s.menus);
+  const allowed = menus.includes(menuKey) || (menuKey.startsWith('/admin') && menus.includes('/admin'));
+  if (!allowed) return <HomeRedirect />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -31,12 +38,12 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
             <Route index element={<HomeRedirect />} />
-            <Route path="org" element={<OrgPage />} />
-            <Route path="users" element={<UserPage />} />
-            <Route path="objects" element={<ObjectPage />} />
-            <Route path="products" element={<ProductPage />} />
-            <Route path="admin" element={<Navigate to="/admin/permissions" />} />
-            <Route path="admin/permissions" element={<AdminPermissionPage />} />
+            <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
+            <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserPage /></MenuRouteGuard>} />
+            <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
+            <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
+            <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />
+            <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
           </Route>
         </Routes>
       </BrowserRouter>
