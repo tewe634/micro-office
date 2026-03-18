@@ -18,10 +18,37 @@ html, body {
   height: 100%;
 }
 
-.ant-tabs-content-holder {
+.ant-tabs {
+  min-height: 0;
+}
+
+.ant-tabs-content-holder,
+.ant-tabs-content,
+.ant-tabs-tabpane {
   min-height: 0;
 }
 
 .ant-tabs-tabpane {
   overflow: hidden;
+}
+
+.ant-table-wrapper,
+.ant-spin-nested-loading,
+.ant-spin-container {
+  height: 100%;
+}
+
+.ant-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ant-table-container {
+  flex: 1;
+  min-height: 0;
+}
+
+.ant-table-body {
+  overflow: auto !important;
 }

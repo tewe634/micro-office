@@ -75,7 +75,9 @@ export default function UserTab() {
           dataSource={users}
           rowKey="id"
           pagination={false}
-          scroll={{ x: true }}
+          sticky
+          scroll={{ x: 1400, y: '100%' }}
+          style={{ height: '100%' }}
           columns={[
             { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
             { title: '工号', dataIndex: 'empNo', width: 110 },

@@ -41,7 +41,9 @@ export default function PositionTab() {
           dataSource={data}
           rowKey="id"
           pagination={false}
-          scroll={{ x: true }}
+          sticky
+          scroll={{ x: 900, y: '100%' }}
+          style={{ height: '100%' }}
           columns={[
           { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
           { title: '岗位名称', dataIndex: 'name' },
