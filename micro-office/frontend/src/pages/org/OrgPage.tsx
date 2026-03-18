@@ -66,7 +66,7 @@ export default function OrgPage() {
         <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: 'auto' }}>
           <Tree
             treeData={buildTree(orgs)}
-            defaultExpandAll
+            defaultExpandedKeys={orgs.filter((o: any) => !o.parentId).map((o: any) => o.id)}
             showLine
             titleRender={(node: any) => (
               <Space>
