@@ -71,7 +71,7 @@ export default function ProductPage() {
               setSize(pageSize);
             },
           }}
-          scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 56px - 16px - 56px)' }}
+          scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 56px - 16px - 56px)', x: 1600 }}
           columns={[
           { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
           { title: '物料号', dataIndex: 'code', width: 180 },
@@ -90,7 +90,6 @@ export default function ProductPage() {
             </Space>
           )},
         ]}
-        scroll={{ x: 1600 }}
       />
       </div>
 
