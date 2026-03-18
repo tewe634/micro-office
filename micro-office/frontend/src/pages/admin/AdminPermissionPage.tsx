@@ -12,15 +12,12 @@ const roles = [
 ];
 
 const menus = [
-  { key: '/workbench', label: '工作台' },
-  { key: '/threads', label: '工作列表' },
-  { key: '/taskpool', label: '任务池' },
   { key: '/org', label: '组织架构' },
   { key: '/users', label: '人员管理' },
   { key: '/objects', label: '外部对象' },
   { key: '/products', label: '产品服务' },
-  { key: '/clock', label: '打卡' },
   { key: '/admin', label: '系统管理' },
+  { key: '/admin/permissions', label: '权限配置' },
 ];
 
 const objectTypes = [

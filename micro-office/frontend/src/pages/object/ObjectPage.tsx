@@ -15,10 +15,15 @@ function ObjectTable({ type, orgs, users }: { type: string; orgs: any[]; users: 
   const [data, setData] = useState<any[]>([]);
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+  const [filterOrg, setFilterOrg] = useState<string | undefined>();
+  const [filterDept, setFilterDept] = useState<string | undefined>();
   const [form] = Form.useForm();
 
-  const load = async () => { const r: any = await objectApi.list(type); setData((r.data || []).filter((o: any) => o.type === type)); };
-  useEffect(() => { load(); }, [type]);
+  const load = async () => {
+    const r: any = await objectApi.list(type, filterOrg, filterDept);
+    setData((r.data || []).filter((o: any) => o.type === type));
+  };
+  useEffect(() => { load(); }, [type, filterOrg, filterDept]);
 
   const save = async (values: any) => {
     const payload = { ...values, type };
@@ -26,23 +31,29 @@ function ObjectTable({ type, orgs, users }: { type: string; orgs: any[]; users: 
     message.success('保存成功'); setModal(false); form.resetFields(); setEdit(null); load();
   };
 
-  const orgName = (id: number) => orgs.find(o => o.id === id)?.name || '-';
-  const userName = (id: number) => users.find(u => u.id === id)?.name || '-';
+  const orgName = (id: string) => orgs.find(o => o.id === id)?.name || '-';
+  const userName = (id: string) => users.find(u => u.id === id)?.name || '-';
 
   return (
     <>
-      <div style={{ marginBottom: 12 }}>
+      <Space style={{ marginBottom: 12 }}>
+        <Select allowClear placeholder="筛选所属组织" style={{ width: 160 }} onChange={setFilterOrg}
+          options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+        <Select allowClear placeholder="筛选所属部门" style={{ width: 160 }} onChange={setFilterDept}
+          options={orgs.map(o => ({ value: o.id, label: o.name }))} />
         <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
           新增{allTypeOptions.find(o => o.value === type)?.label}
         </Button>
-      </div>
-      <Table dataSource={data} rowKey="id" columns={[
-        { title: 'ID', dataIndex: 'id', width: 60 },
+      </Space>
+      <Table dataSource={data} rowKey="id" showSorterTooltip={false} columns={[
+        { title: '序号', key: 'index', width: 60, render: (_: any, __: any, index: number) => index + 1 },
         { title: '名称', dataIndex: 'name' },
         { title: '联系人', dataIndex: 'contact' },
         { title: '电话', dataIndex: 'phone' },
-        { title: '所属组织', dataIndex: 'orgId', width: 100, render: (v: number) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-        { title: '负责人', dataIndex: 'ownerId', width: 90, render: (v: number) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+        { title: '行业', dataIndex: 'industry' },
+        { title: '所属组织', dataIndex: 'orgId', width: 100, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
+        { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{orgName(v)}</Tag> : '-' },
+        { title: '负责人', dataIndex: 'ownerId', width: 90, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
         { title: '操作', width: 140, render: (_: any, r: any) => (
           <Space>
             <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
@@ -59,8 +70,12 @@ function ObjectTable({ type, orgs, users }: { type: string; orgs: any[]; users: 
           <Form.Item name="contact" label="联系人"><Input /></Form.Item>
           <Form.Item name="phone" label="电话"><Input /></Form.Item>
           <Form.Item name="address" label="地址"><Input /></Form.Item>
+          <Form.Item name="industry" label="行业"><Input /></Form.Item>
           <Form.Item name="orgId" label="所属组织">
             <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+          </Form.Item>
+          <Form.Item name="deptId" label="所属部门">
+            <Select allowClear placeholder="选择部门" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
           <Form.Item name="ownerId" label="负责人">
             <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label"

@@ -21,13 +21,10 @@ public class ObjectController {
     private final SysUserMapper userMapper;
     private final JdbcTemplate jdbc;
 
-    // 获取当前用户允许的对象类型
-    private List<String> getAllowedTypes(Integer userId) {
-        // 个人配置优先
+    private List<String> getAllowedTypes(String userId) {
         List<String> personal = jdbc.queryForList(
             "SELECT object_type FROM user_object_type WHERE user_id = ?", String.class, userId);
         if (!personal.isEmpty()) return personal;
-        // 岗位默认（主岗+辅岗并集）
         return jdbc.queryForList(
             "SELECT DISTINCT pot.object_type FROM position_object_type pot " +
             "JOIN sys_user su ON su.primary_position_id = pot.position_id WHERE su.id = ? " +
@@ -37,17 +34,17 @@ public class ObjectController {
     }
 
     @GetMapping
-    public ApiResponse<List<ExternalObject>> list(@RequestParam(required = false) ObjectType type, Authentication auth) {
-        Integer userId = (Integer) auth.getPrincipal();
+    public ApiResponse<List<ExternalObject>> list(@RequestParam(required = false) ObjectType type,
+                                                   @RequestParam(required = false) String orgId,
+                                                   @RequestParam(required = false) String deptId,
+                                                   Authentication auth) {
+        String userId = (String) auth.getPrincipal();
         String role = auth.getAuthorities().stream().findFirst()
             .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("STAFF");
 
-        List<ExternalObject> all = service.list(type);
-
-        // ADMIN sees everything
+        List<ExternalObject> all = service.list(type, orgId, deptId);
         if ("ADMIN".equals(role)) return ApiResponse.ok(all);
 
-        // Filter by allowed types
         List<String> allowed = getAllowedTypes(userId);
         if (!allowed.isEmpty()) {
             all = all.stream()
@@ -55,7 +52,6 @@ public class ObjectController {
                 .collect(Collectors.toList());
         }
 
-        // Ownership filtering
         String posCode = "";
         try {
             posCode = jdbc.queryForObject(
@@ -65,50 +61,45 @@ public class ObjectController {
 
         Set<String> mgmtCodes = Set.of("BOSS", "SALES_DIR", "DEPT_MGR", "SYS_ADMIN");
         if (mgmtCodes.contains(posCode)) {
-            // Management: own + own org and all sub-orgs
             SysUser user = userMapper.selectById(userId);
-            List<Integer> orgIds = jdbc.queryForList(
+            List<String> orgIds = jdbc.queryForList(
                 "WITH RECURSIVE sub AS (SELECT id FROM organization WHERE id = ? UNION ALL SELECT o.id FROM organization o JOIN sub s ON o.parent_id = s.id) SELECT id FROM sub",
-                Integer.class, user.getOrgId());
+                String.class, user.getOrgId());
+            final List<String> orgIdsFinal = orgIds;
             all = all.stream()
-                .filter(o -> userId.equals(o.getOwnerId()) || orgIds.contains(o.getOrgId()))
+                .filter(o -> userId.equals(o.getOwnerId()) || orgIdsFinal.contains(o.getOrgId()) || orgIdsFinal.contains(o.getDeptId()))
                 .collect(Collectors.toList());
         } else if ("SALES_MGR".equals(posCode)) {
-            // Mid-level: own + same org
             SysUser user = userMapper.selectById(userId);
-            Integer orgId = user.getOrgId();
+            String userOrgId = user.getOrgId();
             all = all.stream()
-                .filter(o -> userId.equals(o.getOwnerId()) || (orgId != null && orgId.equals(o.getOrgId())))
+                .filter(o -> userId.equals(o.getOwnerId()) || (userOrgId != null && (userOrgId.equals(o.getOrgId()) || userOrgId.equals(o.getDeptId()))))
                 .collect(Collectors.toList());
         } else {
-            // Regular staff: own only
             all = all.stream()
                 .filter(o -> userId.equals(o.getOwnerId()))
                 .collect(Collectors.toList());
         }
-
         return ApiResponse.ok(all);
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<ExternalObject> get(@PathVariable Integer id) {
+    public ApiResponse<ExternalObject> get(@PathVariable String id) {
         return ApiResponse.ok(service.getById(id));
     }
 
     @PostMapping
     public ApiResponse<ExternalObject> create(@RequestBody ExternalObject obj, Authentication auth) {
-        Integer userId = (Integer) auth.getPrincipal();
+        String userId = (String) auth.getPrincipal();
         SysUser user = userMapper.selectById(userId);
-        // 自动绑定创建者和所属组织
         if (obj.getOwnerId() == null) obj.setOwnerId(userId);
         if (obj.getOrgId() == null && user.getOrgId() != null) obj.setOrgId(user.getOrgId());
         return ApiResponse.ok(service.create(obj));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Void> update(@PathVariable Integer id, @RequestBody ExternalObject obj, Authentication auth) {
+    public ApiResponse<Void> update(@PathVariable String id, @RequestBody ExternalObject obj, Authentication auth) {
         obj.setId(id);
-        // 保留原有的owner_id和org_id（如果前端没传）
         ExternalObject existing = service.getById(id);
         if (existing != null) {
             if (obj.getOwnerId() == null) obj.setOwnerId(existing.getOwnerId());
@@ -119,7 +110,7 @@ public class ObjectController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable Integer id) {
+    public ApiResponse<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ApiResponse.ok(null);
     }
