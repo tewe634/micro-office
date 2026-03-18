@@ -1,0 +1,11 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* 移除整页滚动条 */
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
