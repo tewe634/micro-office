@@ -42,31 +42,37 @@ export default function ProductPage() {
     <Card
       title="产品与服务"
       extra={<Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>}
+      styles={{ body: { padding: 0 } }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
     >
-      <Form form={searchForm} layout="inline" style={{ marginBottom: 16 }}>
-        <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
-        <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
-        <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
-        <Form.Item>
-          <Button type="primary" onClick={onSearch}>搜索</Button>
-        </Form.Item>
-      </Form>
+      <div style={{ padding: 24, paddingBottom: 0 }}>
+        <Form form={searchForm} layout="inline" style={{ marginBottom: 16 }}>
+          <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
+          <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
+          <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
+          <Form.Item>
+            <Button type="primary" onClick={onSearch}>搜索</Button>
+          </Form.Item>
+        </Form>
+      </div>
 
-      <Table
-        dataSource={data}
-        rowKey="id"
-        pagination={{
-          current,
-          pageSize: size,
-          total,
-          showSizeChanger: true,
-          showTotal: (t) => `共 ${t} 条`,
-          onChange: (page, pageSize) => {
-            setCurrent(page);
-            setSize(pageSize);
-          },
-        }}
-        columns={[
+      <div style={{ flex: 1, minHeight: 0, padding: 24, paddingTop: 0 }}>
+          <Table
+          dataSource={data}
+          rowKey="id"
+          pagination={{
+            current,
+            pageSize: size,
+            total,
+            showSizeChanger: true,
+            showTotal: (t) => `共 ${t} 条`,
+            onChange: (page, pageSize) => {
+              setCurrent(page);
+              setSize(pageSize);
+            },
+          }}
+          scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 56px - 16px - 56px)' }}
+          columns={[
           { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
           { title: '物料号', dataIndex: 'code', width: 180 },
           { title: '物料名称', dataIndex: 'name', width: 180 },
@@ -86,6 +92,7 @@ export default function ProductPage() {
         ]}
         scroll={{ x: 1600 }}
       />
+      </div>
 
       <Modal title={edit ? '编辑产品' : '新增产品'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">

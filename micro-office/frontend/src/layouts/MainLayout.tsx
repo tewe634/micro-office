@@ -1,6 +1,6 @@
 import { Layout, Menu } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { HomeOutlined, TeamOutlined, UserOutlined, ContactsOutlined, ShoppingOutlined, ClockCircleOutlined, SettingOutlined, IdcardOutlined, BarChartOutlined } from '@ant-design/icons';
+import { TeamOutlined, UserOutlined, ContactsOutlined, ShoppingOutlined, SettingOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../store/auth';
 import { useEffect, useState } from 'react';
 import { userApi } from '../api';
@@ -8,22 +8,16 @@ import { userApi } from '../api';
 const { Header, Sider, Content } = Layout;
 
 const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
-  '/portal': { icon: <IdcardOutlined />, label: '个人门户' },
-  '/workbench': { icon: <HomeOutlined />, label: '工作台' },
   '/org': { icon: <TeamOutlined />, label: '组织架构' },
   '/users': { icon: <UserOutlined />, label: '人员管理' },
   '/objects': { icon: <ContactsOutlined />, label: '外部对象' },
   '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
-  '/clock': { icon: <ClockCircleOutlined />, label: '打卡' },
-  '/dashboard': { icon: <BarChartOutlined />, label: '数据汇总' },
 };
 
-const menuOrder = ['/portal', '/workbench', '/org', '/users', '/objects', '/products', '/clock', '/dashboard'];
+const menuOrder = ['/org', '/users', '/objects', '/products'];
 
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
-  { key: '/admin/modules', label: '模块配置' },
-  { key: '/admin/templates', label: '流程模板' },
 ];
 
 export default function MainLayout() {
@@ -36,8 +30,7 @@ export default function MainLayout() {
   const [allowedMenus, setAllowedMenus] = useState<string[]>(storedMenus);
   const [userName, setUserName] = useState('');
 
-  // 基础模块所有人都有
-  const baseMenus = ['/portal', '/workbench', '/clock', '/dashboard'];
+  const baseMenus: string[] = [];
 
   useEffect(() => {
     userApi.me().then((r: any) => {
@@ -78,8 +71,10 @@ export default function MainLayout() {
           <span style={{ color: '#888', fontSize: 13 }}>你好，{userName}</span>
           <a onClick={() => { logout(); nav('/login'); }}>退出登录</a>
         </Header>
-        <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8 }}>
-          <Outlet />
+        <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8, height: 'calc(100vh - 64px - 48px)', overflow: 'hidden', display: 'flex' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Outlet />
+          </div>
         </Content>
       </Layout>
     </Layout>
