@@ -72,7 +72,7 @@ export default function OrgPage() {
               <Space>
                 {node.title as string}
                 <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
-                <Popconfirm title="确认删除？" onConfirm={async () => { await orgApi.delete(node.key as string); message.success('已删除'); loadOrgs(); }}>
+                <Popconfirm title="确认删除？" onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
                   <Button size="small" type="link" danger>删除</Button>
                 </Popconfirm>
               </Space>
