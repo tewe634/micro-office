@@ -4,7 +4,7 @@ import zhCN from 'antd/locale/zh_CN';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
 import OrgPage from './pages/org/OrgPage';
-import UserPage from './pages/user/UserPage';
+import UserAndPositionPage from './pages/user/UserAndPositionPage';
 import ObjectPage from './pages/object/ObjectPage';
 import ProductPage from './pages/product/ProductPage';
 import AdminPermissionPage from './pages/admin/AdminPermissionPage';
@@ -39,7 +39,7 @@ export default function App() {
           <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
             <Route index element={<HomeRedirect />} />
             <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
-            <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserPage /></MenuRouteGuard>} />
+            <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserAndPositionPage /></MenuRouteGuard>} />
             <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
             <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
             <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />

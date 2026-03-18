@@ -14,7 +14,7 @@ export const orgApi = {
 };
 
 export const positionApi = {
-  list: () => api.get('/positions'),
+  list: (params?: { current?: number; size?: number }) => api.get('/positions', { params }),
   create: (data: any) => api.post('/positions', data),
   update: (id: number, data: any) => api.put(`/positions/${id}`, data),
   delete: (id: number) => api.delete(`/positions/${id}`),
