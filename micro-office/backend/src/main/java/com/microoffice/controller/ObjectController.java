@@ -5,6 +5,7 @@ import com.microoffice.entity.ExternalObject;
 import com.microoffice.entity.SysUser;
 import com.microoffice.enums.ObjectType;
 import com.microoffice.mapper.SysUserMapper;
+import com.microoffice.service.DataScopeService;
 import com.microoffice.service.ExternalObjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +21,7 @@ public class ObjectController {
     private final ExternalObjectService service;
     private final SysUserMapper userMapper;
     private final JdbcTemplate jdbc;
+    private final DataScopeService dataScopeService;
 
     private List<String> getAllowedTypes(String userId) {
         List<String> personal = jdbc.queryForList(
@@ -43,7 +45,7 @@ public class ObjectController {
             .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("STAFF");
 
         List<ExternalObject> all = service.list(type, orgId, deptId);
-        if ("ADMIN".equals(role)) return ApiResponse.ok(all);
+        if ("ADMIN".equals(role) && dataScopeService.isGlobalAdmin(userId)) return ApiResponse.ok(all);
 
         List<String> allowed = getAllowedTypes(userId);
         if (!allowed.isEmpty()) {
@@ -52,34 +54,10 @@ public class ObjectController {
                 .collect(Collectors.toList());
         }
 
-        String posCode = "";
-        try {
-            posCode = jdbc.queryForObject(
-                "SELECT COALESCE(p.code,'') FROM sys_user su LEFT JOIN position p ON p.id = su.primary_position_id WHERE su.id = ?",
-                String.class, userId);
-        } catch (Exception e) { posCode = ""; }
-
-        Set<String> mgmtCodes = Set.of("BOSS", "SALES_DIR", "DEPT_MGR", "SYS_ADMIN");
-        if (mgmtCodes.contains(posCode)) {
-            SysUser user = userMapper.selectById(userId);
-            List<String> orgIds = jdbc.queryForList(
-                "WITH RECURSIVE sub AS (SELECT id FROM organization WHERE id = ? UNION ALL SELECT o.id FROM organization o JOIN sub s ON o.parent_id = s.id) SELECT id FROM sub",
-                String.class, user.getOrgId());
-            final List<String> orgIdsFinal = orgIds;
-            all = all.stream()
-                .filter(o -> userId.equals(o.getOwnerId()) || orgIdsFinal.contains(o.getOrgId()) || orgIdsFinal.contains(o.getDeptId()))
-                .collect(Collectors.toList());
-        } else if ("SALES_MGR".equals(posCode)) {
-            SysUser user = userMapper.selectById(userId);
-            String userOrgId = user.getOrgId();
-            all = all.stream()
-                .filter(o -> userId.equals(o.getOwnerId()) || (userOrgId != null && (userOrgId.equals(o.getOrgId()) || userOrgId.equals(o.getDeptId()))))
-                .collect(Collectors.toList());
-        } else {
-            all = all.stream()
-                .filter(o -> userId.equals(o.getOwnerId()))
-                .collect(Collectors.toList());
-        }
+        List<String> orgIds = dataScopeService.getScopeOrgIds(userId);
+        all = all.stream()
+            .filter(o -> userId.equals(o.getOwnerId()) || orgIds.contains(o.getOrgId()) || orgIds.contains(o.getDeptId()))
+            .collect(Collectors.toList());
         return ApiResponse.ok(all);
     }
 

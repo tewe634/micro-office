@@ -17,6 +17,7 @@ public class UserController {
     private final SysUserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbc;
+    private final com.microoffice.service.DataScopeService dataScopeService;
 
     @GetMapping("/me/lookups")
     public ApiResponse<Map<String, Object>> lookups() {
@@ -64,8 +65,13 @@ public class UserController {
 
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) String orgId) {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(currentUserId);
         List<SysUser> users;
         if (orgId != null) {
+            if (!visibleOrgIds.contains(orgId)) {
+                return ApiResponse.ok(new ArrayList<>());
+            }
             Integer isRoot = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM organization WHERE id = ? AND parent_id IS NULL", Integer.class, orgId);
             if (isRoot != null && isRoot > 0) {
@@ -116,7 +122,7 @@ public class UserController {
                 users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().in(SysUser::getId, new java.util.ArrayList<>(userIds)));
             }
         } else {
-            users = userMapper.selectList(null);
+            users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().in(SysUser::getOrgId, visibleOrgIds));
         }
         // 按工号数字部分排序
         users.sort((a, b) -> {
