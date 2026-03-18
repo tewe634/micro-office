@@ -9,3 +9,19 @@ html, body {
   height: 100%;
   overflow: hidden;
 }
+
+/* Tabs 在固定页面里撑满，避免分页器被裁掉 */
+.ant-tabs,
+.ant-tabs-content-holder,
+.ant-tabs-content,
+.ant-tabs-tabpane {
+  height: 100%;
+}
+
+.ant-tabs-content-holder {
+  min-height: 0;
+}
+
+.ant-tabs-tabpane {
+  overflow: hidden;
+}
