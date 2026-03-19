@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { authApi, userApi } from '../../api';
 import { useAuthStore } from '../../store/auth';
 
-const defaultRouteOrder = ['/workbench', '/users', '/objects', '/products', '/admin/permissions'];
-const resolveHomePath = (menus: string[]) => defaultRouteOrder.find(route => menus.includes(route) || (route === '/admin/permissions' && menus.includes('/admin'))) || '/org';
+const resolveHomePath = () => '/org';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -24,7 +23,7 @@ export default function LoginPage() {
       const objectTypes = me.data?.objectTypes || [];
       setMenus(menus);
       setObjectTypes(objectTypes);
-      nav(resolveHomePath(menus));
+      nav(resolveHomePath());
     } catch {
       message.error('登录失败，请检查手机号/邮箱或密码');
     }
@@ -42,7 +41,7 @@ export default function LoginPage() {
       setMenus(menus);
       setObjectTypes(objectTypes);
       message.success('注册成功');
-      nav(resolveHomePath(menus));
+      nav(resolveHomePath());
     } catch { message.error('注册失败'); }
     setLoading(false);
   };

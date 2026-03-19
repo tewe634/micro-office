@@ -11,8 +11,6 @@ import AdminPermissionPage from './pages/admin/AdminPermissionPage';
 import { useAuthStore } from './store/auth';
 import { uiText } from './constants/ui';
 
-const defaultRouteOrder = ['/workbench', '/users', '/objects', '/products', '/admin/permissions'];
-
 const appLocale = {
   ...zhCN,
   Pagination: {
@@ -43,9 +41,7 @@ const appLocale = {
 };
 
 function HomeRedirect() {
-  const menus = useAuthStore(s => s.menus);
-  const first = defaultRouteOrder.find(route => menus.includes(route) || (route === '/admin/permissions' && menus.includes('/admin')));
-  return <Navigate to={first || '/org'} replace />;
+  return <Navigate to="/org" replace />;
 }
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
