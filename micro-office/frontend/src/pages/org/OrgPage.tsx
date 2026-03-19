@@ -37,6 +37,16 @@ const orgChartStyles = `
   height: 100%;
   overflow: auto;
   padding: 40px 48px 96px;
+  cursor: grab;
+}
+
+.org-canvas-viewport--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.org-canvas-viewport--dragging * {
+  user-select: none;
 }
 
 .org-canvas-stage {
@@ -320,10 +330,17 @@ export default function OrgPage() {
   const [orgs, setOrgs] = useState<OrgItem[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [isDragging, setIsDragging] = useState(false);
   const [orgModal, setOrgModal] = useState(false);
   const [editOrg, setEditOrg] = useState<OrgItem | null>(null);
   const [orgForm] = Form.useForm();
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef({
+    startX: 0,
+    startY: 0,
+    scrollLeft: 0,
+    scrollTop: 0,
+  });
 
   const childrenMap = useMemo(() => {
     const map = new Map<string | null, OrgItem[]>();
@@ -363,6 +380,49 @@ export default function OrgPage() {
       viewport.scrollLeft = Math.max((viewport.scrollWidth - viewport.clientWidth) / 2, 0);
     });
   }, [rootOrg?.id, zoom, orgs.length]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const deltaX = event.clientX - dragStateRef.current.startX;
+      const deltaY = event.clientY - dragStateRef.current.startY;
+      viewport.scrollLeft = dragStateRef.current.scrollLeft - deltaX;
+      viewport.scrollTop = dragStateRef.current.scrollTop - deltaY;
+    };
+
+    const stopDragging = () => setIsDragging(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', stopDragging);
+    window.addEventListener('mouseleave', stopDragging);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', stopDragging);
+      window.removeEventListener('mouseleave', stopDragging);
+    };
+  }, [isDragging]);
+
+  const handleViewportMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('.org-canvas-toolbar, .ant-btn, .ant-slider, .ant-input, .ant-input-number, .ant-select, .ant-tree-select')) {
+      return;
+    }
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    dragStateRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    };
+    setIsDragging(true);
+    event.preventDefault();
+  };
 
   const openOrgModal = (org?: OrgItem) => {
     if (!canManageOrg) return;
@@ -405,7 +465,11 @@ export default function OrgPage() {
       >
         <div className="page-card-body page-card-body--flush">
           <div className="org-canvas-page">
-            <div className="org-canvas-viewport" ref={viewportRef}>
+            <div
+              className={`org-canvas-viewport${isDragging ? ' org-canvas-viewport--dragging' : ''}`}
+              ref={viewportRef}
+              onMouseDown={handleViewportMouseDown}
+            >
               <div className="org-canvas-stage">
                 <div className="org-canvas-content" style={{ zoom: zoom / 100 } as React.CSSProperties}>
                   {rootOrg ? (
