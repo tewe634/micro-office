@@ -22,11 +22,12 @@ export const positionApi = {
 
 export const objectApi = {
   list: (type?: string, deptId?: string) => api.get('/objects', { params: { type, deptId } }),
+  page: (params?: { current?: number; size?: number; type?: string; deptId?: string; orgId?: string }) => api.get('/objects/page', { params }),
   departments: () => api.get('/objects/departments'),
-  get: (id: number) => api.get(`/objects/${id}`),
+  get: (id: string | number) => api.get(`/objects/${id}`),
   create: (data: any) => api.post('/objects', data),
-  update: (id: number, data: any) => api.put(`/objects/${id}`, data),
-  delete: (id: number) => api.delete(`/objects/${id}`),
+  update: (id: string | number, data: any) => api.put(`/objects/${id}`, data),
+  delete: (id: string | number) => api.delete(`/objects/${id}`),
 };
 
 export const productApi = {

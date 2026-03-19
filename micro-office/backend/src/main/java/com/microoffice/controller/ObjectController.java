@@ -1,6 +1,7 @@
 package com.microoffice.controller;
 
 import com.microoffice.dto.response.ApiResponse;
+import com.microoffice.dto.response.PageResponse;
 import com.microoffice.entity.ExternalObject;
 import com.microoffice.entity.SysUser;
 import com.microoffice.enums.ObjectType;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,28 @@ public class ObjectController {
             String.class, userId, userId);
     }
 
+    private List<ExternalObject> filterAccessibleObjects(List<ExternalObject> all, Authentication auth) {
+        String userId = (String) auth.getPrincipal();
+        String role = auth.getAuthorities().stream().findFirst()
+            .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("STAFF");
+
+        if ("ADMIN".equals(role) && dataScopeService.isGlobalAdmin(userId)) {
+            return all;
+        }
+
+        List<String> allowed = getAllowedTypes(userId);
+        if (!allowed.isEmpty()) {
+            all = all.stream()
+                .filter(o -> allowed.contains(o.getType().name()))
+                .collect(Collectors.toList());
+        }
+
+        List<String> orgIds = dataScopeService.getScopeOrgIds(userId);
+        return all.stream()
+            .filter(o -> userId.equals(o.getOwnerId()) || orgIds.contains(o.getOrgId()) || orgIds.contains(o.getDeptId()))
+            .collect(Collectors.toList());
+    }
+
     @GetMapping("/departments")
     public ApiResponse<List<Map<String, Object>>> departments(Authentication auth) {
         String userId = (String) auth.getPrincipal();
@@ -50,28 +74,26 @@ public class ObjectController {
 
     @GetMapping
     public ApiResponse<List<ExternalObject>> list(@RequestParam(required = false) ObjectType type,
-                                                   @RequestParam(required = false) String orgId,
-                                                   @RequestParam(required = false) String deptId,
-                                                   Authentication auth) {
-        String userId = (String) auth.getPrincipal();
-        String role = auth.getAuthorities().stream().findFirst()
-            .map(a -> a.getAuthority().replace("ROLE_", "")).orElse("STAFF");
-
+                                                  @RequestParam(required = false) String orgId,
+                                                  @RequestParam(required = false) String deptId,
+                                                  Authentication auth) {
         List<ExternalObject> all = service.list(type, orgId, deptId);
-        if ("ADMIN".equals(role) && dataScopeService.isGlobalAdmin(userId)) return ApiResponse.ok(all);
+        return ApiResponse.ok(filterAccessibleObjects(all, auth));
+    }
 
-        List<String> allowed = getAllowedTypes(userId);
-        if (!allowed.isEmpty()) {
-            all = all.stream()
-                .filter(o -> allowed.contains(o.getType().name()))
-                .collect(Collectors.toList());
-        }
-
-        List<String> orgIds = dataScopeService.getScopeOrgIds(userId);
-        all = all.stream()
-            .filter(o -> userId.equals(o.getOwnerId()) || orgIds.contains(o.getOrgId()) || orgIds.contains(o.getDeptId()))
-            .collect(Collectors.toList());
-        return ApiResponse.ok(all);
+    @GetMapping("/page")
+    public ApiResponse<PageResponse<ExternalObject>> page(@RequestParam(defaultValue = "1") long current,
+                                                          @RequestParam(defaultValue = "20") long size,
+                                                          @RequestParam(required = false) ObjectType type,
+                                                          @RequestParam(required = false) String orgId,
+                                                          @RequestParam(required = false) String deptId,
+                                                          Authentication auth) {
+        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId), auth);
+        long total = all.size();
+        int fromIndex = (int) Math.max(0, (current - 1) * size);
+        int toIndex = (int) Math.min(total, fromIndex + size);
+        List<ExternalObject> records = fromIndex >= total ? Collections.emptyList() : all.subList(fromIndex, toIndex);
+        return ApiResponse.ok(new PageResponse<>(current, size, total, records));
     }
 
     @GetMapping("/{id}")

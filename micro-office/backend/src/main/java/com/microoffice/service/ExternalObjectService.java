@@ -18,6 +18,9 @@ public class ExternalObjectService {
         if (type != null) q.eq(ExternalObject::getType, type);
         if (orgId != null) q.eq(ExternalObject::getOrgId, orgId);
         if (deptId != null) q.eq(ExternalObject::getDeptId, deptId);
+        q.orderByDesc(ExternalObject::getUpdatedAt)
+            .orderByDesc(ExternalObject::getCreatedAt)
+            .orderByDesc(ExternalObject::getId);
         return mapper.selectList(q);
     }
     public ExternalObject getById(String id) { return mapper.selectById(id); }
