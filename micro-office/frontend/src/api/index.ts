@@ -7,10 +7,10 @@ export const authApi = {
 
 export const orgApi = {
   list: () => api.get('/orgs'),
-  get: (id: number) => api.get(`/orgs/${id}`),
+  get: (id: string | number) => api.get(`/orgs/${id}`),
   create: (data: any) => api.post('/orgs', data),
-  update: (id: number, data: any) => api.put(`/orgs/${id}`, data),
-  delete: (id: number) => api.delete(`/orgs/${id}`),
+  update: (id: string | number, data: any) => api.put(`/orgs/${id}`, data),
+  delete: (id: string | number) => api.delete(`/orgs/${id}`),
 };
 
 export const positionApi = {
