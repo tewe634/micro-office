@@ -1,54 +1,193 @@
-html, body {
+html,
+body,
+#root {
+  width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* 移除整页滚动条 */
 }
 
-#root {
-  height: 100%;
+body {
   overflow: hidden;
+  background: #f5f5f5;
 }
 
-/* Tabs 在固定页面里撑满，避免分页器被裁掉 */
-.ant-tabs,
-.ant-tabs-content-holder,
-.ant-tabs-content,
-.ant-tabs-tabpane {
+* {
+  box-sizing: border-box;
+}
+
+.page-fill {
   height: 100%;
-}
-
-.ant-tabs {
   min-height: 0;
-}
-
-.ant-tabs-content-holder,
-.ant-tabs-content,
-.ant-tabs-tabpane {
-  min-height: 0;
-}
-
-.ant-tabs-tabpane {
-  overflow: hidden;
-}
-
-.ant-table-wrapper,
-.ant-spin-nested-loading,
-.ant-spin-container {
-  height: 100%;
-}
-
-.ant-table {
   display: flex;
   flex-direction: column;
+}
+
+.page-card.ant-card {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-card > .ant-card-head {
+  flex: 0 0 auto;
+}
+
+.page-card > .ant-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.page-card-body--flush {
+  padding: 0;
+}
+
+.page-card-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.page-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-toolbar-right {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-tabs.ant-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-tabs > .ant-tabs-nav {
+  flex: 0 0 auto;
+  margin-bottom: 16px;
+}
+
+.page-tabs > .ant-tabs-content-holder,
+.page-tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.page-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  flex: 1;
+  min-height: 0;
   height: 100%;
 }
 
-.ant-table-container {
+.page-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+  overflow: hidden;
+}
+
+.fixed-table-page {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fixed-table-page__section {
+  flex: 0 0 auto;
+}
+
+.fixed-table-page__frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+}
+
+.fixed-table-page__table {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 12px 0;
+}
+
+.fixed-table-page__footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+}
+
+.fixed-table-page .ant-table-wrapper,
+.fixed-table-page .ant-spin-nested-loading,
+.fixed-table-page .ant-spin-container,
+.fixed-table-page .ant-table,
+.fixed-table-page .ant-table-container {
+  height: 100%;
   min-height: 0;
 }
 
-.ant-table-body {
+.fixed-table-page .ant-table-body {
+  height: 100% !important;
+  max-height: none !important;
   overflow: auto !important;
+}
+
+.fixed-table-page .ant-pagination {
+  margin: 0;
+}
+
+.split-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 24px;
+  overflow: hidden;
+}
+
+.split-panel__aside {
+  width: 320px;
+  min-width: 280px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.split-panel__content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.split-panel__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }

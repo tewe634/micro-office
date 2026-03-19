@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag } from 'antd';
 import { objectApi, userApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 
 const allTypeOptions = [
   { value: 'CUSTOMER', label: '客户' },
@@ -22,12 +23,23 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
     const r: any = await objectApi.list(type, filterDept);
     setData((r.data || []).filter((o: any) => o.type === type));
   };
-  useEffect(() => { load(); }, [type, filterDept]);
+
+  useEffect(() => {
+    load();
+  }, [type, filterDept]);
 
   const save = async (values: any) => {
     const payload = { ...values, type };
-    if (edit) { await objectApi.update(edit.id, payload); } else { await objectApi.create(payload); }
-    message.success('保存成功'); setModal(false); form.resetFields(); setEdit(null); load();
+    if (edit) {
+      await objectApi.update(edit.id, payload);
+    } else {
+      await objectApi.create(payload);
+    }
+    message.success('保存成功');
+    setModal(false);
+    form.resetFields();
+    setEdit(null);
+    load();
   };
 
   const orgName = (id: string) => orgs.find(o => o.id === id)?.name || '-';
@@ -35,33 +47,58 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
 
   return (
     <>
-      <Space style={{ marginBottom: 12 }}>
-        <Select allowClear placeholder="按所属部门筛选" style={{ width: 180 }} onChange={setFilterDept}
-          options={departments.map(o => ({ value: o.id, label: o.name }))} />
-        <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
-          新增{allTypeOptions.find(o => o.value === type)?.label}
-        </Button>
-      </Space>
-      <Table dataSource={data} rowKey="id" showSorterTooltip={false}
-        scroll={{ y: 'calc(100vh - 64px - 48px - 24px - 24px - 24px - 46px - 16px - 56px)' }}
-        columns={[
-        { title: '序号', key: 'index', width: 60, render: (_: any, __: any, index: number) => index + 1 },
-        { title: '名称', dataIndex: 'name' },
-        { title: '联系人', dataIndex: 'contact' },
-        { title: '电话', dataIndex: 'phone' },
-        { title: '行业', dataIndex: 'industry' },
-        { title: '所属组织', dataIndex: 'orgId', width: 100, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-        { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{orgName(v)}</Tag> : '-' },
-        { title: '负责人', dataIndex: 'ownerId', width: 90, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
-        { title: '操作', width: 140, render: (_: any, r: any) => (
-          <Space>
-            <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-            <Popconfirm title="确认删除？" onConfirm={async () => { await objectApi.delete(r.id); message.success('已删除'); load(); }}>
-              <Button size="small" danger>删除</Button>
-            </Popconfirm>
-          </Space>
-        )},
-      ]} />
+      <FixedTablePage
+        top={
+          <div className="page-toolbar">
+            <Select
+              allowClear
+              placeholder="按所属部门筛选"
+              style={{ width: 220 }}
+              onChange={setFilterDept}
+              options={departments.map(o => ({ value: o.id, label: o.name }))}
+            />
+            <div className="page-toolbar-right">
+              <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
+                新增{allTypeOptions.find(o => o.value === type)?.label}
+              </Button>
+            </div>
+          </div>
+        }
+        table={
+          <Table
+            dataSource={data}
+            rowKey="id"
+            pagination={false}
+            sticky
+            showSorterTooltip={false}
+            scroll={{ x: 1400, y: '100%' }}
+            style={{ height: '100%' }}
+            columns={[
+              { title: '序号', key: 'index', width: 60, render: (_: any, __: any, index: number) => index + 1 },
+              { title: '名称', dataIndex: 'name', width: 180 },
+              { title: '联系人', dataIndex: 'contact', width: 120 },
+              { title: '电话', dataIndex: 'phone', width: 140 },
+              { title: '行业', dataIndex: 'industry', width: 140 },
+              { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
+              { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{orgName(v)}</Tag> : '-' },
+              { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+              {
+                title: '操作',
+                width: 140,
+                fixed: 'right',
+                render: (_: any, r: any) => (
+                  <Space>
+                    <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
+                    <Popconfirm title="确认删除？" onConfirm={async () => { await objectApi.delete(r.id); message.success('已删除'); load(); }}>
+                      <Button size="small" danger>删除</Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        }
+      />
 
       <Modal title={edit ? '编辑' : '新增'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
@@ -114,17 +151,32 @@ export default function ObjectPage() {
   const visibleTypes = allTypeOptions.filter(o => objectTypes.includes(o.value));
 
   if (visibleTypes.length === 0) {
-    return <Card title="外部对象管理"><p style={{ color: '#888' }}>您当前岗位没有可查看的外部对象类型，请联系管理员配置。</p></Card>;
+    return (
+      <Card title="外部对象管理" className="page-card page-fill" styles={{ body: { minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
+        <p style={{ color: '#888' }}>您当前岗位没有可查看的外部对象类型，请联系管理员配置。</p>
+      </Card>
+    );
   }
 
   return (
-    <Card title="外部对象管理" styles={{ body: { padding: 0 } }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, minHeight: 0, padding: 24 }}>
-        <Tabs items={visibleTypes.map(t => ({
-          key: t.value,
-          label: t.label,
-          children: <ObjectTable type={t.value} orgs={orgs} users={users} departments={departments} />,
-        }))} />
+    <Card
+      title="外部对象管理"
+      className="page-card page-fill"
+      styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
+    >
+      <div className="page-card-body">
+        <Tabs
+          className="page-tabs"
+          items={visibleTypes.map(t => ({
+            key: t.value,
+            label: t.label,
+            children: (
+              <div className="page-fill">
+                <ObjectTable type={t.value} orgs={orgs} users={users} departments={departments} />
+              </div>
+            ),
+          }))}
+        />
       </div>
     </Card>
   );

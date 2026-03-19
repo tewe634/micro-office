@@ -56,28 +56,30 @@ export default function OrgPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="page-fill">
       <Card
         title="公司整体组织架构"
-        styles={{ body: { padding: 0 } }}
-        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+        className="page-card page-fill"
+        styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
         extra={<Button type="primary" onClick={() => openOrgModal()}>新增组织</Button>}
       >
-        <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: 'auto' }}>
-          <Tree
-            treeData={buildTree(orgs)}
-            defaultExpandedKeys={['90f8e26c-cf34-4e9b-a4c8-ea18353879bb']}
-            showLine
-            titleRender={(node: any) => (
-              <Space>
-                {node.title as string}
-                <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
-                <Popconfirm title="确认删除？" onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
-                  <Button size="small" type="link" danger>删除</Button>
-                </Popconfirm>
-              </Space>
-            )}
-          />
+        <div className="page-card-body">
+          <div className="page-card-scroll">
+            <Tree
+              treeData={buildTree(orgs)}
+              defaultExpandedKeys={['90f8e26c-cf34-4e9b-a4c8-ea18353879bb']}
+              showLine
+              titleRender={(node: any) => (
+                <Space>
+                  {node.title as string}
+                  <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
+                  <Popconfirm title="确认删除？" onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
+                    <Button size="small" type="link" danger>删除</Button>
+                  </Popconfirm>
+                </Space>
+              )}
+            />
+          </div>
         </div>
       </Card>
 

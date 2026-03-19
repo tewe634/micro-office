@@ -6,15 +6,31 @@ export default function UserAndPositionPage() {
   return (
     <Card
       title="人员管理"
-      styles={{ body: { padding: 0, height: '100%' } }}
-      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+      className="page-card page-fill"
+      styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >
-      <div style={{ flex: 1, minHeight: 0, padding: 24, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="page-card-body">
         <Tabs
-          style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}
+          className="page-tabs"
           items={[
-            { key: 'users', label: '人员', children: <UserTab /> },
-            { key: 'positions', label: '岗位', children: <PositionTab /> },
+            {
+              key: 'users',
+              label: '人员',
+              children: (
+                <div className="page-fill">
+                  <UserTab />
+                </div>
+              ),
+            },
+            {
+              key: 'positions',
+              label: '岗位',
+              children: (
+                <div className="page-fill">
+                  <PositionTab />
+                </div>
+              ),
+            },
           ]}
         />
       </div>
