@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag, Pagination } from 'antd';
 import { objectApi, userApi } from '../../api';
-import FixedTablePage from '../../components/FixedTablePage';
 
 const allTypeOptions = [
   { value: 'CUSTOMER', label: '客户' },
@@ -61,68 +60,88 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
 
   return (
     <>
-      <FixedTablePage
-        top={
-          <div className="page-toolbar">
-            <Select
-              allowClear
-              placeholder="按所属部门筛选"
-              style={{ width: 220 }}
-              onChange={v => setFilterDept(v)}
-              options={departments.map(o => ({ value: o.id, label: o.name }))}
-            />
-            <div className="page-toolbar-right">
-              <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
-                新增{allTypeOptions.find(o => o.value === type)?.label}
-              </Button>
-            </div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="page-toolbar">
+          <Select
+            allowClear
+            placeholder="按所属部门筛选"
+            style={{ width: 220 }}
+            onChange={v => setFilterDept(v)}
+            options={departments.map(o => ({ value: o.id, label: o.name }))}
+          />
+          <div className="page-toolbar-right">
+            <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
+              新增{allTypeOptions.find(o => o.value === type)?.label}
+            </Button>
           </div>
-        }
-        table={
-          <Table
-            dataSource={data}
-            rowKey="id"
-            pagination={false}
-            tableLayout="fixed"
-            showSorterTooltip={false}
-            sticky
-            scroll={{ y: '100%' }}
-            style={{ height: '100%' }}
-            columns={[
-              { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
-              { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
-              { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
-              { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
-              { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
-              { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-              { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{deptName(v)}</Tag> : '-' },
-              { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
-              {
-                title: '操作',
-                width: 140,
-                render: (_: any, r: any) => (
-                  <Space>
-                    <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-                    <Popconfirm title="确认删除？" onConfirm={() => reloadAfterDelete(r.id)}>
-                      <Button size="small" danger>删除</Button>
-                    </Popconfirm>
-                  </Space>
-                ),
-              },
-            ]}
-          />
-        }
-        pagination={
-          <Pagination
-            current={current}
-            pageSize={size}
-            total={total}
-            showSizeChanger
-            showTotal={(t) => `共 ${t} 条`}
-            onChange={(page, pageSize) => load(page, pageSize, filterDept)}
-          />
-        }
-      />
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#fff',
+            border: '1px solid #f0f0f0',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+            <Table
+              dataSource={data}
+              rowKey="id"
+              pagination={false}
+              tableLayout="fixed"
+              showSorterTooltip={false}
+              scroll={{ y: 'calc(100dvh - 455px)' }}
+              columns={[
+                { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
+                { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
+                { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
+                { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
+                { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
+                { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
+                { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{deptName(v)}</Tag> : '-' },
+                { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+                {
+                  title: '操作',
+                  width: 140,
+                  render: (_: any, r: any) => (
+                    <Space>
+                      <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
+                      <Popconfirm title="确认删除？" onConfirm={() => reloadAfterDelete(r.id)}>
+                        <Button size="small" danger>删除</Button>
+                      </Popconfirm>
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          </div>
+
+          <div
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '12px 16px 16px',
+              borderTop: '1px solid #f0f0f0',
+              background: '#fff',
+            }}
+          >
+            <Pagination
+              current={current}
+              pageSize={size}
+              total={total}
+              showSizeChanger
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(page, pageSize) => load(page, pageSize, filterDept)}
+            />
+          </div>
+        </div>
+      </div>
 
       <Modal title={edit ? '编辑' : '新增'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
