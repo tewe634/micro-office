@@ -65,7 +65,7 @@ export default function UserTab() {
     setModal(false);
     form.resetFields();
     setEdit(null);
-    loadUsers(1, size, filterOrg);
+    loadUsers(current, size, filterOrg);
   };
 
   const changePwd = async (values: any) => {
@@ -143,7 +143,7 @@ export default function UserTab() {
                     <Space size={6} wrap>
                       <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
                       <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
-                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(1, size, filterOrg); }}>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); const nextCurrent = current > 1 && users.length === 1 ? current - 1 : current; loadUsers(nextCurrent, size, filterOrg); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>

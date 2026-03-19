@@ -31,7 +31,7 @@ export default function PositionTab() {
     setModal(false);
     setEdit(null);
     form.resetFields();
-    load(1, size);
+    load(current, size);
   };
 
   return (
@@ -70,7 +70,7 @@ export default function PositionTab() {
                   render: (_: any, r: any) => (
                     <Space>
                       <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await positionApi.delete(r.id); message.success('已删除'); load(1, size); }}>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await positionApi.delete(r.id); message.success('已删除'); const nextCurrent = current > 1 && data.length === 1 ? current - 1 : current; load(nextCurrent, size); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>

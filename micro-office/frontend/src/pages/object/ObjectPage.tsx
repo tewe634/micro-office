@@ -51,7 +51,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
     setModal(false);
     form.resetFields();
     setEdit(null);
-    load(1, size, filterDept);
+    load(current, size, filterDept);
   };
 
   const reloadAfterDelete = async (id: string) => {
