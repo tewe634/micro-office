@@ -117,9 +117,8 @@ export default function UserTab() {
               dataSource={users}
               rowKey="id"
               pagination={false}
-              sticky
               tableLayout="fixed"
-              scroll={{ y: 'calc(100dvh - 360px)' }}
+              scroll={{ y: 'calc(100dvh - 390px)' }}
               columns={[
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '工号', dataIndex: 'empNo', width: 110, ellipsis: true },
