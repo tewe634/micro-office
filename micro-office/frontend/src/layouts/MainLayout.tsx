@@ -30,7 +30,7 @@ export default function MainLayout() {
   const [allowedMenus, setAllowedMenus] = useState<string[]>(storedMenus);
   const [userName, setUserName] = useState('');
 
-  const baseMenus: string[] = ['/org'];
+  const baseMenus: string[] = ['/org', '/users'];
 
   useEffect(() => {
     userApi.me().then((r: any) => {

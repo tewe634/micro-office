@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination } from 'antd';
 import { positionApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
+import { useAuthStore } from '../../store/auth';
 
 export default function PositionTab() {
+  const role = useAuthStore(s => s.role);
+  const canManagePersonnel = role === 'ADMIN' || role === 'HR';
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
@@ -38,7 +41,7 @@ export default function PositionTab() {
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="page-toolbar-right">
-          <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>
+          {canManagePersonnel ? <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button> : null}
         </div>
 
         <div
@@ -64,7 +67,7 @@ export default function PositionTab() {
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '岗位名称', dataIndex: 'name', ellipsis: true },
                 { title: '编码', dataIndex: 'code', width: 220, ellipsis: true },
-                {
+                ...(canManagePersonnel ? [{
                   title: '操作',
                   width: 140,
                   render: (_: any, r: any) => (
@@ -75,7 +78,7 @@ export default function PositionTab() {
                       </Popconfirm>
                     </Space>
                   ),
-                },
+                }] : []),
               ]}
             />
           </div>
@@ -103,12 +106,12 @@ export default function PositionTab() {
         </div>
       </div>
 
-      <Modal okText="确定" cancelText="取消" title={edit ? '编辑岗位' : '新增岗位'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      {canManagePersonnel ? <Modal okText="确定" cancelText="取消" title={edit ? '编辑岗位' : '新增岗位'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="编码" rules={[{ required: true }]}><Input /></Form.Item>
         </Form>
-      </Modal>
+      </Modal> : null}
     </>
   );
 }

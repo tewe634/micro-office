@@ -49,7 +49,9 @@ public class SecurityConfig {
                 // 组织架构: 全员可查看；变更操作仍保留给 HR 和 ADMIN
                 .requestMatchers(HttpMethod.GET, "/api/orgs/**").authenticated()
                 .requestMatchers("/api/orgs/**").hasAnyRole("HR", "ADMIN")
-                // 人员管理: HR 和 ADMIN
+                // 人员管理: 所有登录用户可查看；变更操作仍保留给 HR 和 ADMIN
+                .requestMatchers(HttpMethod.GET, "/api/users/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/positions/**").authenticated()
                 .requestMatchers("/api/users/**").hasAnyRole("HR", "ADMIN")
                 .requestMatchers("/api/positions/**").hasAnyRole("HR", "ADMIN")
                 // 系统管理: 仅 ADMIN

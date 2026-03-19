@@ -6,6 +6,7 @@ import com.microoffice.dto.response.PageResponse;
 import com.microoffice.entity.Position;
 import com.microoffice.service.PositionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,19 +18,25 @@ public class PositionController {
     private final PositionService service;
 
     @GetMapping
-    public ApiResponse<List<Position>> list() {
-        return ApiResponse.ok(service.list());
+    public ApiResponse<List<Position>> list(Authentication auth) {
+        String currentUserId = (String) auth.getPrincipal();
+        return ApiResponse.ok(service.list(currentUserId));
     }
 
     @GetMapping("/page")
     public ApiResponse<PageResponse<Position>> page(@RequestParam(defaultValue = "1") long current,
-                                                    @RequestParam(defaultValue = "20") long size) {
-        Page<Position> page = service.page(current, size);
+                                                    @RequestParam(defaultValue = "20") long size,
+                                                    Authentication auth) {
+        String currentUserId = (String) auth.getPrincipal();
+        Page<Position> page = service.page(current, size, currentUserId);
         return ApiResponse.ok(new PageResponse<>(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords()));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Position> get(@PathVariable String id) { return ApiResponse.ok(service.getById(id)); }
+    public ApiResponse<Position> get(@PathVariable String id, Authentication auth) {
+        String currentUserId = (String) auth.getPrincipal();
+        return ApiResponse.ok(service.getById(id, currentUserId));
+    }
 
     @PostMapping
     public ApiResponse<Position> create(@RequestBody Position p) { return ApiResponse.ok(service.create(p)); }

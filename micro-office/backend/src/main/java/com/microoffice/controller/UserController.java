@@ -21,9 +21,22 @@ public class UserController {
 
     @GetMapping("/me/lookups")
     public ApiResponse<Map<String, Object>> lookups() {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(currentUserId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("orgs", jdbc.queryForList("SELECT id, name, parent_id FROM organization ORDER BY sort_order, id"));
-        result.put("users", jdbc.queryForList("SELECT id, name, org_id FROM sys_user ORDER BY id"));
+        if (visibleOrgIds.isEmpty()) {
+            result.put("orgs", new ArrayList<>());
+            result.put("users", new ArrayList<>());
+        } else {
+            result.put("orgs", jdbc.queryForList(
+                "SELECT id, name, parent_id FROM organization WHERE id = ANY(?::varchar[]) ORDER BY sort_order, id",
+                (Object) visibleOrgIds.toArray(new String[0])
+            ));
+            result.put("users", jdbc.queryForList(
+                "SELECT id, name, org_id FROM sys_user WHERE org_id = ANY(?::varchar[]) ORDER BY id",
+                (Object) visibleOrgIds.toArray(new String[0])
+            ));
+        }
         result.put("roles", jdbc.queryForList("SELECT code, name FROM sys_role ORDER BY sort_order"));
         return ApiResponse.ok(result);
     }
@@ -44,7 +57,7 @@ public class UserController {
                 "SELECT menu_key FROM role_menu_permission WHERE role = ? ORDER BY menu_key", String.class, u.getRole());
         }
         userMenus = userMenus.stream()
-            .filter(menu -> !"/org".equals(menu))
+            .filter(menu -> !"/org".equals(menu) && !"/users".equals(menu))
             .toList();
         m.put("menus", userMenus);
         m.put("homePath", resolveHomePath(userMenus));
@@ -168,7 +181,12 @@ public class UserController {
 
     @GetMapping("/{id}")
     public ApiResponse<SysUser> get(@PathVariable String id) {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(currentUserId);
         SysUser u = userMapper.selectById(id);
+        if (u != null && !visibleOrgIds.contains(u.getOrgId())) {
+            return ApiResponse.ok(null);
+        }
         if (u != null) u.setPasswordHash(null);
         return ApiResponse.ok(u);
     }

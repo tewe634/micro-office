@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
 import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
+import { useAuthStore } from '../../store/auth';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
 export default function UserTab() {
+  const role = useAuthStore(s => s.role);
+  const canManagePersonnel = role === 'ADMIN' || role === 'HR';
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
@@ -97,7 +100,7 @@ export default function UserTab() {
             onChange={v => setFilterOrg(v)}
           />
           <div className="page-toolbar-right">
-            <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>
+            {canManagePersonnel ? <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button> : null}
           </div>
         </div>
 
@@ -136,7 +139,7 @@ export default function UserTab() {
                   ellipsis: true,
                   render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-',
                 },
-                {
+                ...(canManagePersonnel ? [{
                   title: '操作',
                   width: 210,
                   render: (_: any, r: any) => (
@@ -148,7 +151,7 @@ export default function UserTab() {
                       </Popconfirm>
                     </Space>
                   ),
-                },
+                }] : []),
               ]}
             />
           </div>
@@ -176,7 +179,7 @@ export default function UserTab() {
         </div>
       </div>
 
-      <Modal okText="确定" cancelText="取消" title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
+      {canManagePersonnel ? <Modal okText="确定" cancelText="取消" title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
           {!edit && <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>}
@@ -196,9 +199,9 @@ export default function UserTab() {
           </Form.Item>
           <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>
         </Form>
-      </Modal>
+      </Modal> : null}
 
-      <Modal okText="确定" cancelText="取消" title={`修改密码 - ${pwdModal.name}`} open={pwdModal.open} onCancel={() => setPwdModal({ open: false, userId: null, name: '' })} onOk={() => pwdForm.submit()}>
+      {canManagePersonnel ? <Modal okText="确定" cancelText="取消" title={`修改密码 - ${pwdModal.name}`} open={pwdModal.open} onCancel={() => setPwdModal({ open: false, userId: null, name: '' })} onOk={() => pwdForm.submit()}>
         <Form form={pwdForm} onFinish={changePwd} layout="vertical">
           <Form.Item name="password" label="新密码" rules={[{ required: true, min: 6, message: '密码至少6位' }]}><Input.Password /></Form.Item>
           <Form.Item
@@ -217,7 +220,7 @@ export default function UserTab() {
             <Input.Password />
           </Form.Item>
         </Form>
-      </Modal>
+      </Modal> : null}
     </>
   );
 }
