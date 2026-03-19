@@ -45,18 +45,6 @@ function shouldHideMemberSection(nodeName: string) {
     || /^业务[一二三123]部$/.test(nodeName);
 }
 
-function collectDescendantOrgIds(orgId: string, childrenMap: Map<string | null, OrgItem[]>) {
-  const result: string[] = [];
-  const stack = [...(childrenMap.get(orgId) || [])];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    result.push(current.id);
-    stack.push(...(childrenMap.get(current.id) || []));
-  }
-  return result;
-}
-
 function dedupeUsers(list: OrgUser[]) {
   const seen = new Set<string>();
   return list.filter(user => {
@@ -406,6 +394,7 @@ function OrgChartNode({
   onDelete,
   onSelectUser,
   fixedLeaderUser,
+  businessDepartmentId,
 }: {
   node: OrgItem;
   rootId?: string;
@@ -418,6 +407,7 @@ function OrgChartNode({
   onDelete: (id: string) => Promise<void>;
   onSelectUser: (user: OrgUser) => void;
   fixedLeaderUser?: OrgUser | null;
+  businessDepartmentId?: string | null;
 }) {
   const children = childrenMap.get(node.id) || [];
   const users = [...(usersByOrg.get(node.id) || [])].sort((a, b) => {
@@ -425,16 +415,13 @@ function OrgChartNode({
     return a.name.localeCompare(b.name, 'zh-CN');
   });
   const defaultLeaderUsers = users.filter(user => user.leaderCandidate);
-  const businessDepartmentDescendantUsers = node.name === '商务部'
-    ? collectDescendantOrgIds(node.id, childrenMap).flatMap(orgId => usersByOrg.get(orgId) || [])
-    : [];
-  const businessDepartmentLeaders = node.name === '商务部'
-    ? dedupeUsers([...users.filter(isBusinessSpecialist), ...businessDepartmentDescendantUsers.filter(isBusinessSpecialist)])
+  const businessGroupLeaders = node.parentId === businessDepartmentId
+    ? dedupeUsers(users.filter(isBusinessSpecialist))
     : [];
   const leaderUsers = FIXED_LEADER_NODE_NAMES.has(node.name) && fixedLeaderUser
     ? [fixedLeaderUser]
-    : businessDepartmentLeaders.length > 0
-      ? dedupeUsers([...defaultLeaderUsers, ...businessDepartmentLeaders])
+    : businessGroupLeaders.length > 0
+      ? dedupeUsers([...defaultLeaderUsers, ...businessGroupLeaders])
       : defaultLeaderUsers;
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
@@ -517,6 +504,7 @@ function OrgChartNode({
                 onDelete={onDelete}
                 onSelectUser={onSelectUser}
                 fixedLeaderUser={fixedLeaderUser}
+                businessDepartmentId={businessDepartmentId}
               />
             </li>
           ))}
@@ -568,6 +556,10 @@ export default function OrgPage() {
 
   const rootOrg = useMemo(() => {
     return orgs.find(item => item.name === ROOT_NAME) || orgs.find(item => !item.parentId) || null;
+  }, [orgs]);
+
+  const businessDepartmentId = useMemo(() => {
+    return orgs.find(item => item.name === '商务部')?.id || null;
   }, [orgs]);
 
   const fixedLeaderUser = useMemo(() => {
@@ -701,6 +693,7 @@ export default function OrgPage() {
                         onDelete={deleteOrg}
                         onSelectUser={setSelectedUser}
                         fixedLeaderUser={fixedLeaderUser}
+                        businessDepartmentId={businessDepartmentId}
                       />
                     </div>
                   ) : (
