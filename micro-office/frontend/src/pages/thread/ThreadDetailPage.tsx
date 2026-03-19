@@ -141,7 +141,7 @@ export default function ThreadDetailPage() {
         <Card title={<Space><Button icon={<ArrowLeftOutlined />} type="text" onClick={() => nav('/workbench')} />  {thread.title}</Space>} extra={<Space>
           <Tag color={statusMap[thread.status]?.color}>{statusMap[thread.status]?.text || thread.status}</Tag>
           {isActive && thread.currentUserId === thread.creator_id && (
-            <Popconfirm title={uiText.cancelWorkflowConfirm} onConfirm={async () => { await threadApi.update(Number(id), { status: 'CANCELLED' }); message.success('已取消'); load(); }}>
+            <Popconfirm okText="确定" cancelText="取消" title={uiText.cancelWorkflowConfirm} onConfirm={async () => { await threadApi.update(Number(id), { status: 'CANCELLED' }); message.success('已取消'); load(); }}>
               <Button size="small" danger>取消工作流</Button>
             </Popconfirm>
           )}
@@ -188,10 +188,10 @@ export default function ThreadDetailPage() {
                       onClick={() => { setSpawnModal(n.id); spawnForm.resetFields(); }}>发起工作流</Button>
                     <Button size="small" icon={<SwapOutlined />}
                       onClick={() => { setTransferModal(n.id); setTransferUser(undefined); }}>转派</Button>
-                    <Popconfirm title={uiText.cancelNodeConfirm} onConfirm={() => handleCancel(n.id)}>
+                    <Popconfirm okText="确定" cancelText="取消" title={uiText.cancelNodeConfirm} onConfirm={() => handleCancel(n.id)}>
                       <Button size="small" danger icon={<StopOutlined />}>取消</Button>
                     </Popconfirm>
-                    <Popconfirm title={uiText.finishWorkflowConfirm} onConfirm={() => handleFinish(n.id)}>
+                    <Popconfirm okText="确定" cancelText="取消" title={uiText.finishWorkflowConfirm} onConfirm={() => handleFinish(n.id)}>
                       <Button size="small" icon={<FlagOutlined />}>完成</Button>
                     </Popconfirm>
                   </>)}
@@ -210,7 +210,7 @@ export default function ThreadDetailPage() {
             {nodeDetail.references?.length ? (
               <List size="small" dataSource={nodeDetail.references} renderItem={(ref: any) => (
                 <List.Item actions={[
-                  <Popconfirm title={uiText.removeReferenceConfirm} onConfirm={async () => { await nodeApi.removeReference(drawerNode.id, ref.id); refreshDrawer(); }}>
+                  <Popconfirm okText="确定" cancelText="取消" title={uiText.removeReferenceConfirm} onConfirm={async () => { await nodeApi.removeReference(drawerNode.id, ref.id); refreshDrawer(); }}>
                     <Button size="small" danger>移除</Button>
                   </Popconfirm>
                 ]}>
@@ -241,7 +241,7 @@ export default function ThreadDetailPage() {
       </Drawer>
 
       {/* 完成并指派弹窗 */}
-      <Modal title="完成并指派" open={!!assignModal} onOk={handleCompleteAssign} onCancel={() => setAssignModal(null)}
+      <Modal okText="确定" cancelText="取消" title="完成并指派" open={!!assignModal} onOk={handleCompleteAssign} onCancel={() => setAssignModal(null)}
         okButtonProps={{ disabled: !assignUser }}>
         <Select placeholder="选择下一处理人" style={{ width: '100%', marginBottom: 12 }} showSearch optionFilterProp="label"
           options={users.map(u => ({ value: u.id, label: u.name }))} value={assignUser} onChange={v => setAssignUser(v)} />
@@ -249,14 +249,14 @@ export default function ThreadDetailPage() {
       </Modal>
 
       {/* 转派弹窗 */}
-      <Modal title="转派节点" open={!!transferModal} onOk={handleTransfer} onCancel={() => setTransferModal(null)}
+      <Modal okText="确定" cancelText="取消" title="转派节点" open={!!transferModal} onOk={handleTransfer} onCancel={() => setTransferModal(null)}
         okButtonProps={{ disabled: !transferUser }}>
         <Select placeholder="选择转派目标" style={{ width: '100%' }} showSearch optionFilterProp="label"
           options={users.map(u => ({ value: u.id, label: u.name }))} value={transferUser} onChange={v => setTransferUser(v)} />
       </Modal>
 
       {/* 发起子工作流弹窗 */}
-      <Modal title="发起子工作流" open={!!spawnModal} onOk={() => spawnForm.submit()} onCancel={() => setSpawnModal(null)} width={500}>
+      <Modal okText="确定" cancelText="取消" title="发起子工作流" open={!!spawnModal} onOk={() => spawnForm.submit()} onCancel={() => setSpawnModal(null)} width={500}>
         <Form form={spawnForm} onFinish={handleSpawn} layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="content" label="描述"><Input.TextArea rows={2} /></Form.Item>
@@ -271,7 +271,7 @@ export default function ThreadDetailPage() {
       </Modal>
 
       {/* 添加关联弹窗 */}
-      <Modal title="添加关联引用" open={refModal} onOk={addRef} onCancel={() => setRefModal(false)}>
+      <Modal okText="确定" cancelText="取消" title="添加关联引用" open={refModal} onOk={addRef} onCancel={() => setRefModal(false)}>
         <Select value={refType} style={{ width: '100%', marginBottom: 12 }} onChange={v => loadRefItems(v)}
           options={[{ value: 'THREAD', label: '关联工作流' }, { value: 'OBJECT', label: '关联外部对象' }, { value: 'PRODUCT', label: '关联产品' }]} />
         <Select placeholder="选择关联项" style={{ width: '100%' }} showSearch optionFilterProp="label"

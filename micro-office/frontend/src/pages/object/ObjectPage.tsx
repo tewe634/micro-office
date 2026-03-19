@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag, Pagination } from 'antd';
 import { objectApi, userApi } from '../../api';
-import { formatPaginationTotal, uiText } from '../../constants/ui';
+import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
 const allTypeOptions = [
   { value: 'CUSTOMER', label: '客户' },
@@ -112,7 +112,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
                   render: (_: any, r: any) => (
                     <Space>
                       <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-                      <Popconfirm title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>
@@ -133,6 +133,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
             }}
           >
             <Pagination
+              locale={paginationLocale}
               current={current}
               pageSize={size}
               total={total}
@@ -144,7 +145,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
         </div>
       </div>
 
-      <Modal title={edit ? '编辑' : '新增'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal okText="确定" cancelText="取消" title={edit ? '编辑' : '新增'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="contact" label="联系人"><Input /></Form.Item>

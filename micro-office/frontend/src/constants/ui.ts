@@ -43,6 +43,24 @@ export const uiText = {
   finishWorkflowConfirm: '确定要完成当前节点，并将整个工作流标记为已完成吗？',
 };
 
+export const paginationLocale = {
+  items_per_page: '条/页',
+  jump_to: '跳至',
+  jump_to_confirm: '确定',
+  page: '页',
+  prev_page: '上一页',
+  next_page: '下一页',
+  prev_5: '向前 5 页',
+  next_5: '向后 5 页',
+  prev_3: '向前 3 页',
+  next_3: '向后 3 页',
+};
+
+export const actionText = {
+  okText: '确定',
+  cancelText: '取消',
+};
+
 export function formatRoleLabel(code?: string, name?: string) {
   if (code && roleLabelMap[code]) return roleLabelMap[code];
   if (name) {

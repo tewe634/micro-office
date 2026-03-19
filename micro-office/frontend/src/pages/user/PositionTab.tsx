@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination } from 'antd';
 import { positionApi } from '../../api';
-import { formatPaginationTotal, uiText } from '../../constants/ui';
+import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
 export default function PositionTab() {
   const [data, setData] = useState<any[]>([]);
@@ -70,7 +70,7 @@ export default function PositionTab() {
                   render: (_: any, r: any) => (
                     <Space>
                       <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-                      <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await positionApi.delete(r.id); message.success('已删除'); load(1, size); }}>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await positionApi.delete(r.id); message.success('已删除'); load(1, size); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>
@@ -91,6 +91,7 @@ export default function PositionTab() {
             }}
           >
             <Pagination
+              locale={paginationLocale}
               current={current}
               pageSize={size}
               total={total}
@@ -102,7 +103,7 @@ export default function PositionTab() {
         </div>
       </div>
 
-      <Modal title={edit ? '编辑岗位' : '新增岗位'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal okText="确定" cancelText="取消" title={edit ? '编辑岗位' : '新增岗位'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="编码" rules={[{ required: true }]}><Input /></Form.Item>

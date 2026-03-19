@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
-import { formatPaginationTotal, formatRoleLabel, uiText } from '../../constants/ui';
+import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
@@ -143,7 +143,7 @@ export default function UserTab() {
                     <Space size={6} wrap>
                       <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
                       <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
-                      <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(1, size, filterOrg); }}>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(1, size, filterOrg); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>
@@ -164,6 +164,7 @@ export default function UserTab() {
             }}
           >
             <Pagination
+              locale={paginationLocale}
               current={current}
               pageSize={size}
               total={total}
@@ -175,7 +176,7 @@ export default function UserTab() {
         </div>
       </div>
 
-      <Modal title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
+      <Modal okText="确定" cancelText="取消" title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
           {!edit && <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>}
@@ -197,7 +198,7 @@ export default function UserTab() {
         </Form>
       </Modal>
 
-      <Modal title={`修改密码 - ${pwdModal.name}`} open={pwdModal.open} onCancel={() => setPwdModal({ open: false, userId: null, name: '' })} onOk={() => pwdForm.submit()}>
+      <Modal okText="确定" cancelText="取消" title={`修改密码 - ${pwdModal.name}`} open={pwdModal.open} onCancel={() => setPwdModal({ open: false, userId: null, name: '' })} onOk={() => pwdForm.submit()}>
         <Form form={pwdForm} onFinish={changePwd} layout="vertical">
           <Form.Item name="password" label="新密码" rules={[{ required: true, min: 6, message: '密码至少6位' }]}><Input.Password /></Form.Item>
           <Form.Item

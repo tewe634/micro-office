@@ -74,7 +74,7 @@ export default function OrgPage() {
                 <Space>
                   {node.title as string}
                   <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
-                  <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
+                  <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
                     <Button size="small" type="link" danger>删除</Button>
                   </Popconfirm>
                 </Space>
@@ -84,7 +84,7 @@ export default function OrgPage() {
         </div>
       </Card>
 
-      <Modal title={editOrg ? '编辑组织' : '新增组织'} open={orgModal} onCancel={() => setOrgModal(false)} onOk={() => orgForm.submit()} destroyOnClose>
+      <Modal okText="确定" cancelText="取消" title={editOrg ? '编辑组织' : '新增组织'} open={orgModal} onCancel={() => setOrgModal(false)} onOk={() => orgForm.submit()} destroyOnClose>
         <Form form={orgForm} onFinish={saveOrg} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="parentId" label="上级部门">

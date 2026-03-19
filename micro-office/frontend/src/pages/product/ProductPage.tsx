@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination, Tabs } from 'antd';
 import { productApi } from '../../api';
-import { formatPaginationTotal, uiText } from '../../constants/ui';
+import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
 const productLineOptions = [
   { key: 'ABB', label: 'ABB' },
@@ -145,7 +145,7 @@ export default function ProductPage() {
                           render: (_: any, r: any) => (
                             <Space>
                               <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
-                              <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await productApi.delete(r.id); message.success('已删除'); load({ current, size, filters, productLine: activeLine }); }}>
+                              <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await productApi.delete(r.id); message.success('已删除'); load({ current, size, filters, productLine: activeLine }); }}>
                                 <Button size="small" danger>删除</Button>
                               </Popconfirm>
                             </Space>
@@ -166,6 +166,7 @@ export default function ProductPage() {
                     }}
                   >
                     <Pagination
+                      locale={paginationLocale}
                       current={current}
                       pageSize={size}
                       total={total}
@@ -181,7 +182,7 @@ export default function ProductPage() {
         />
       </div>
 
-      <Modal title={edit ? '编辑产品' : '新增产品'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal okText="确定" cancelText="取消" title={edit ? '编辑产品' : '新增产品'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="productLine" hidden><Input /></Form.Item>
           <Form.Item name="code" label="物料号" rules={[{ required: true }]}><Input /></Form.Item>

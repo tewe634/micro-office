@@ -40,21 +40,21 @@ export default function AdminTemplatePage() {
         { title: '操作', render: (_: any, r: any) => (
           <Space>
             <Button size="small" onClick={() => loadNodes(r.id)}>管理节点</Button>
-            <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await adminApi.deleteTemplate(r.id); message.success('已删除'); load(); }}>
+            <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await adminApi.deleteTemplate(r.id); message.success('已删除'); load(); }}>
               <Button size="small" danger>删除</Button>
             </Popconfirm>
           </Space>
         )},
       ]} />
 
-      <Modal title="新增流程模板" open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal okText="确定" cancelText="取消" title="新增流程模板" open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="模板名称" rules={[{ required: true }]}><Input placeholder="如：销售全流程" /></Form.Item>
           <Form.Item name="description" label="描述"><Input.TextArea /></Form.Item>
         </Form>
       </Modal>
 
-      <Modal title="模板节点管理" open={nodeModal.open} onCancel={() => setNodeModal({ open: false, templateId: null })} footer={null} width={600}>
+      <Modal okText="确定" cancelText="取消" title="模板节点管理" open={nodeModal.open} onCancel={() => setNodeModal({ open: false, templateId: null })} footer={null} width={600}>
         <div style={{ marginBottom: 16 }}>
           {nodes.map((n: any, i: number) => (
             <Tag key={n.id} color="blue" style={{ marginBottom: 4 }}>{i + 1}. {n.name}</Tag>

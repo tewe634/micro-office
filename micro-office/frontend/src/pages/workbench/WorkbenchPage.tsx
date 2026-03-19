@@ -72,7 +72,7 @@ export default function WorkbenchPage() {
         </List.Item>
       )} />}
 
-      <Modal title="新建工作流" open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={500}>
+      <Modal okText="确定" cancelText="取消" title="新建工作流" open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={500}>
         <Form form={form} onFinish={createThread} layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="content" label="描述"><Input.TextArea rows={3} /></Form.Item>

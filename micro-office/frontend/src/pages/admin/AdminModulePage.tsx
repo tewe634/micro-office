@@ -27,14 +27,14 @@ export default function AdminModulePage() {
         { title: '操作', render: (_: any, r: any) => (
           <Space>
             <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-            <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await adminApi.deleteModule(r.id); message.success('已删除'); load(); }}>
+            <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await adminApi.deleteModule(r.id); message.success('已删除'); load(); }}>
               <Button size="small" danger>删除</Button>
             </Popconfirm>
           </Space>
         )},
       ]} />
 
-      <Modal title={edit ? '编辑模块' : '新增模块'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal okText="确定" cancelText="取消" title={edit ? '编辑模块' : '新增模块'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="keyword" label="触发关键词" rules={[{ required: true }]}><Input placeholder="如：出差、合同、报销" /></Form.Item>
           <Form.Item name="moduleName" label="模块名称" rules={[{ required: true }]}><Input /></Form.Item>

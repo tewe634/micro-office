@@ -102,7 +102,7 @@ export default function PortalPage() {
                   { title: '操作', width: 120, render: (_: any, r: any) => (
                     <Space>
                       <Button size="small" onClick={() => { setEditAch(r); form.setFieldsValue({ ...r, eventDate: r.event_date }); setModal(true); }}>编辑</Button>
-                      <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await portalApi.deleteAchievement(r.id); message.success('已删除'); load(); }}>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await portalApi.deleteAchievement(r.id); message.success('已删除'); load(); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>
@@ -113,7 +113,7 @@ export default function PortalPage() {
         </Col>
       </Row>
 
-      <Modal title={editAch ? '编辑记录' : '添加记录'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal okText="确定" cancelText="取消" title={editAch ? '编辑记录' : '添加记录'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
         <Form form={form} onFinish={saveAch} layout="vertical">
           <Form.Item name="type" label="类型" initialValue="ACHIEVEMENT"><Select options={achTypeOpts} /></Form.Item>
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
