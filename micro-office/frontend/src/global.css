@@ -129,6 +129,8 @@ body {
   min-height: 0;
   overflow: hidden;
   padding: 12px 12px 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .fixed-table-page__footer {
@@ -142,22 +144,31 @@ body {
   background: #fff;
 }
 
-.fixed-table-page .ant-table-wrapper,
-.fixed-table-page .ant-spin-nested-loading,
-.fixed-table-page .ant-spin-container,
-.fixed-table-page .ant-table,
-.fixed-table-page .ant-table-container {
-  height: 100%;
+.fixed-table-page__table .ant-table-wrapper,
+.fixed-table-page__table .ant-spin-nested-loading,
+.fixed-table-page__table .ant-spin-container,
+.fixed-table-page__table .ant-table,
+.fixed-table-page__table .ant-table-container {
+  flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.fixed-table-page .ant-table-body {
-  height: 100% !important;
+.fixed-table-page__table .ant-table-header {
+  flex: 0 0 auto;
+  overflow: hidden !important;
+}
+
+.fixed-table-page__table .ant-table-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
   max-height: none !important;
   overflow: auto !important;
 }
 
-.fixed-table-page .ant-pagination {
+.fixed-table-page__footer .ant-pagination {
   margin: 0;
 }
 
