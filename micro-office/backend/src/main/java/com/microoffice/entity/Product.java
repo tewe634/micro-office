@@ -16,6 +16,7 @@ public class Product {
     private String spec;
     private BigDecimal price;
     private String orgId;
+    private String productLine;
     private String categoryCode;
     private String categoryLevel1;
     private String categoryLevel2;

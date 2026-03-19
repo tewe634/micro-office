@@ -18,21 +18,31 @@ public class ProductController {
                                            @RequestParam(defaultValue = "20") long size,
                                            @RequestParam(required = false) String categoryCode,
                                            @RequestParam(required = false) String code,
-                                           @RequestParam(required = false) String name) {
-        return ApiResponse.ok(service.list(current, size, categoryCode, code, name));
+                                           @RequestParam(required = false) String name,
+                                           @RequestParam(required = false) String productLine) {
+        return ApiResponse.ok(service.list(current, size, categoryCode, code, name, productLine));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Product> get(@PathVariable String id) { return ApiResponse.ok(service.getById(id)); }
+    public ApiResponse<Product> get(@PathVariable String id) {
+        return ApiResponse.ok(service.getById(id));
+    }
 
     @PostMapping
-    public ApiResponse<Product> create(@RequestBody Product p) { return ApiResponse.ok(service.create(p)); }
+    public ApiResponse<Product> create(@RequestBody Product p) {
+        return ApiResponse.ok(service.create(p));
+    }
 
     @PutMapping("/{id}")
     public ApiResponse<Void> update(@PathVariable String id, @RequestBody Product p) {
-        p.setId(id); service.update(p); return ApiResponse.ok(null);
+        p.setId(id);
+        service.update(p);
+        return ApiResponse.ok(null);
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable String id) { service.delete(id); return ApiResponse.ok(null); }
+    public ApiResponse<Void> delete(@PathVariable String id) {
+        service.delete(id);
+        return ApiResponse.ok(null);
+    }
 }

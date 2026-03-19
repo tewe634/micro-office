@@ -32,10 +32,10 @@ export const objectApi = {
 };
 
 export const productApi = {
-  list: (params?: { current?: number; size?: number; categoryCode?: string; code?: string; name?: string }) => api.get('/products', { params }),
+  list: (params?: { current?: number; size?: number; categoryCode?: string; code?: string; name?: string; productLine?: string }) => api.get('/products', { params }),
   create: (data: any) => api.post('/products', data),
-  update: (id: number, data: any) => api.put(`/products/${id}`, data),
-  delete: (id: number) => api.delete(`/products/${id}`),
+  update: (id: string | number, data: any) => api.put(`/products/${id}`, data),
+  delete: (id: string | number) => api.delete(`/products/${id}`),
 };
 
 export const threadApi = {
