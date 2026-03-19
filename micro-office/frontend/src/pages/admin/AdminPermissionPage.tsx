@@ -2,14 +2,25 @@ import { useEffect, useState } from 'react';
 import { Card, Table, Checkbox, Button, message, Tag, Tabs, Select, Space, Divider } from 'antd';
 import { adminApi, userApi, orgApi, positionApi } from '../../api';
 
-const roles = [
-  { key: 'ADMIN', label: '管理员', color: 'red' },
-  { key: 'HR', label: '人事', color: 'purple' },
-  { key: 'SALES', label: '销售', color: 'cyan' },
-  { key: 'PURCHASE', label: '采购', color: 'geekblue' },
-  { key: 'FINANCE', label: '财务', color: 'gold' },
-  { key: 'STAFF', label: '普通员工', color: 'default' },
-];
+type RoleItem = {
+  key: string;
+  label: string;
+  color: string;
+};
+
+const roleColorMap: Record<string, string> = {
+  ADMIN: 'red',
+  HR: 'purple',
+  SALES: 'cyan',
+  PURCHASE: 'geekblue',
+  FINANCE: 'gold',
+  BIZ: 'orange',
+  TECH: 'lime',
+  WAREHOUSE: 'volcano',
+  IT: 'magenta',
+  PRODUCTION: 'green',
+  STAFF: 'default',
+};
 
 const menus = [
   { key: '/org', label: '组织架构' },
@@ -29,7 +40,7 @@ const objectTypes = [
   { key: 'OTHER', label: '其他' },
 ];
 
-function RolePermTab() {
+function RolePermTab({ roles }: { roles: RoleItem[] }) {
   const [perms, setPerms] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -56,14 +67,18 @@ function RolePermTab() {
 
   const save = async () => {
     setLoading(true);
-    await adminApi.savePermissions(perms);
+    const payload = roles.reduce((acc, role) => {
+      acc[role.key] = perms[role.key] || [];
+      return acc;
+    }, {} as Record<string, string[]>);
+    await adminApi.savePermissions(payload);
     message.success('角色权限已保存');
     setLoading(false);
   };
 
   return (
     <div className="page-fill" style={{ gap: 16 }}>
-      <p style={{ color: '#888', margin: 0 }}>配置每个角色默认可见的功能模块。用户如果没有个人权限配置，则使用角色默认权限。</p>
+      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表，当前页面可直接配置系统中全部角色的默认模块权限。</p>
       <div className="page-card-scroll">
         <Table
           dataSource={menus}
@@ -71,12 +86,12 @@ function RolePermTab() {
           pagination={false}
           bordered
           size="middle"
-          scroll={{ x: 900 }}
+          scroll={{ x: Math.max(900, 140 + roles.length * 110) }}
           columns={[
-            { title: '功能模块', dataIndex: 'label', width: 120 },
+            { title: '功能模块', dataIndex: 'label', width: 140, fixed: 'left' as const },
             ...roles.map(r => ({
               title: <Tag color={r.color}>{r.label}</Tag>,
-              width: 100,
+              width: 110,
               align: 'center' as const,
               render: (_: any, record: any) => (
                 <Checkbox
@@ -95,10 +110,10 @@ function RolePermTab() {
   );
 }
 
-function UserPermTab() {
+function UserPermTab({ roles }: { roles: RoleItem[] }) {
   const [users, setUsers] = useState<any[]>([]);
   const [orgs, setOrgs] = useState<any[]>([]);
-  const [filterOrg, setFilterOrg] = useState<number>();
+  const [filterOrg, setFilterOrg] = useState<string | number>();
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userMenus, setUserMenus] = useState<string[]>([]);
   const [hasCustomMenus, setHasCustomMenus] = useState(false);
@@ -113,7 +128,7 @@ function UserPermTab() {
   }, []);
 
   useEffect(() => {
-    userApi.list(filterOrg).then((r: any) => setUsers(r.data || []));
+    userApi.list(filterOrg as any).then((r: any) => setUsers(r.data || []));
   }, [filterOrg]);
 
   const selectUser = async (u: any) => {
@@ -210,10 +225,10 @@ function UserPermTab() {
                 {
                   title: '角色',
                   dataIndex: 'role',
-                  width: 80,
+                  width: 100,
                   render: (v: string) => {
                     const r = roles.find(x => x.key === v);
-                    return <Tag color={r?.color}>{r?.label || v}</Tag>;
+                    return <Tag color={r?.color || 'default'}>{r?.label || v}</Tag>;
                   },
                 },
               ]}
@@ -361,6 +376,19 @@ function ObjectTypePermTab() {
 }
 
 export default function AdminPermissionPage() {
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+
+  useEffect(() => {
+    userApi.lookups().then((r: any) => {
+      const roleList = (r.data?.roles || []).map((role: any) => ({
+        key: role.code,
+        label: role.name,
+        color: roleColorMap[role.code] || 'default',
+      }));
+      setRoles(roleList);
+    }).catch(() => {});
+  }, []);
+
   return (
     <Card
       title="权限配置"
@@ -371,8 +399,8 @@ export default function AdminPermissionPage() {
         <Tabs
           className="page-tabs"
           items={[
-            { key: 'role', label: '角色模块权限', children: <RolePermTab /> },
-            { key: 'user', label: '人员权限', children: <UserPermTab /> },
+            { key: 'role', label: '角色模块权限', children: <RolePermTab roles={roles} /> },
+            { key: 'user', label: '人员权限', children: <UserPermTab roles={roles} /> },
             { key: 'object', label: '岗位对象类型', children: <ObjectTypePermTab /> },
           ]}
         />
