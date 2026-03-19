@@ -19,8 +19,8 @@ export default function UserPage() {
   const loadUsers = async () => { const r: any = await userApi.list(filterOrg); setUsers(r.data || []); };
   const loadOrgs = async () => { const r: any = await orgApi.list(); setOrgs(r.data || []); };
   const loadPositions = async () => {
-    const r: any = await positionApi.list({ current: 1, size: 2000 });
-    setPositions(r.data?.records || []);
+    const r: any = await positionApi.list();
+    setPositions(r.data || []);
   };
   const loadRoles = async () => { const r: any = await userApi.lookups(); setRoles(r.data?.roles || []); };
 

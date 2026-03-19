@@ -27,8 +27,8 @@ export default function UserTab() {
   };
 
   const loadPositions = async () => {
-    const r: any = await positionApi.list({ current: 1, size: 2000 });
-    setPositions(r.data?.records || []);
+    const r: any = await positionApi.list();
+    setPositions(r.data || []);
   };
 
   const loadRoles = async () => {

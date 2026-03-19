@@ -12,7 +12,7 @@ export default function PositionTab() {
   const [form] = Form.useForm();
 
   const load = async (c = current, s = size) => {
-    const r: any = await positionApi.list({ current: c, size: s });
+    const r: any = await positionApi.page({ current: c, size: s });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
     setCurrent(c);
