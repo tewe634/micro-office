@@ -61,13 +61,13 @@ export default function UserTab() {
     <>
     <FixedTablePage
       top={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="page-toolbar">
           <Select allowClear placeholder="按组织筛选" style={{ width: 220 }}
             options={orgs.map(o => ({ value: o.id, label: o.name }))}
             onChange={v => setFilterOrg(v)} />
-          <Space>
+          <div className="page-toolbar-right">
             <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>
-          </Space>
+          </div>
         </div>
       }
       table={
@@ -76,19 +76,19 @@ export default function UserTab() {
           rowKey="id"
           pagination={false}
           sticky
-          scroll={{ x: 1400, y: '100%' }}
+          scroll={{ x: 1750, y: '100%' }}
           style={{ height: '100%' }}
           columns={[
-            { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
-            { title: '工号', dataIndex: 'empNo', width: 110 },
-            { title: '姓名', dataIndex: 'name', width: 90 },
-            { title: '邮箱', dataIndex: 'email', width: 180 },
-            { title: '手机', dataIndex: 'phone', width: 120 },
-            { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roles.find(r => r.code === v)?.name || v}</Tag> },
-            { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: any) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-            { title: '主岗位', dataIndex: 'primaryPositionId', width: 120, render: (v: any) => v ? <Tag color="green">{posName(v)}</Tag> : '-' },
-            { title: '辅助岗位', dataIndex: 'extraPositionIds', render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-' },
-            { title: '操作', width: 220, render: (_: any, r: any) => (
+            { title: '序号', key: 'index', width: 80, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
+            { title: '工号', dataIndex: 'empNo', width: 130 },
+            { title: '姓名', dataIndex: 'name', width: 110 },
+            { title: '邮箱', dataIndex: 'email', width: 220 },
+            { title: '手机', dataIndex: 'phone', width: 150 },
+            { title: '角色', dataIndex: 'role', width: 110, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roles.find(r => r.code === v)?.name || v}</Tag> },
+            { title: '所属组织', dataIndex: 'orgId', width: 150, render: (v: any) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
+            { title: '主岗位', dataIndex: 'primaryPositionId', width: 150, render: (v: any) => v ? <Tag color="green">{posName(v)}</Tag> : '-' },
+            { title: '辅助岗位', dataIndex: 'extraPositionIds', width: 280, render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-' },
+            { title: '操作', width: 260, render: (_: any, r: any) => (
               <Space>
                 <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
                 <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
