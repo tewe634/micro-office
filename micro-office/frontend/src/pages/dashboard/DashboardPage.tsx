@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Tabs, Row, Col, Statistic, Table, Tag, Space } from 'antd';
 import { BarChartOutlined } from '@ant-design/icons';
 import { dashboardApi } from '../../api';
+import { formatObjectType } from '../../constants/ui';
 
 const periodOpts = [
   { value: 'today', label: '今天' },
@@ -9,8 +10,6 @@ const periodOpts = [
   { value: 'week', label: '本周' },
   { value: 'month', label: '本月' },
 ];
-const typeMap: Record<string, string> = { CUSTOMER: '客户', SUPPLIER: '供应商', BANK: '银行', CARRIER: '承运商', THIRD_PARTY_PAY: '第三方支付', OTHER: '其他' };
-
 export default function DashboardPage() {
   const [scopes, setScopes] = useState<any[]>([]);
   const [activeScope, setActiveScope] = useState<any>(null);
@@ -65,7 +64,7 @@ export default function DashboardPage() {
           <Table dataSource={data.byUser} rowKey="id" size="small" columns={columns} pagination={false} />
           {data.externalObjects?.length > 0 && (
             <Card title="外部对象分布" size="small" style={{ marginTop: 16 }}>
-              <Space wrap>{data.externalObjects.map((o: any) => <Tag key={o.type} color="blue">{typeMap[o.type] || o.type}: {o.count}</Tag>)}</Space>
+              <Space wrap>{data.externalObjects.map((o: any) => <Tag key={o.type} color="blue">{formatObjectType(o.type)}：{o.count}</Tag>)}</Space>
             </Card>
           )}
         </>

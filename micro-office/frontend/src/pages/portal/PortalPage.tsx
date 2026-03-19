@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Card, Descriptions, Tag, Table, Row, Col, Button, Modal, Form, Input, Select, Space, message, Popconfirm, List } from 'antd';
 import { TrophyOutlined, UserOutlined, TeamOutlined, GlobalOutlined } from '@ant-design/icons';
 import { portalApi } from '../../api';
+import { formatObjectType, formatRoleLabel } from '../../constants/ui';
 
-const typeMap: Record<string, string> = { CUSTOMER: '客户', SUPPLIER: '供应商', BANK: '银行', CARRIER: '承运商', THIRD_PARTY_PAY: '第三方支付', OTHER: '其他' };
 const achTypeOpts = [{ value: 'ACHIEVEMENT', label: '重大贡献' }, { value: 'AWARD', label: '奖励' }, { value: 'MILESTONE', label: '里程碑' }];
 const achColorMap: Record<string, string> = { ACHIEVEMENT: 'gold', AWARD: 'red', MILESTONE: 'blue' };
 
@@ -36,7 +36,7 @@ export default function PortalPage() {
               <Descriptions.Item label="姓名">{p.name}</Descriptions.Item>
               <Descriptions.Item label="邮箱">{p.email}</Descriptions.Item>
               <Descriptions.Item label="手机">{p.phone || '-'}</Descriptions.Item>
-              <Descriptions.Item label="角色"><Tag color="blue">{p.role}</Tag></Descriptions.Item>
+              <Descriptions.Item label="角色"><Tag color="blue">{formatRoleLabel(p.role, p.roleName)}</Tag></Descriptions.Item>
               <Descriptions.Item label="所属组织">{p.orgName || '-'}</Descriptions.Item>
               <Descriptions.Item label="岗位">{p.positionName || '-'}</Descriptions.Item>
               <Descriptions.Item label="入职日期">{p.hiredAt || '-'}</Descriptions.Item>
@@ -79,7 +79,7 @@ export default function PortalPage() {
             {data.externalContacts?.length ? (
               <List size="small" dataSource={data.externalContacts} renderItem={(item: any) => (
                 <List.Item>
-                  <Tag color="orange">{typeMap[item.type] || item.type}</Tag>
+                  <Tag color="orange">{formatObjectType(item.type)}</Tag>
                   {item.name} {item.contact ? `(${item.contact})` : ''} {item.phone || ''}
                 </List.Item>
               )} />

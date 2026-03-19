@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Timeline, Tag, Input, Button, List, Modal, Space, message, Select, Descriptions, Popconfirm, Drawer, Form } from 'antd';
 import { LockOutlined, MessageOutlined, LinkOutlined, SendOutlined, SwapOutlined, CheckCircleOutlined, StopOutlined, FlagOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { threadApi, nodeApi, userApi, objectApi, productApi } from '../../api';
+import { extractPagedRecords, formatObjectType, formatRefType } from '../../constants/ui';
 
 const statusMap: Record<string, { color: string; text: string }> = {
   IN_PROGRESS: { color: 'processing', text: '进行中' },
@@ -116,8 +117,8 @@ export default function ThreadDetailPage() {
     setRefType(type);
     try {
       if (type === 'THREAD') { const r: any = await threadApi.list(); setRefItems((r.data || []).map((t: any) => ({ id: t.id, label: t.title }))); }
-      else if (type === 'OBJECT') { const r: any = await objectApi.list(); setRefItems((r.data || []).map((o: any) => ({ id: o.id, label: `[${o.type}] ${o.name}` }))); }
-      else if (type === 'PRODUCT') { const r: any = await productApi.list(); setRefItems((r.data || []).map((p: any) => ({ id: p.id, label: p.name }))); }
+      else if (type === 'OBJECT') { const r: any = await objectApi.list(); setRefItems(extractPagedRecords(r.data).map((o: any) => ({ id: o.id, label: `[${formatObjectType(o.type)}] ${o.name}` }))); }
+      else if (type === 'PRODUCT') { const r: any = await productApi.list(); setRefItems(extractPagedRecords(r.data).map((p: any) => ({ id: p.id, label: p.name }))); }
     } catch { setRefItems([]); }
   };
 
@@ -148,7 +149,7 @@ export default function ThreadDetailPage() {
           <Descriptions column={2} size="small">
             <Descriptions.Item label="创建人">{thread.creator_name}</Descriptions.Item>
             <Descriptions.Item label="创建时间">{new Date(thread.created_at).toLocaleString('zh-CN')}</Descriptions.Item>
-            {thread.object_name && <Descriptions.Item label="关联对象"><Tag color="orange">{thread.object_type}</Tag> {thread.object_name}</Descriptions.Item>}
+            {thread.object_name && <Descriptions.Item label="关联对象"><Tag color="orange">{formatObjectType(thread.object_type)}</Tag> {thread.object_name}</Descriptions.Item>}
             {thread.product_name && <Descriptions.Item label="关联产品">{thread.product_name}</Descriptions.Item>}
           </Descriptions>
           {thread.content && <p style={{ marginTop: 12 }}>{thread.content}</p>}
@@ -213,7 +214,7 @@ export default function ThreadDetailPage() {
                     <Button size="small" danger>移除</Button>
                   </Popconfirm>
                 ]}>
-                  <Tag color="blue">{ref.ref_type}</Tag> {ref.ref_label}
+                  <Tag color="blue">{formatRefType(ref.ref_type)}</Tag> {ref.ref_label}
                   {ref.ref_type === 'THREAD' && <Button type="link" size="small" onClick={() => nav(`/threads/${ref.ref_id}`)}>查看</Button>}
                 </List.Item>
               )} />

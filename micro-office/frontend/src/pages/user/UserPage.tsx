@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
+import { formatRoleLabel } from '../../constants/ui';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
@@ -66,7 +67,7 @@ export default function UserPage() {
         { title: '姓名', dataIndex: 'name', width: 80 },
         { title: '邮箱', dataIndex: 'email', width: 180 },
         { title: '手机', dataIndex: 'phone', width: 120 },
-        { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roles.find(r => r.code === v)?.name || v}</Tag> },
+        { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{formatRoleLabel(v, roles.find(r => r.code === v)?.name)}</Tag> },
         { title: '所属组织', dataIndex: 'orgId', width: 100, render: (v: number) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
         { title: '主岗位', dataIndex: 'primaryPositionId', width: 100, render: (v: number) => v ? <Tag color="green">{posName(v)}</Tag> : '-' },
         { title: '辅助岗位', dataIndex: 'extraPositionIds', render: (ids: number[]) =>
@@ -91,7 +92,7 @@ export default function UserPage() {
           {!edit && <Form.Item name="password" label="密码" extra="不填默认123456"><Input.Password /></Form.Item>}
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="role" label="角色">
-            <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: r.name }))} />
+            <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
           </Form.Item>
           <Form.Item name="orgId" label="所属组织">
             <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />

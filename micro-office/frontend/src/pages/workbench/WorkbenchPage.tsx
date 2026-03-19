@@ -3,6 +3,7 @@ import { Tabs, List, Tag, Button, Card, Modal, Form, Input, Select, Badge, messa
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workbenchApi, threadApi, objectApi, productApi, templateApi, userApi } from '../../api';
+import { extractPagedRecords, formatObjectType } from '../../constants/ui';
 
 const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green', CANCELLED: 'default', IN_PROGRESS: 'processing', PENDING_NEXT: 'warning' };
 const statusLabel: Record<string, string> = { ACTIVE: '进行中', COMPLETED: '已完成', CANCELLED: '已取消', IN_PROGRESS: '进行中', PENDING_NEXT: '待处理' };
@@ -28,8 +29,8 @@ export default function WorkbenchPage() {
   const openCreate = async () => {
     form.resetFields();
     const [o, p, t, u] = await Promise.allSettled([objectApi.list(), productApi.list(), templateApi.list(), userApi.lookups()]);
-    setObjects(o.status === 'fulfilled' ? (o.value as any).data || [] : []);
-    setProducts(p.status === 'fulfilled' ? (p.value as any).data || [] : []);
+    setObjects(o.status === 'fulfilled' ? extractPagedRecords((o.value as any).data) : []);
+    setProducts(p.status === 'fulfilled' ? extractPagedRecords((p.value as any).data) : []);
     setTemplates(t.status === 'fulfilled' ? (t.value as any).data || [] : []);
     setUsers(u.status === 'fulfilled' ? (u.value as any).data?.users || [] : []);
     setModal(true);
@@ -80,7 +81,7 @@ export default function WorkbenchPage() {
           </Form.Item>
           <Form.Item name="objectId" label="关联外部对象">
             <Select allowClear showSearch optionFilterProp="label" placeholder="选择对象"
-              options={objects.map(o => ({ value: o.id, label: `[${o.type}] ${o.name}` }))} />
+              options={objects.map(o => ({ value: o.id, label: `[${formatObjectType(o.type)}] ${o.name}` }))} />
           </Form.Item>
           <Form.Item name="productId" label="关联产品">
             <Select allowClear showSearch optionFilterProp="label" placeholder="选择产品"

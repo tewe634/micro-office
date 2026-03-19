@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Checkbox, Button, message, Tag, Tabs, Select, Space, Divider } from 'antd';
 import { adminApi, userApi, orgApi, positionApi } from '../../api';
+import { formatRoleLabel } from '../../constants/ui';
 
 type RoleItem = {
   key: string;
@@ -382,7 +383,7 @@ export default function AdminPermissionPage() {
     userApi.lookups().then((r: any) => {
       const roleList = (r.data?.roles || []).map((role: any) => ({
         key: role.code,
-        label: role.name,
+        label: formatRoleLabel(role.code, role.name),
         color: roleColorMap[role.code] || 'default',
       }));
       setRoles(roleList);
