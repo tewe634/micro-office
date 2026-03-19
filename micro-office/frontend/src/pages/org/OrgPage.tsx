@@ -196,10 +196,10 @@ const orgChartStyles = `
 }
 
 .org-canvas-toolbar {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  z-index: 5;
+  position: fixed;
+  right: 44px;
+  bottom: 28px;
+  z-index: 50;
   width: 260px;
   padding: 12px 14px;
   border: 1px solid #d6e4ff;
