@@ -35,7 +35,7 @@ const orgChartStyles = `
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   padding: 40px 48px 96px;
   cursor: grab;
 }
@@ -50,7 +50,7 @@ const orgChartStyles = `
 }
 
 .org-canvas-stage {
-  min-width: 100%;
+  width: 100%;
   min-height: 100%;
   display: flex;
   justify-content: center;
@@ -60,6 +60,7 @@ const orgChartStyles = `
 .org-canvas-content {
   width: max-content;
   transform-origin: top center;
+  will-change: transform;
 }
 
 .org-root-wrap {
@@ -330,6 +331,7 @@ export default function OrgPage() {
   const [orgs, setOrgs] = useState<OrgItem[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [orgModal, setOrgModal] = useState(false);
   const [editOrg, setEditOrg] = useState<OrgItem | null>(null);
@@ -338,8 +340,8 @@ export default function OrgPage() {
   const dragStateRef = useRef({
     startX: 0,
     startY: 0,
-    scrollLeft: 0,
-    scrollTop: 0,
+    panX: 0,
+    panY: 0,
   });
 
   const childrenMap = useMemo(() => {
@@ -374,23 +376,15 @@ export default function OrgPage() {
   }, [rootOrg, orgs]);
 
   useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    requestAnimationFrame(() => {
-      viewport.scrollLeft = Math.max((viewport.scrollWidth - viewport.clientWidth) / 2, 0);
-    });
-  }, [rootOrg?.id, zoom, orgs.length]);
-
-  useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (event: MouseEvent) => {
-      const viewport = viewportRef.current;
-      if (!viewport) return;
       const deltaX = event.clientX - dragStateRef.current.startX;
       const deltaY = event.clientY - dragStateRef.current.startY;
-      viewport.scrollLeft = dragStateRef.current.scrollLeft - deltaX;
-      viewport.scrollTop = dragStateRef.current.scrollTop - deltaY;
+      setPan({
+        x: dragStateRef.current.panX + deltaX,
+        y: dragStateRef.current.panY + deltaY,
+      });
     };
 
     const stopDragging = () => setIsDragging(false);
@@ -412,13 +406,11 @@ export default function OrgPage() {
     if (target.closest('.org-canvas-toolbar, .ant-btn, .ant-slider, .ant-input, .ant-input-number, .ant-select, .ant-tree-select')) {
       return;
     }
-    const viewport = viewportRef.current;
-    if (!viewport) return;
     dragStateRef.current = {
       startX: event.clientX,
       startY: event.clientY,
-      scrollLeft: viewport.scrollLeft,
-      scrollTop: viewport.scrollTop,
+      panX: pan.x,
+      panY: pan.y,
     };
     setIsDragging(true);
     event.preventDefault();
@@ -471,7 +463,13 @@ export default function OrgPage() {
               onMouseDown={handleViewportMouseDown}
             >
               <div className="org-canvas-stage">
-                <div className="org-canvas-content" style={{ zoom: zoom / 100 } as React.CSSProperties}>
+                <div
+                  className="org-canvas-content"
+                  style={{
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom / 100})`,
+                    transition: isDragging ? 'none' : 'transform 0.12s ease-out',
+                  }}
+                >
                   {rootOrg ? (
                     <div className="org-root-wrap">
                       <OrgChartNode
@@ -515,8 +513,8 @@ export default function OrgPage() {
                 <Button icon={<PlusOutlined />} onClick={() => setZoom(value => Math.min(MAX_ZOOM, value + 10))} />
               </Space.Compact>
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-                <Button size="small" icon={<ReloadOutlined />} onClick={() => setZoom(DEFAULT_ZOOM)}>恢复 100%</Button>
-                <Button size="small" onClick={() => rootOrg && setExpandedKeys([rootOrg.id])}>回到默认展开</Button>
+                <Button size="small" icon={<ReloadOutlined />} onClick={() => { setZoom(DEFAULT_ZOOM); setPan({ x: 0, y: 0 }); }}>恢复 100%</Button>
+                <Button size="small" onClick={() => { if (rootOrg) setExpandedKeys([rootOrg.id]); setPan({ x: 0, y: 0 }); }}>回到默认展开</Button>
               </div>
             </div>
           </div>
