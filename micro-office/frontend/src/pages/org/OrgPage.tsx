@@ -390,6 +390,8 @@ function OrgChartNode({
     return a.name.localeCompare(b.name, 'zh-CN');
   });
   const leaderUsers = users.filter(user => user.leaderCandidate);
+  const leaderUserIds = new Set(leaderUsers.map(user => user.id));
+  const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
 
@@ -429,12 +431,12 @@ function OrgChartNode({
 
         <div className="org-node-card__section">
           <div className="org-node-card__section-label">节点下人员</div>
-          {users.length > 0 ? (
+          {memberUsers.length > 0 ? (
             <div className="org-node-card__people">
-              {users.map(user => <PersonCard key={user.id} user={user} onClick={onSelectUser} />)}
+              {memberUsers.map(user => <PersonCard key={user.id} user={user} onClick={onSelectUser} />)}
             </div>
           ) : (
-            <div className="org-node-card__empty">当前节点暂无人员</div>
+            <div className="org-node-card__empty">当前节点暂无其他人员</div>
           )}
         </div>
 
