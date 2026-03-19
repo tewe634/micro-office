@@ -31,6 +31,9 @@ const ROOT_NAME = '总经办';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
+const FIXED_LEADER_NAME = '杨筱辉';
+const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['总经办', '产品支持体系', '管理体系', '销售体系']);
+const FIXED_LEADER_NODE_NAMES = new Set(['产品支持体系', '销售体系']);
 
 const orgChartStyles = `
 .org-canvas-page {
@@ -372,6 +375,7 @@ function OrgChartNode({
   onEdit,
   onDelete,
   onSelectUser,
+  fixedLeaderUser,
 }: {
   node: OrgItem;
   rootId?: string;
@@ -383,15 +387,18 @@ function OrgChartNode({
   onEdit: (org?: OrgItem) => void;
   onDelete: (id: string) => Promise<void>;
   onSelectUser: (user: OrgUser) => void;
+  fixedLeaderUser?: OrgUser | null;
 }) {
   const children = childrenMap.get(node.id) || [];
   const users = [...(usersByOrg.get(node.id) || [])].sort((a, b) => {
     if (!!b.leaderCandidate !== !!a.leaderCandidate) return Number(b.leaderCandidate) - Number(a.leaderCandidate);
     return a.name.localeCompare(b.name, 'zh-CN');
   });
-  const leaderUsers = users.filter(user => user.leaderCandidate);
+  const defaultLeaderUsers = users.filter(user => user.leaderCandidate);
+  const leaderUsers = FIXED_LEADER_NODE_NAMES.has(node.name) && fixedLeaderUser ? [fixedLeaderUser] : defaultLeaderUsers;
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
+  const showMemberSection = !HIDE_MEMBER_SECTION_NODE_NAMES.has(node.name);
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
 
@@ -429,16 +436,18 @@ function OrgChartNode({
           )}
         </div>
 
-        <div className="org-node-card__section">
-          <div className="org-node-card__section-label">节点下人员</div>
-          {memberUsers.length > 0 ? (
-            <div className="org-node-card__people">
-              {memberUsers.map(user => <PersonCard key={user.id} user={user} onClick={onSelectUser} />)}
-            </div>
-          ) : (
-            <div className="org-node-card__empty">当前节点暂无其他人员</div>
-          )}
-        </div>
+        {showMemberSection ? (
+          <div className="org-node-card__section">
+            <div className="org-node-card__section-label">节点下人员</div>
+            {memberUsers.length > 0 ? (
+              <div className="org-node-card__people">
+                {memberUsers.map(user => <PersonCard key={user.id} user={user} onClick={onSelectUser} />)}
+              </div>
+            ) : (
+              <div className="org-node-card__empty">当前节点暂无其他人员</div>
+            )}
+          </div>
+        ) : null}
 
         {canManageOrg ? (
           <div className="org-node-card__actions">
@@ -467,6 +476,7 @@ function OrgChartNode({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onSelectUser={onSelectUser}
+                fixedLeaderUser={fixedLeaderUser}
               />
             </li>
           ))}
@@ -519,6 +529,10 @@ export default function OrgPage() {
   const rootOrg = useMemo(() => {
     return orgs.find(item => item.name === ROOT_NAME) || orgs.find(item => !item.parentId) || null;
   }, [orgs]);
+
+  const fixedLeaderUser = useMemo(() => {
+    return orgUsers.find(user => user.name === FIXED_LEADER_NAME) || null;
+  }, [orgUsers]);
 
   const loadChart = async () => {
     const r: any = await orgApi.chart();
@@ -646,6 +660,7 @@ export default function OrgPage() {
                         onEdit={openOrgModal}
                         onDelete={deleteOrg}
                         onSelectUser={setSelectedUser}
+                        fixedLeaderUser={fixedLeaderUser}
                       />
                     </div>
                   ) : (
