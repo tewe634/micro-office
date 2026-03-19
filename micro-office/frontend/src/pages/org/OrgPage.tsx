@@ -362,7 +362,6 @@ function PersonCard({ user, onClick }: { user: OrgUser; onClick: (user: OrgUser)
       </div>
       <div className="org-person-card__meta">
         <span>主岗位：{user.primary_position_name || '-'}</span>
-        <span>辅助岗位：{user.extra_position_names || '-'}</span>
         <span>手机号：{user.phone || '-'}</span>
         <span>角色：{formatRoleLabel(user.role || undefined, user.role || undefined)}</span>
       </div>
@@ -732,7 +731,6 @@ export default function OrgPage() {
             <Descriptions.Item label="角色">{formatRoleLabel(selectedUser.role || undefined, selectedUser.role || undefined)}</Descriptions.Item>
             <Descriptions.Item label="所属组织">{selectedUser.org_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="主岗位">{selectedUser.primary_position_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="辅助岗位">{selectedUser.extra_position_names || '-'}</Descriptions.Item>
             <Descriptions.Item label="入职日期">{selectedUser.hired_at || '-'}</Descriptions.Item>
           </Descriptions>
         ) : null}
