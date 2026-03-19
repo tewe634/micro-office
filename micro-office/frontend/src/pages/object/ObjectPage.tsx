@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag, Pagination } from 'antd';
 import { objectApi, userApi } from '../../api';
+import { formatPaginationTotal, uiText } from '../../constants/ui';
 
 const allTypeOptions = [
   { value: 'CUSTOMER', label: '客户' },
@@ -111,7 +112,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
                   render: (_: any, r: any) => (
                     <Space>
                       <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-                      <Popconfirm title="确认删除？" onConfirm={() => reloadAfterDelete(r.id)}>
+                      <Popconfirm title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>
@@ -136,7 +137,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
               pageSize={size}
               total={total}
               showSizeChanger
-              showTotal={(t) => `共 ${t} 条`}
+              showTotal={(t) => formatPaginationTotal(t)}
               onChange={(page, pageSize) => load(page, pageSize, filterDept)}
             />
           </div>

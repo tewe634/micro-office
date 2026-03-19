@@ -3,7 +3,7 @@ import { Tabs, List, Tag, Button, Card, Modal, Form, Input, Select, Badge, messa
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workbenchApi, threadApi, objectApi, productApi, templateApi, userApi } from '../../api';
-import { extractPagedRecords, formatObjectType } from '../../constants/ui';
+import { extractPagedRecords, formatObjectType, uiText } from '../../constants/ui';
 
 const statusColor: Record<string, string> = { ACTIVE: 'blue', COMPLETED: 'green', CANCELLED: 'default', IN_PROGRESS: 'processing', PENDING_NEXT: 'warning' };
 const statusLabel: Record<string, string> = { ACTIVE: '进行中', COMPLETED: '已完成', CANCELLED: '已取消', IN_PROGRESS: '进行中', PENDING_NEXT: '待处理' };
@@ -55,7 +55,7 @@ export default function WorkbenchPage() {
       ]} />
 
       {view === 'todo' && (
-        <List dataSource={data.todoNodes} locale={{ emptyText: '暂无待办' }} renderItem={(item: any) => (
+        <List dataSource={data.todoNodes} locale={{ emptyText: uiText.noPendingItems }} renderItem={(item: any) => (
           <List.Item actions={[<Button type="link" onClick={() => nav(`/threads/${item.thread_id}`)}>处理</Button>]}>
             <List.Item.Meta title={<><Tag color={statusColor[item.status]}>{statusLabel[item.status]}</Tag> {item.name}</>}
               description={item.thread_title} />
@@ -63,7 +63,7 @@ export default function WorkbenchPage() {
         )} />
       )}
 
-      {view !== 'todo' && <List dataSource={data.threads} locale={{ emptyText: '暂无数据' }} renderItem={(item: any) => (
+      {view !== 'todo' && <List dataSource={data.threads} locale={{ emptyText: uiText.appEmpty }} renderItem={(item: any) => (
         <List.Item actions={[<Button type="link" onClick={() => nav(`/threads/${item.id}`)}>查看</Button>]}>
           <List.Item.Meta
             title={<>{item.title} {item.object_name && <Tag color="orange">{item.object_name}</Tag>}</>}

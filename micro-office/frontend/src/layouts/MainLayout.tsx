@@ -75,7 +75,7 @@ export default function MainLayout() {
       </Sider>
       <Layout style={{ minHeight: 0 }}>
         <Header style={{ flex: '0 0 64px', background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
-          <span style={{ color: '#888', fontSize: 13 }}>你好，{userName}</span>
+          <span style={{ color: '#888', fontSize: 13 }}>您好，{userName}</span>
           <a onClick={() => { logout(); nav('/login'); }}>退出登录</a>
         </Header>
         <Content style={{ flex: 1, minHeight: 0, margin: 24, overflow: 'hidden', display: 'flex' }}>

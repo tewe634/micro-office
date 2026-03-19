@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
-import { formatRoleLabel } from '../../constants/ui';
+import { formatRoleLabel, uiText } from '../../constants/ui';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
@@ -77,7 +77,7 @@ export default function UserPage() {
           <Space>
             <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
             <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
-            <Popconfirm title="确认删除？" onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(); }}>
+            <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(); }}>
               <Button size="small" danger>删除</Button>
             </Popconfirm>
           </Space>

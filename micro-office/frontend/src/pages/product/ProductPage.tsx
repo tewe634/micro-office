@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination, Tabs } from 'antd';
 import { productApi } from '../../api';
+import { formatPaginationTotal, uiText } from '../../constants/ui';
 
 const productLineOptions = [
   { key: 'ABB', label: 'ABB' },
@@ -144,7 +145,7 @@ export default function ProductPage() {
                           render: (_: any, r: any) => (
                             <Space>
                               <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
-                              <Popconfirm title="确认删除？" onConfirm={async () => { await productApi.delete(r.id); message.success('已删除'); load({ current, size, filters, productLine: activeLine }); }}>
+                              <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await productApi.delete(r.id); message.success('已删除'); load({ current, size, filters, productLine: activeLine }); }}>
                                 <Button size="small" danger>删除</Button>
                               </Popconfirm>
                             </Space>
@@ -169,7 +170,7 @@ export default function ProductPage() {
                       pageSize={size}
                       total={total}
                       showSizeChanger
-                      showTotal={(t) => `共 ${t} 条`}
+                      showTotal={(t) => formatPaginationTotal(t)}
                       onChange={(page, pageSize) => load({ current: page, size: pageSize, filters, productLine: activeLine })}
                     />
                   </div>

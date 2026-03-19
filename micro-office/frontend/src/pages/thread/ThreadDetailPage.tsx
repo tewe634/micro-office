@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Timeline, Tag, Input, Button, List, Modal, Space, message, Select, Descriptions, Popconfirm, Drawer, Form } from 'antd';
 import { LockOutlined, MessageOutlined, LinkOutlined, SendOutlined, SwapOutlined, CheckCircleOutlined, StopOutlined, FlagOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { threadApi, nodeApi, userApi, objectApi, productApi } from '../../api';
-import { extractPagedRecords, formatObjectType, formatRefType } from '../../constants/ui';
+import { extractPagedRecords, formatObjectType, formatRefType, uiText } from '../../constants/ui';
 
 const statusMap: Record<string, { color: string; text: string }> = {
   IN_PROGRESS: { color: 'processing', text: '进行中' },
@@ -141,7 +141,7 @@ export default function ThreadDetailPage() {
         <Card title={<Space><Button icon={<ArrowLeftOutlined />} type="text" onClick={() => nav('/workbench')} />  {thread.title}</Space>} extra={<Space>
           <Tag color={statusMap[thread.status]?.color}>{statusMap[thread.status]?.text || thread.status}</Tag>
           {isActive && thread.currentUserId === thread.creator_id && (
-            <Popconfirm title="确认取消此工作流？" onConfirm={async () => { await threadApi.update(Number(id), { status: 'CANCELLED' }); message.success('已取消'); load(); }}>
+            <Popconfirm title={uiText.cancelWorkflowConfirm} onConfirm={async () => { await threadApi.update(Number(id), { status: 'CANCELLED' }); message.success('已取消'); load(); }}>
               <Button size="small" danger>取消工作流</Button>
             </Popconfirm>
           )}
@@ -188,10 +188,10 @@ export default function ThreadDetailPage() {
                       onClick={() => { setSpawnModal(n.id); spawnForm.resetFields(); }}>发起工作流</Button>
                     <Button size="small" icon={<SwapOutlined />}
                       onClick={() => { setTransferModal(n.id); setTransferUser(undefined); }}>转派</Button>
-                    <Popconfirm title="确认取消此节点？" onConfirm={() => handleCancel(n.id)}>
+                    <Popconfirm title={uiText.cancelNodeConfirm} onConfirm={() => handleCancel(n.id)}>
                       <Button size="small" danger icon={<StopOutlined />}>取消</Button>
                     </Popconfirm>
-                    <Popconfirm title="确认完成此节点并标记整个工作流完成？" onConfirm={() => handleFinish(n.id)}>
+                    <Popconfirm title={uiText.finishWorkflowConfirm} onConfirm={() => handleFinish(n.id)}>
                       <Button size="small" icon={<FlagOutlined />}>完成</Button>
                     </Popconfirm>
                   </>)}
@@ -210,7 +210,7 @@ export default function ThreadDetailPage() {
             {nodeDetail.references?.length ? (
               <List size="small" dataSource={nodeDetail.references} renderItem={(ref: any) => (
                 <List.Item actions={[
-                  <Popconfirm title="移除关联？" onConfirm={async () => { await nodeApi.removeReference(drawerNode.id, ref.id); refreshDrawer(); }}>
+                  <Popconfirm title={uiText.removeReferenceConfirm} onConfirm={async () => { await nodeApi.removeReference(drawerNode.id, ref.id); refreshDrawer(); }}>
                     <Button size="small" danger>移除</Button>
                   </Popconfirm>
                 ]}>
@@ -218,7 +218,7 @@ export default function ThreadDetailPage() {
                   {ref.ref_type === 'THREAD' && <Button type="link" size="small" onClick={() => nav(`/threads/${ref.ref_id}`)}>查看</Button>}
                 </List.Item>
               )} />
-            ) : <p style={{ color: '#888' }}>暂无关联</p>}
+            ) : <p style={{ color: '#888' }}>{uiText.noRelatedRecords}</p>}
           </Card>
 
           <Card title={<><MessageOutlined /> 消息通道</>} size="small">
@@ -230,7 +230,7 @@ export default function ThreadDetailPage() {
                   {m.file_name && <a href={m.file_url} target="_blank" rel="noreferrer">{m.file_name}</a>}
                 </div>
               ))}
-              {!nodeDetail.messages?.length && <p style={{ color: '#888' }}>暂无消息</p>}
+              {!nodeDetail.messages?.length && <p style={{ color: '#888' }}>{uiText.noMessageRecords}</p>}
             </div>
             <Space.Compact style={{ width: '100%' }}>
               <Input value={msgText} onChange={e => setMsgText(e.target.value)} placeholder="输入消息..." onPressEnter={sendMessage} />

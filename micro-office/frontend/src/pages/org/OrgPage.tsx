@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Tree, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import { orgApi } from '../../api';
+import { uiText } from '../../constants/ui';
 
 function buildTree(list: any[], parentId: string | null = null): DataNode[] {
   return list.filter(i => i.parentId === parentId).map(i => ({
@@ -73,7 +74,7 @@ export default function OrgPage() {
                 <Space>
                   {node.title as string}
                   <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
-                  <Popconfirm title="确认删除？" onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
+                  <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
                     <Button size="small" type="link" danger>删除</Button>
                   </Popconfirm>
                 </Space>

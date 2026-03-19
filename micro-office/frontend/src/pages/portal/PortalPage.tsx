@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Descriptions, Tag, Table, Row, Col, Button, Modal, Form, Input, Select, Space, message, Popconfirm, List } from 'antd';
 import { TrophyOutlined, UserOutlined, TeamOutlined, GlobalOutlined } from '@ant-design/icons';
 import { portalApi } from '../../api';
-import { formatObjectType, formatRoleLabel } from '../../constants/ui';
+import { formatObjectType, formatRoleLabel, uiText } from '../../constants/ui';
 
 const achTypeOpts = [{ value: 'ACHIEVEMENT', label: '重大贡献' }, { value: 'AWARD', label: '奖励' }, { value: 'MILESTONE', label: '里程碑' }];
 const achColorMap: Record<string, string> = { ACHIEVEMENT: 'gold', AWARD: 'red', MILESTONE: 'blue' };
@@ -55,7 +55,7 @@ export default function PortalPage() {
                   { title: '姓名', dataIndex: 'name' },
                   { title: '完成工作数', dataIndex: 'thread_count', align: 'center' },
                 ]} />
-            ) : <p style={{ color: '#888' }}>暂无数据</p>}
+            ) : <p style={{ color: '#888' }}>{uiText.appEmpty}</p>}
           </Card>
         </Col>
 
@@ -83,7 +83,7 @@ export default function PortalPage() {
                   {item.name} {item.contact ? `(${item.contact})` : ''} {item.phone || ''}
                 </List.Item>
               )} />
-            ) : <p style={{ color: '#888' }}>暂无关联的外部对象</p>}
+            ) : <p style={{ color: '#888' }}>{uiText.noExternalObjectLinks}</p>}
           </Card>
         </Col>
 
@@ -102,13 +102,13 @@ export default function PortalPage() {
                   { title: '操作', width: 120, render: (_: any, r: any) => (
                     <Space>
                       <Button size="small" onClick={() => { setEditAch(r); form.setFieldsValue({ ...r, eventDate: r.event_date }); setModal(true); }}>编辑</Button>
-                      <Popconfirm title="确认删除？" onConfirm={async () => { await portalApi.deleteAchievement(r.id); message.success('已删除'); load(); }}>
+                      <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await portalApi.deleteAchievement(r.id); message.success('已删除'); load(); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
                     </Space>
                   )},
                 ]} />
-            ) : <p style={{ color: '#888' }}>暂无记录，点击右上角添加</p>}
+            ) : <p style={{ color: '#888' }}>{uiText.noAchievementRecords}</p>}
           </Card>
         </Col>
       </Row>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Space, message, Popconfirm } from 'antd';
 import { adminApi } from '../../api';
+import { uiText } from '../../constants/ui';
 
 export default function AdminModulePage() {
   const [data, setData] = useState<any[]>([]);
@@ -26,7 +27,7 @@ export default function AdminModulePage() {
         { title: '操作', render: (_: any, r: any) => (
           <Space>
             <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-            <Popconfirm title="确认删除？" onConfirm={async () => { await adminApi.deleteModule(r.id); message.success('已删除'); load(); }}>
+            <Popconfirm title={uiText.deleteConfirm} onConfirm={async () => { await adminApi.deleteModule(r.id); message.success('已删除'); load(); }}>
               <Button size="small" danger>删除</Button>
             </Popconfirm>
           </Space>

@@ -27,6 +27,22 @@ export const refTypeLabelMap: Record<string, string> = {
   PRODUCT: '产品',
 };
 
+export const uiText = {
+  appEmpty: '暂无数据',
+  noClockRecords: '暂无打卡记录',
+  noPendingItems: '暂无待处理事项',
+  noRelatedRecords: '暂无关联记录',
+  noMessageRecords: '暂无消息记录',
+  noNodeRecords: '暂无节点记录',
+  noExternalObjectLinks: '暂无关联外部对象',
+  noAchievementRecords: '暂无记录，可点击右上角新增',
+  deleteConfirm: '确定要删除当前记录吗？',
+  removeReferenceConfirm: '确定要移除这条关联吗？',
+  cancelWorkflowConfirm: '确定要取消当前工作流吗？',
+  cancelNodeConfirm: '确定要取消当前节点吗？',
+  finishWorkflowConfirm: '确定要完成当前节点，并将整个工作流标记为已完成吗？',
+};
+
 export function formatRoleLabel(code?: string, name?: string) {
   if (code && roleLabelMap[code]) return roleLabelMap[code];
   if (name) {
@@ -50,4 +66,8 @@ export function extractPagedRecords(payload: any) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.records)) return payload.records;
   return [];
+}
+
+export function formatPaginationTotal(total: number) {
+  return `共 ${total} 条记录`;
 }

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, Empty } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
@@ -9,6 +9,7 @@ import ObjectPage from './pages/object/ObjectPage';
 import ProductPage from './pages/product/ProductPage';
 import AdminPermissionPage from './pages/admin/AdminPermissionPage';
 import { useAuthStore } from './store/auth';
+import { uiText } from './constants/ui';
 
 const defaultRouteOrder = ['/workbench', '/org', '/users', '/objects', '/products', '/admin/permissions'];
 
@@ -32,7 +33,10 @@ function MenuRouteGuard({ menuKey, children }: { menuKey: string; children: Reac
 
 export default function App() {
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider
+      locale={zhCN}
+      renderEmpty={() => <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={uiText.appEmpty} />}
+    >
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
