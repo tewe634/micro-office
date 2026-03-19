@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm, Slider, Empty } from 'antd';
+import { Card, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm, Slider, Empty, Tag } from 'antd';
 import { MinusOutlined, PlusOutlined, ReloadOutlined, ZoomInOutlined } from '@ant-design/icons';
 import { orgApi } from '../../api';
-import { uiText } from '../../constants/ui';
+import { formatRoleLabel, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
 
 type OrgItem = {
@@ -12,10 +12,21 @@ type OrgItem = {
   sortOrder?: number;
 };
 
+type OrgUser = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  role?: string | null;
+  org_id: string;
+  primary_position_name?: string | null;
+  leaderCandidate?: boolean;
+};
+
 const ROOT_NAME = '总经办';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
+const MAX_VISIBLE_USERS = 6;
 
 const orgChartStyles = `
 .org-canvas-page {
@@ -141,18 +152,18 @@ const orgChartStyles = `
 }
 
 .org-node-card {
-  min-width: 180px;
-  max-width: 240px;
-  padding: 14px 16px 12px;
+  min-width: 260px;
+  max-width: 340px;
+  padding: 14px 16px 14px;
   border: 1px solid #d6e4ff;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.94);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 12px 24px rgba(22, 119, 255, 0.08);
   backdrop-filter: blur(4px);
 }
 
 .org-node-card--root {
-  min-width: 220px;
+  min-width: 280px;
   background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   color: #fff;
   border-color: transparent;
@@ -167,8 +178,8 @@ const orgChartStyles = `
 }
 
 .org-node-card__title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.5;
   word-break: break-word;
 }
@@ -181,6 +192,77 @@ const orgChartStyles = `
 
 .org-node-card--root .org-node-card__meta {
   color: rgba(255, 255, 255, 0.82);
+}
+
+.org-node-card__section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(5, 5, 5, 0.10);
+}
+
+.org-node-card--root .org-node-card__section {
+  border-top-color: rgba(255, 255, 255, 0.22);
+}
+
+.org-node-card__section-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.org-node-card--root .org-node-card__section-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.org-node-card__people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.org-person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f5f8ff;
+  border: 1px solid #d6e4ff;
+  font-size: 12px;
+  color: #1f1f1f;
+}
+
+.org-node-card--root .org-person-chip {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.org-person-chip__name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.org-person-chip__sub {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.org-node-card--root .org-person-chip__sub {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.org-node-card__empty {
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+}
+
+.org-node-card--root .org-node-card__empty {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .org-node-card__actions {
@@ -245,10 +327,22 @@ function buildTreeSelect(list: OrgItem[], parentId: string | null = null, exclud
     }));
 }
 
+function PersonChip({ user, root }: { user: OrgUser; root?: boolean }) {
+  return (
+    <div className="org-person-chip" title={`${user.name}${user.primary_position_name ? ` / ${user.primary_position_name}` : ''}${user.phone ? ` / ${user.phone}` : ''}`}>
+      <span className="org-person-chip__name">{user.name}</span>
+      {user.primary_position_name ? <span className="org-person-chip__sub">{user.primary_position_name}</span> : null}
+      {!user.primary_position_name && user.role ? <span className="org-person-chip__sub">{formatRoleLabel(user.role, user.role)}</span> : null}
+      {root ? <Tag color="gold" style={{ marginInlineStart: 2, marginRight: 0 }}>负责人</Tag> : null}
+    </div>
+  );
+}
+
 function OrgChartNode({
   node,
   rootId,
   childrenMap,
+  usersByOrg,
   expandedKeys,
   onToggle,
   canManageOrg,
@@ -258,6 +352,7 @@ function OrgChartNode({
   node: OrgItem;
   rootId?: string;
   childrenMap: Map<string | null, OrgItem[]>;
+  usersByOrg: Map<string, OrgUser[]>;
   expandedKeys: string[];
   onToggle: (id: string) => void;
   canManageOrg: boolean;
@@ -265,8 +360,13 @@ function OrgChartNode({
   onDelete: (id: string) => Promise<void>;
 }) {
   const children = childrenMap.get(node.id) || [];
+  const users = usersByOrg.get(node.id) || [];
+  const leaderUsers = users.filter(user => user.leaderCandidate);
+  const displayLeaders = leaderUsers.length > 0 ? leaderUsers : (users.length === 1 ? users : []);
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
+  const visibleUsers = users.slice(0, MAX_VISIBLE_USERS);
+  const hiddenUserCount = Math.max(users.length - MAX_VISIBLE_USERS, 0);
 
   return (
     <div className="org-node-wrap">
@@ -288,7 +388,30 @@ function OrgChartNode({
         </div>
 
         <div className="org-node-card__meta">
-          {children.length > 0 ? `${children.length} 个下级组织` : '末级组织'}
+          {children.length} 个下级组织 · {users.length} 人
+        </div>
+
+        <div className="org-node-card__section">
+          <div className="org-node-card__section-label">负责人</div>
+          {displayLeaders.length > 0 ? (
+            <div className="org-node-card__people">
+              {displayLeaders.map(user => <PersonChip key={user.id} user={user} root />)}
+            </div>
+          ) : (
+            <div className="org-node-card__empty">暂无负责人标识</div>
+          )}
+        </div>
+
+        <div className="org-node-card__section">
+          <div className="org-node-card__section-label">节点下人员</div>
+          {users.length > 0 ? (
+            <div className="org-node-card__people">
+              {visibleUsers.map(user => <PersonChip key={user.id} user={user} />)}
+              {hiddenUserCount > 0 ? <div className="org-person-chip">+{hiddenUserCount} 人</div> : null}
+            </div>
+          ) : (
+            <div className="org-node-card__empty">当前节点暂无人员</div>
+          )}
         </div>
 
         {canManageOrg ? (
@@ -311,6 +434,7 @@ function OrgChartNode({
                 node={child}
                 rootId={rootId}
                 childrenMap={childrenMap}
+                usersByOrg={usersByOrg}
                 expandedKeys={expandedKeys}
                 onToggle={onToggle}
                 canManageOrg={canManageOrg}
@@ -329,6 +453,7 @@ export default function OrgPage() {
   const role = useAuthStore(s => s.role);
   const canManageOrg = role === 'ADMIN' || role === 'HR';
   const [orgs, setOrgs] = useState<OrgItem[]>([]);
+  const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -354,17 +479,27 @@ export default function OrgPage() {
     return map;
   }, [orgs]);
 
+  const usersByOrg = useMemo(() => {
+    const map = new Map<string, OrgUser[]>();
+    orgUsers.forEach(user => {
+      const key = String(user.org_id);
+      map.set(key, [...(map.get(key) || []), user]);
+    });
+    return map;
+  }, [orgUsers]);
+
   const rootOrg = useMemo(() => {
     return orgs.find(item => item.name === ROOT_NAME) || orgs.find(item => !item.parentId) || null;
   }, [orgs]);
 
-  const loadOrgs = async () => {
-    const r: any = await orgApi.list();
-    setOrgs(r.data || []);
+  const loadChart = async () => {
+    const r: any = await orgApi.chart();
+    setOrgs(r.data?.orgs || []);
+    setOrgUsers(r.data?.users || []);
   };
 
   useEffect(() => {
-    loadOrgs();
+    loadChart();
   }, []);
 
   useEffect(() => {
@@ -433,13 +568,13 @@ export default function OrgPage() {
     setOrgModal(false);
     orgForm.resetFields();
     setEditOrg(null);
-    loadOrgs();
+    loadChart();
   };
 
   const deleteOrg = async (id: string) => {
     await orgApi.delete(id);
     message.success('已删除');
-    loadOrgs();
+    loadChart();
   };
 
   const toggleExpanded = (id: string) => {
@@ -476,6 +611,7 @@ export default function OrgPage() {
                         node={rootOrg}
                         rootId={rootOrg.id}
                         childrenMap={childrenMap}
+                        usersByOrg={usersByOrg}
                         expandedKeys={expandedKeys}
                         onToggle={toggleExpanded}
                         canManageOrg={canManageOrg}

@@ -7,6 +7,7 @@ export const authApi = {
 
 export const orgApi = {
   list: () => api.get('/orgs'),
+  chart: () => api.get('/orgs/chart'),
   get: (id: string | number) => api.get(`/orgs/${id}`),
   create: (data: any) => api.post('/orgs', data),
   update: (id: string | number, data: any) => api.put(`/orgs/${id}`, data),
