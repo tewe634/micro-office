@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { authApi, userApi } from '../../api';
 import { useAuthStore } from '../../store/auth';
 
-const defaultRouteOrder = ['/workbench', '/org', '/users', '/objects', '/products', '/admin/permissions'];
-const resolveHomePath = (menus: string[]) => defaultRouteOrder.find(route => menus.includes(route) || (route === '/admin/permissions' && menus.includes('/admin'))) || '/objects';
+const defaultRouteOrder = ['/workbench', '/users', '/objects', '/products', '/admin/permissions'];
+const resolveHomePath = (menus: string[]) => defaultRouteOrder.find(route => menus.includes(route) || (route === '/admin/permissions' && menus.includes('/admin'))) || '/org';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);

@@ -43,6 +43,9 @@ public class UserController {
             userMenus = jdbc.queryForList(
                 "SELECT menu_key FROM role_menu_permission WHERE role = ? ORDER BY menu_key", String.class, u.getRole());
         }
+        userMenus = userMenus.stream()
+            .filter(menu -> !"/org".equals(menu))
+            .toList();
         m.put("menus", userMenus);
         m.put("homePath", resolveHomePath(userMenus));
         m.put("hasCustomMenus", !jdbc.queryForList("SELECT 1 FROM user_menu_permission WHERE user_id = ? LIMIT 1", userId).isEmpty());
@@ -248,6 +251,6 @@ public class UserController {
                 return path;
             }
         }
-        return "/objects";
+        return "/org";
     }
 }

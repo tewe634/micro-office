@@ -2,6 +2,7 @@ package com.microoffice.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+
 import java.util.List;
 
 @Configuration
@@ -44,13 +46,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/threads/**").authenticated()
                 .requestMatchers("/api/nodes/**").authenticated()
                 .requestMatchers("/api/templates/**").authenticated()
-                // 组织架构 + 人员管理: HR 和 ADMIN
+                // 组织架构: 全员可查看；变更操作仍保留给 HR 和 ADMIN
+                .requestMatchers(HttpMethod.GET, "/api/orgs/**").authenticated()
                 .requestMatchers("/api/orgs/**").hasAnyRole("HR", "ADMIN")
+                // 人员管理: HR 和 ADMIN
                 .requestMatchers("/api/users/**").hasAnyRole("HR", "ADMIN")
                 .requestMatchers("/api/positions/**").hasAnyRole("HR", "ADMIN")
                 // 系统管理: 仅 ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // 外部对象: SALES, PURCHASE, FINANCE, ADMIN
+                // 外部对象: 登录即可访问（具体范围在业务侧控制）
                 .requestMatchers("/api/objects/**").authenticated()
                 .anyRequest().authenticated()
             )

@@ -24,7 +24,6 @@ const roleColorMap: Record<string, string> = {
 };
 
 const menus = [
-  { key: '/org', label: '组织架构' },
   { key: '/users', label: '人员管理' },
   { key: '/objects', label: '外部对象' },
   { key: '/products', label: '产品服务' },
@@ -79,7 +78,7 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
 
   return (
     <div className="page-fill" style={{ gap: 16 }}>
-      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表，当前页面可直接配置系统中全部角色的默认模块权限。</p>
+      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织架构模块已改为全员可见，因此不再参与这里的权限配置。</p>
       <div className="page-card-scroll">
         <Table
           dataSource={menus}

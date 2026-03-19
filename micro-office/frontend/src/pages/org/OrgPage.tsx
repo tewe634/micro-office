@@ -3,6 +3,7 @@ import { Card, Tree, Button, Modal, Form, Input, InputNumber, Space, TreeSelect,
 import type { DataNode } from 'antd/es/tree';
 import { orgApi } from '../../api';
 import { uiText } from '../../constants/ui';
+import { useAuthStore } from '../../store/auth';
 
 function buildTree(list: any[], parentId: string | null = null): DataNode[] {
   return list.filter(i => i.parentId === parentId).map(i => ({
@@ -23,6 +24,8 @@ function buildTreeSelect(list: any[], parentId: string | null = null, excludeId?
 }
 
 export default function OrgPage() {
+  const role = useAuthStore(s => s.role);
+  const canManageOrg = role === 'ADMIN' || role === 'HR';
   const [orgs, setOrgs] = useState<any[]>([]);
   const [orgModal, setOrgModal] = useState(false);
   const [editOrg, setEditOrg] = useState<any>(null);
@@ -38,6 +41,7 @@ export default function OrgPage() {
   }, []);
 
   const openOrgModal = (org?: any) => {
+    if (!canManageOrg) return;
     setEditOrg(org || null);
     orgForm.resetFields();
     if (org) {
@@ -62,7 +66,7 @@ export default function OrgPage() {
         title="公司整体组织架构"
         className="page-card page-fill"
         styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
-        extra={<Button type="primary" onClick={() => openOrgModal()}>新增组织</Button>}
+        extra={canManageOrg ? <Button type="primary" onClick={() => openOrgModal()}>新增组织</Button> : null}
       >
         <div className="page-card-body">
           <div className="page-card-scroll">
@@ -73,10 +77,14 @@ export default function OrgPage() {
               titleRender={(node: any) => (
                 <Space>
                   {node.title as string}
-                  <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
-                  <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
-                    <Button size="small" type="link" danger>删除</Button>
-                  </Popconfirm>
+                  {canManageOrg ? (
+                    <>
+                      <Button size="small" type="link" onClick={() => openOrgModal(orgs.find(i => i.id === node.key))}>编辑</Button>
+                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await orgApi.delete(node.key as any); message.success('已删除'); loadOrgs(); }}>
+                        <Button size="small" type="link" danger>删除</Button>
+                      </Popconfirm>
+                    </>
+                  ) : null}
                 </Space>
               )}
             />

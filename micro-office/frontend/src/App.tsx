@@ -11,7 +11,7 @@ import AdminPermissionPage from './pages/admin/AdminPermissionPage';
 import { useAuthStore } from './store/auth';
 import { uiText } from './constants/ui';
 
-const defaultRouteOrder = ['/workbench', '/org', '/users', '/objects', '/products', '/admin/permissions'];
+const defaultRouteOrder = ['/workbench', '/users', '/objects', '/products', '/admin/permissions'];
 
 const appLocale = {
   ...zhCN,
@@ -45,7 +45,7 @@ const appLocale = {
 function HomeRedirect() {
   const menus = useAuthStore(s => s.menus);
   const first = defaultRouteOrder.find(route => menus.includes(route) || (route === '/admin/permissions' && menus.includes('/admin')));
-  return <Navigate to={first || '/objects'} replace />;
+  return <Navigate to={first || '/org'} replace />;
 }
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -55,7 +55,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function MenuRouteGuard({ menuKey, children }: { menuKey: string; children: React.ReactNode }) {
   const menus = useAuthStore(s => s.menus);
-  const allowed = menus.includes(menuKey) || (menuKey.startsWith('/admin') && menus.includes('/admin'));
+  const allowed = menuKey === '/org' || menus.includes(menuKey) || (menuKey.startsWith('/admin') && menus.includes('/admin'));
   if (!allowed) return <HomeRedirect />;
   return <>{children}</>;
 }
