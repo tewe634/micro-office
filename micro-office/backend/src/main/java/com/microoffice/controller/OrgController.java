@@ -2,14 +2,11 @@ package com.microoffice.controller;
 
 import com.microoffice.dto.response.ApiResponse;
 import com.microoffice.entity.Organization;
-import com.microoffice.service.DataScopeService;
 import com.microoffice.service.OrgService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +18,6 @@ import java.util.stream.Collectors;
 public class OrgController {
     private final OrgService orgService;
     private final JdbcTemplate jdbc;
-    private final DataScopeService dataScopeService;
 
     @GetMapping
     public ApiResponse<List<Organization>> list() {
@@ -29,30 +25,21 @@ public class OrgController {
     }
 
     @GetMapping("/chart")
-    public ApiResponse<Map<String, Object>> chart(Authentication auth) {
-        String currentUserId = (String) auth.getPrincipal();
+    public ApiResponse<Map<String, Object>> chart() {
         List<Organization> orgs = orgService.list();
-        List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(currentUserId);
-
-        List<Map<String, Object>> users;
-        if (visibleOrgIds.isEmpty()) {
-            users = new ArrayList<>();
-        } else {
-            users = jdbc.queryForList(
-                "SELECT su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name AS org_name, su.role, su.hired_at, " +
-                "su.primary_position_id, p.name AS primary_position_name, " +
-                "COALESCE(string_agg(DISTINCT p2.name, '、') FILTER (WHERE p2.name IS NOT NULL), '') AS extra_position_names " +
-                "FROM sys_user su " +
-                "LEFT JOIN organization o ON o.id = su.org_id " +
-                "LEFT JOIN position p ON p.id = su.primary_position_id " +
-                "LEFT JOIN user_position up ON up.user_id = su.id " +
-                "LEFT JOIN position p2 ON p2.id = up.position_id " +
-                "WHERE su.org_id = ANY(?::varchar[]) " +
-                "GROUP BY su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name, su.role, su.hired_at, su.primary_position_id, p.name " +
-                "ORDER BY su.org_id, su.name",
-                (Object) visibleOrgIds.toArray(new String[0])
-            );
-        }
+        List<Map<String, Object>> users = jdbc.queryForList(
+            "SELECT su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name AS org_name, su.role, su.hired_at, " +
+            "su.primary_position_id, p.name AS primary_position_name, " +
+            "COALESCE(string_agg(DISTINCT p2.name, '、') FILTER (WHERE p2.name IS NOT NULL), '') AS extra_position_names " +
+            "FROM sys_user su " +
+            "LEFT JOIN organization o ON o.id = su.org_id " +
+            "LEFT JOIN position p ON p.id = su.primary_position_id " +
+            "LEFT JOIN user_position up ON up.user_id = su.id " +
+            "LEFT JOIN position p2 ON p2.id = up.position_id " +
+            "WHERE su.org_id IS NOT NULL " +
+            "GROUP BY su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name, su.role, su.hired_at, su.primary_position_id, p.name " +
+            "ORDER BY su.org_id, su.name"
+        );
 
         Map<String, List<Map<String, Object>>> usersByOrg = users.stream()
             .peek(user -> {

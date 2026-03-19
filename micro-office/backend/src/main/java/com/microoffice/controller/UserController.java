@@ -4,10 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.microoffice.dto.response.ApiResponse;
 import com.microoffice.entity.SysUser;
 import com.microoffice.mapper.SysUserMapper;
+import com.microoffice.service.MenuPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.*;
 
 @RestController
@@ -18,6 +20,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbc;
     private final com.microoffice.service.DataScopeService dataScopeService;
+    private final MenuPermissionService menuPermissionService;
 
     @GetMapping("/me/lookups")
     public ApiResponse<Map<String, Object>> lookups() {
@@ -50,18 +53,12 @@ public class UserController {
         m.put("id", u.getId()); m.put("name", u.getName()); m.put("email", u.getEmail());
         m.put("role", u.getRole()); m.put("orgId", u.getOrgId()); m.put("primaryPositionId", u.getPrimaryPositionId());
 
-        List<String> userMenus = jdbc.queryForList(
-            "SELECT menu_key FROM user_menu_permission WHERE user_id = ? ORDER BY menu_key", String.class, userId);
-        if (userMenus.isEmpty()) {
-            userMenus = jdbc.queryForList(
-                "SELECT menu_key FROM role_menu_permission WHERE role = ? ORDER BY menu_key", String.class, u.getRole());
-        }
-        userMenus = userMenus.stream()
-            .filter(menu -> !"/org".equals(menu) && !"/users".equals(menu))
+        List<String> userMenus = menuPermissionService.getEffectiveMenus(userId).stream()
+            .filter(menu -> !"/org".equals(menu))
             .toList();
         m.put("menus", userMenus);
         m.put("homePath", resolveHomePath(userMenus));
-        m.put("hasCustomMenus", !jdbc.queryForList("SELECT 1 FROM user_menu_permission WHERE user_id = ? LIMIT 1", userId).isEmpty());
+        m.put("hasCustomMenus", menuPermissionService.hasCustomMenus(userId));
 
         List<String> userObjTypes = jdbc.queryForList(
             "SELECT object_type FROM user_object_type WHERE user_id = ? ORDER BY object_type", String.class, userId);
@@ -97,6 +94,7 @@ public class UserController {
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) String orgId) {
         String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        menuPermissionService.requireMenu(currentUserId, "/users");
         List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(currentUserId);
         List<SysUser> users;
         if (orgId != null) {
@@ -182,6 +180,7 @@ public class UserController {
     @GetMapping("/{id}")
     public ApiResponse<SysUser> get(@PathVariable String id) {
         String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        menuPermissionService.requireMenu(currentUserId, "/users");
         List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(currentUserId);
         SysUser u = userMapper.selectById(id);
         if (u != null && !visibleOrgIds.contains(u.getOrgId())) {
@@ -193,6 +192,8 @@ public class UserController {
 
     @PostMapping
     public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        menuPermissionService.requireMenu(currentUserId, "/users");
         SysUser u = new SysUser();
         u.setName((String) body.get("name"));
         u.setEmail((String) body.get("email"));
@@ -211,6 +212,8 @@ public class UserController {
 
     @PutMapping("/{id}")
     public ApiResponse<Void> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        menuPermissionService.requireMenu(currentUserId, "/users");
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new RuntimeException("用户不存在");
         if (body.containsKey("name")) u.setName((String) body.get("name"));
@@ -234,6 +237,8 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable String id) {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        menuPermissionService.requireMenu(currentUserId, "/users");
         jdbc.update("DELETE FROM user_position WHERE user_id = ?", id);
         userMapper.deleteById(id);
         return ApiResponse.ok(null);

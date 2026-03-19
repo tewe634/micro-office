@@ -51,7 +51,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function MenuRouteGuard({ menuKey, children }: { menuKey: string; children: React.ReactNode }) {
   const menus = useAuthStore(s => s.menus);
-  const allowed = menuKey === '/org' || menuKey === '/users' || menus.includes(menuKey) || (menuKey.startsWith('/admin') && menus.includes('/admin'));
+  const allowed = menuKey === '/org' || menus.includes(menuKey) || (menuKey.startsWith('/admin') && menus.includes('/admin'));
   if (!allowed) return <HomeRedirect />;
   return <>{children}</>;
 }
