@@ -6,6 +6,7 @@ import com.microoffice.enums.ObjectType;
 import com.microoffice.mapper.ExternalObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
@@ -23,8 +24,29 @@ public class ExternalObjectService {
             .orderByDesc(ExternalObject::getId);
         return mapper.selectList(q);
     }
-    public ExternalObject getById(String id) { return mapper.selectById(id); }
-    public ExternalObject create(ExternalObject obj) { mapper.insert(obj); return obj; }
-    public void update(ExternalObject obj) { mapper.updateById(obj); }
-    public void delete(String id) { mapper.deleteById(id); }
+
+    public ExternalObject getById(String id) {
+        return mapper.selectById(id);
+    }
+
+    public ExternalObject create(ExternalObject obj) {
+        sanitizeByType(obj);
+        mapper.insert(obj);
+        return obj;
+    }
+
+    public void update(ExternalObject obj) {
+        sanitizeByType(obj);
+        mapper.updateById(obj);
+    }
+
+    public void delete(String id) {
+        mapper.deleteById(id);
+    }
+
+    private void sanitizeByType(ExternalObject obj) {
+        if (obj.getType() != ObjectType.CUSTOMER) {
+            obj.setIndustry(null);
+        }
+    }
 }

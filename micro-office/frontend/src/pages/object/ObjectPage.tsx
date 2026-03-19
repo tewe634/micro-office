@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag, Pagination } from 'antd';
 import { objectApi, userApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
@@ -22,6 +22,8 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   const [filterDept, setFilterDept] = useState<string | undefined>();
   const [form] = Form.useForm();
 
+  const isCustomerType = type === 'CUSTOMER';
+
   const load = async (c = current, s = size, deptId = filterDept) => {
     const r: any = await objectApi.page({ current: c, size: s, type, deptId });
     setData(r.data?.records || []);
@@ -35,7 +37,11 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   }, [type, filterDept]);
 
   const save = async (values: any) => {
-    const payload = { ...values, type };
+    const payload = {
+      ...values,
+      type,
+      industry: isCustomerType ? values.industry : null,
+    };
     if (edit) {
       await objectApi.update(edit.id, payload);
     } else {
@@ -58,6 +64,37 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   const orgName = (id: string) => orgs.find(o => o.id === id)?.name || '-';
   const deptName = (id: string) => departments.find(o => o.id === id)?.name || orgName(id);
   const userName = (id: string) => users.find(u => u.id === id)?.name || '-';
+
+  const columns = useMemo(() => {
+    const baseColumns: any[] = [
+      { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
+      { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
+      { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
+      { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
+      { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
+      { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{deptName(v)}</Tag> : '-' },
+      { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+    ];
+
+    if (isCustomerType) {
+      baseColumns.splice(4, 0, { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true });
+    }
+
+    baseColumns.push({
+      title: '操作',
+      width: 140,
+      render: (_: any, r: any) => (
+        <Space>
+          <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
+          <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
+            <Button size="small" danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    });
+
+    return baseColumns;
+  }, [current, size, isCustomerType, orgs, departments, users]);
 
   return (
     <>
@@ -97,28 +134,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
               tableLayout="fixed"
               showSorterTooltip={false}
               scroll={{ y: 'calc(100dvh - 455px)' }}
-              columns={[
-                { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
-                { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
-                { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
-                { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
-                { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
-                { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-                { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{deptName(v)}</Tag> : '-' },
-                { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
-                {
-                  title: '操作',
-                  width: 140,
-                  render: (_: any, r: any) => (
-                    <Space>
-                      <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
-                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
-                        <Button size="small" danger>删除</Button>
-                      </Popconfirm>
-                    </Space>
-                  ),
-                },
-              ]}
+              columns={columns}
             />
           </div>
 
@@ -151,7 +167,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
           <Form.Item name="contact" label="联系人"><Input /></Form.Item>
           <Form.Item name="phone" label="电话"><Input /></Form.Item>
           <Form.Item name="address" label="地址"><Input /></Form.Item>
-          <Form.Item name="industry" label="行业"><Input /></Form.Item>
+          {isCustomerType ? <Form.Item name="industry" label="行业"><Input /></Form.Item> : null}
           <Form.Item name="orgId" label="所属组织">
             <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
