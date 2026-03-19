@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
@@ -86,93 +87,73 @@ export default function UserTab() {
 
   return (
     <>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="page-toolbar">
-          <Select
-            allowClear
-            placeholder="按组织筛选"
-            style={{ width: 220 }}
-            options={orgs.map(o => ({ value: o.id, label: o.name }))}
-            onChange={v => setFilterOrg(v)}
+      <FixedTablePage
+        top={
+          <div className="page-toolbar">
+            <Select
+              allowClear
+              placeholder="按组织筛选"
+              style={{ width: 220 }}
+              options={orgs.map(o => ({ value: o.id, label: o.name }))}
+              onChange={v => setFilterOrg(v)}
+            />
+            <div className="page-toolbar-right">
+              <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>
+            </div>
+          </div>
+        }
+        table={
+          <Table
+            dataSource={users}
+            rowKey="id"
+            pagination={false}
+            tableLayout="fixed"
+            sticky
+            scroll={{ y: '100%' }}
+            style={{ height: '100%' }}
+            columns={[
+              { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
+              { title: '工号', dataIndex: 'empNo', width: 110, ellipsis: true },
+              { title: '姓名', dataIndex: 'name', width: 90, ellipsis: true },
+              { title: '邮箱', dataIndex: 'email', width: 180, ellipsis: true },
+              { title: '手机', dataIndex: 'phone', width: 120, ellipsis: true },
+              { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roles.find(r => r.code === v)?.name || v}</Tag> },
+              { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: any) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
+              { title: '主岗位', dataIndex: 'primaryPositionId', width: 120, render: (v: any) => v ? <Tag color="green">{posName(v)}</Tag> : '-' },
+              {
+                title: '辅助岗位',
+                dataIndex: 'extraPositionIds',
+                width: 180,
+                ellipsis: true,
+                render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-',
+              },
+              {
+                title: '操作',
+                width: 210,
+                render: (_: any, r: any) => (
+                  <Space size={6} wrap>
+                    <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
+                    <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
+                    <Popconfirm title="确认删除？" onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(1, size, filterOrg); }}>
+                      <Button size="small" danger>删除</Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
           />
-          <div className="page-toolbar-right">
-            <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button>
-          </div>
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            background: '#fff',
-            border: '1px solid #f0f0f0',
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
-            <Table
-              dataSource={users}
-              rowKey="id"
-              pagination={false}
-              tableLayout="fixed"
-              scroll={{ y: 'calc(100dvh - 455px)' }}
-              columns={[
-                { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
-                { title: '工号', dataIndex: 'empNo', width: 110, ellipsis: true },
-                { title: '姓名', dataIndex: 'name', width: 90, ellipsis: true },
-                { title: '邮箱', dataIndex: 'email', width: 180, ellipsis: true },
-                { title: '手机', dataIndex: 'phone', width: 120, ellipsis: true },
-                { title: '角色', dataIndex: 'role', width: 90, render: (v: string) => <Tag color={roleColorMap[v] || 'default'}>{roles.find(r => r.code === v)?.name || v}</Tag> },
-                { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: any) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-                { title: '主岗位', dataIndex: 'primaryPositionId', width: 120, render: (v: any) => v ? <Tag color="green">{posName(v)}</Tag> : '-' },
-                {
-                  title: '辅助岗位',
-                  dataIndex: 'extraPositionIds',
-                  width: 180,
-                  ellipsis: true,
-                  render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-',
-                },
-                {
-                  title: '操作',
-                  width: 210,
-                  render: (_: any, r: any) => (
-                    <Space size={6} wrap>
-                      <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
-                      <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
-                      <Popconfirm title="确认删除？" onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(1, size, filterOrg); }}>
-                        <Button size="small" danger>删除</Button>
-                      </Popconfirm>
-                    </Space>
-                  ),
-                },
-              ]}
-            />
-          </div>
-
-          <div
-            style={{
-              flex: '0 0 auto',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              padding: '12px 16px 16px',
-              borderTop: '1px solid #f0f0f0',
-              background: '#fff',
-            }}
-          >
-            <Pagination
-              current={current}
-              pageSize={size}
-              total={total}
-              showSizeChanger
-              showTotal={(t) => `共 ${t} 条`}
-              onChange={(page, pageSize) => loadUsers(page, pageSize, filterOrg)}
-            />
-          </div>
-        </div>
-      </div>
+        }
+        pagination={
+          <Pagination
+            current={current}
+            pageSize={size}
+            total={total}
+            showSizeChanger
+            showTotal={(t) => `共 ${t} 条`}
+            onChange={(page, pageSize) => loadUsers(page, pageSize, filterOrg)}
+          />
+        }
+      />
 
       <Modal title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
         <Form form={form} onFinish={save} layout="vertical">
