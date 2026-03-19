@@ -87,6 +87,7 @@ export default function ProductPage() {
                 dataSource={data}
                 rowKey="id"
                 pagination={false}
+                tableLayout="fixed"
                 scroll={{ x: 1600, y: 'calc(100dvh - 455px)' }}
                 columns={[
                   { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
