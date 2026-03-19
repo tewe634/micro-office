@@ -45,6 +45,27 @@ function shouldHideMemberSection(nodeName: string) {
     || /^业务[一二三123]部$/.test(nodeName);
 }
 
+function collectDescendantOrgIds(orgId: string, childrenMap: Map<string | null, OrgItem[]>) {
+  const result: string[] = [];
+  const stack = [...(childrenMap.get(orgId) || [])];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    result.push(current.id);
+    stack.push(...(childrenMap.get(current.id) || []));
+  }
+  return result;
+}
+
+function dedupeUsers(list: OrgUser[]) {
+  const seen = new Set<string>();
+  return list.filter(user => {
+    if (seen.has(user.id)) return false;
+    seen.add(user.id);
+    return true;
+  });
+}
+
 const orgChartStyles = `
 .org-canvas-page {
   position: relative;
@@ -357,12 +378,12 @@ function buildTreeSelect(list: OrgItem[], parentId: string | null = null, exclud
     }));
 }
 
-function PersonCard({ user, onClick }: { user: OrgUser; onClick: (user: OrgUser) => void }) {
+function PersonCard({ user, onClick, showLeaderTag }: { user: OrgUser; onClick: (user: OrgUser) => void; showLeaderTag?: boolean }) {
   return (
     <button type="button" className="org-person-card" onClick={() => onClick(user)}>
       <div className="org-person-card__top">
         <span className="org-person-card__name">{user.name}</span>
-        {user.leaderCandidate ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
+        {showLeaderTag || user.leaderCandidate ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
       </div>
       <div className="org-person-card__meta">
         <span>主岗位：{user.primary_position_name || '-'}</span>
@@ -404,11 +425,16 @@ function OrgChartNode({
     return a.name.localeCompare(b.name, 'zh-CN');
   });
   const defaultLeaderUsers = users.filter(user => user.leaderCandidate);
-  const businessDepartmentLeaders = node.name === '商务部' ? users.filter(isBusinessSpecialist) : [];
+  const businessDepartmentDescendantUsers = node.name === '商务部'
+    ? collectDescendantOrgIds(node.id, childrenMap).flatMap(orgId => usersByOrg.get(orgId) || [])
+    : [];
+  const businessDepartmentLeaders = node.name === '商务部'
+    ? dedupeUsers([...users.filter(isBusinessSpecialist), ...businessDepartmentDescendantUsers.filter(isBusinessSpecialist)])
+    : [];
   const leaderUsers = FIXED_LEADER_NODE_NAMES.has(node.name) && fixedLeaderUser
     ? [fixedLeaderUser]
     : businessDepartmentLeaders.length > 0
-      ? businessDepartmentLeaders
+      ? dedupeUsers([...defaultLeaderUsers, ...businessDepartmentLeaders])
       : defaultLeaderUsers;
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
@@ -443,7 +469,7 @@ function OrgChartNode({
           <div className="org-node-card__section-label">负责人</div>
           {leaderUsers.length > 0 ? (
             <div className="org-node-card__people">
-              {leaderUsers.map(user => <PersonCard key={`leader-${user.id}`} user={user} onClick={onSelectUser} />)}
+              {leaderUsers.map(user => <PersonCard key={`leader-${user.id}`} user={user} onClick={onSelectUser} showLeaderTag />)}
             </div>
           ) : (
             <div className="org-node-card__empty">暂无负责人标识</div>
