@@ -32,7 +32,7 @@ const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
 const FIXED_LEADER_NAME = '杨筱辉';
-const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['总经办', '产品支持体系', '管理体系', '销售体系']);
+const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['总经办', '产品支持体系', '管理体系', '销售体系', '销售体系业务一部', '销售体系业务二部', '销售体系业务三部', '商务部']);
 const FIXED_LEADER_NODE_NAMES = new Set(['产品支持体系', '销售体系']);
 
 const orgChartStyles = `
