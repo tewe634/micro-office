@@ -112,13 +112,13 @@ export default function UserTab() {
             overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 0 12px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 16px 12px', overflow: 'hidden' }}>
             <Table
               dataSource={users}
               rowKey="id"
               pagination={false}
               tableLayout="fixed"
-              scroll={{ y: 'calc(100dvh - 390px)' }}
+              scroll={{ y: 'calc(100dvh - 420px)' }}
               columns={[
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '工号', dataIndex: 'empNo', width: 110, ellipsis: true },
