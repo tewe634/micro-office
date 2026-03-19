@@ -9,7 +9,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -36,23 +39,29 @@ public class OrgController {
             users = new ArrayList<>();
         } else {
             users = jdbc.queryForList(
-                "SELECT su.id, su.name, su.phone, su.role, su.org_id, su.primary_position_id, p.name AS primary_position_name " +
+                "SELECT su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name AS org_name, su.role, su.hired_at, " +
+                "su.primary_position_id, p.name AS primary_position_name, " +
+                "COALESCE(string_agg(DISTINCT p2.name, '、') FILTER (WHERE p2.name IS NOT NULL), '') AS extra_position_names " +
                 "FROM sys_user su " +
+                "LEFT JOIN organization o ON o.id = su.org_id " +
                 "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "LEFT JOIN user_position up ON up.user_id = su.id " +
+                "LEFT JOIN position p2 ON p2.id = up.position_id " +
                 "WHERE su.org_id = ANY(?::varchar[]) " +
+                "GROUP BY su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name, su.role, su.hired_at, su.primary_position_id, p.name " +
                 "ORDER BY su.org_id, su.name",
                 (Object) visibleOrgIds.toArray(new String[0])
             );
         }
 
         Map<String, List<Map<String, Object>>> usersByOrg = users.stream()
+            .peek(user -> {
+                String positionName = user.get("primary_position_name") == null ? null : String.valueOf(user.get("primary_position_name"));
+                String extraPositionNames = user.get("extra_position_names") == null ? null : String.valueOf(user.get("extra_position_names"));
+                String role = user.get("role") == null ? null : String.valueOf(user.get("role"));
+                user.put("leaderCandidate", isLeaderCandidate(positionName, extraPositionNames, role));
+            })
             .collect(Collectors.groupingBy(row -> String.valueOf(row.get("org_id")), LinkedHashMap::new, Collectors.toList()));
-
-        for (Map<String, Object> user : users) {
-            String positionName = user.get("primary_position_name") == null ? null : String.valueOf(user.get("primary_position_name"));
-            String role = user.get("role") == null ? null : String.valueOf(user.get("role"));
-            user.put("leaderCandidate", isLeaderCandidate(positionName, role));
-        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("orgs", orgs);
@@ -61,13 +70,12 @@ public class OrgController {
         return ApiResponse.ok(result);
     }
 
-    private boolean isLeaderCandidate(String positionName, String role) {
-        if (positionName != null) {
-            String[] keywords = {"负责人", "总经理", "总监", "经理", "主管", "主任", "部长", "厂长", "组长", "科长"};
-            for (String keyword : keywords) {
-                if (positionName.contains(keyword)) {
-                    return true;
-                }
+    private boolean isLeaderCandidate(String positionName, String extraPositionNames, String role) {
+        String combined = String.format("%s %s", positionName == null ? "" : positionName, extraPositionNames == null ? "" : extraPositionNames);
+        String[] keywords = {"负责人", "总经理", "总监", "经理", "主管", "主任", "部长", "厂长", "组长", "科长"};
+        for (String keyword : keywords) {
+            if (combined.contains(keyword)) {
+                return true;
             }
         }
         return "ADMIN".equals(role);

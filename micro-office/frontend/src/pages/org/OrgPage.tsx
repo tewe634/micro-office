@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm, Slider, Empty, Tag } from 'antd';
+import { Card, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm, Slider, Empty, Tag, Drawer, Descriptions } from 'antd';
 import { MinusOutlined, PlusOutlined, ReloadOutlined, ZoomInOutlined } from '@ant-design/icons';
 import { orgApi } from '../../api';
 import { formatRoleLabel, uiText } from '../../constants/ui';
@@ -15,10 +15,15 @@ type OrgItem = {
 type OrgUser = {
   id: string;
   name: string;
+  email?: string | null;
   phone?: string | null;
-  role?: string | null;
+  emp_no?: string | null;
   org_id: string;
+  org_name?: string | null;
+  role?: string | null;
+  hired_at?: string | null;
   primary_position_name?: string | null;
+  extra_position_names?: string | null;
   leaderCandidate?: boolean;
 };
 
@@ -26,7 +31,6 @@ const ROOT_NAME = '总经办';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
-const MAX_VISIBLE_USERS = 6;
 
 const orgChartStyles = `
 .org-canvas-page {
@@ -152,8 +156,8 @@ const orgChartStyles = `
 }
 
 .org-node-card {
-  min-width: 260px;
-  max-width: 340px;
+  min-width: 300px;
+  max-width: 400px;
   padding: 14px 16px 14px;
   border: 1px solid #d6e4ff;
   border-radius: 18px;
@@ -163,7 +167,7 @@ const orgChartStyles = `
 }
 
 .org-node-card--root {
-  min-width: 280px;
+  min-width: 320px;
   background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
   color: #fff;
   border-color: transparent;
@@ -217,43 +221,56 @@ const orgChartStyles = `
 
 .org-node-card__people {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
 }
 
-.org-person-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #f5f8ff;
+.org-person-card {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
   border: 1px solid #d6e4ff;
-  font-size: 12px;
-  color: #1f1f1f;
+  background: #f7faff;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.org-node-card--root .org-person-chip {
+.org-person-card:hover {
+  transform: translateY(-1px);
+  border-color: #91caff;
+  box-shadow: 0 8px 18px rgba(22, 119, 255, 0.10);
+}
+
+.org-node-card--root .org-person-card {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.22);
 }
 
-.org-person-chip__name {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
+.org-person-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.org-person-chip__sub {
-  color: rgba(0, 0, 0, 0.45);
+.org-person-card__name {
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.org-node-card--root .org-person-chip__sub {
-  color: rgba(255, 255, 255, 0.82);
+.org-person-card__meta {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.org-node-card--root .org-person-card__meta {
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .org-node-card__empty {
@@ -327,14 +344,20 @@ function buildTreeSelect(list: OrgItem[], parentId: string | null = null, exclud
     }));
 }
 
-function PersonChip({ user, root }: { user: OrgUser; root?: boolean }) {
+function PersonCard({ user, onClick }: { user: OrgUser; onClick: (user: OrgUser) => void }) {
   return (
-    <div className="org-person-chip" title={`${user.name}${user.primary_position_name ? ` / ${user.primary_position_name}` : ''}${user.phone ? ` / ${user.phone}` : ''}`}>
-      <span className="org-person-chip__name">{user.name}</span>
-      {user.primary_position_name ? <span className="org-person-chip__sub">{user.primary_position_name}</span> : null}
-      {!user.primary_position_name && user.role ? <span className="org-person-chip__sub">{formatRoleLabel(user.role, user.role)}</span> : null}
-      {root ? <Tag color="gold" style={{ marginInlineStart: 2, marginRight: 0 }}>负责人</Tag> : null}
-    </div>
+    <button type="button" className="org-person-card" onClick={() => onClick(user)}>
+      <div className="org-person-card__top">
+        <span className="org-person-card__name">{user.name}</span>
+        {user.leaderCandidate ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
+      </div>
+      <div className="org-person-card__meta">
+        <span>主岗位：{user.primary_position_name || '-'}</span>
+        <span>辅助岗位：{user.extra_position_names || '-'}</span>
+        <span>手机号：{user.phone || '-'}</span>
+        <span>角色：{formatRoleLabel(user.role || undefined, user.role || undefined)}</span>
+      </div>
+    </button>
   );
 }
 
@@ -348,6 +371,7 @@ function OrgChartNode({
   canManageOrg,
   onEdit,
   onDelete,
+  onSelectUser,
 }: {
   node: OrgItem;
   rootId?: string;
@@ -358,15 +382,16 @@ function OrgChartNode({
   canManageOrg: boolean;
   onEdit: (org?: OrgItem) => void;
   onDelete: (id: string) => Promise<void>;
+  onSelectUser: (user: OrgUser) => void;
 }) {
   const children = childrenMap.get(node.id) || [];
-  const users = usersByOrg.get(node.id) || [];
+  const users = [...(usersByOrg.get(node.id) || [])].sort((a, b) => {
+    if (!!b.leaderCandidate !== !!a.leaderCandidate) return Number(b.leaderCandidate) - Number(a.leaderCandidate);
+    return a.name.localeCompare(b.name, 'zh-CN');
+  });
   const leaderUsers = users.filter(user => user.leaderCandidate);
-  const displayLeaders = leaderUsers.length > 0 ? leaderUsers : (users.length === 1 ? users : []);
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
-  const visibleUsers = users.slice(0, MAX_VISIBLE_USERS);
-  const hiddenUserCount = Math.max(users.length - MAX_VISIBLE_USERS, 0);
 
   return (
     <div className="org-node-wrap">
@@ -393,9 +418,9 @@ function OrgChartNode({
 
         <div className="org-node-card__section">
           <div className="org-node-card__section-label">负责人</div>
-          {displayLeaders.length > 0 ? (
+          {leaderUsers.length > 0 ? (
             <div className="org-node-card__people">
-              {displayLeaders.map(user => <PersonChip key={user.id} user={user} root />)}
+              {leaderUsers.map(user => <PersonCard key={`leader-${user.id}`} user={user} onClick={onSelectUser} />)}
             </div>
           ) : (
             <div className="org-node-card__empty">暂无负责人标识</div>
@@ -406,8 +431,7 @@ function OrgChartNode({
           <div className="org-node-card__section-label">节点下人员</div>
           {users.length > 0 ? (
             <div className="org-node-card__people">
-              {visibleUsers.map(user => <PersonChip key={user.id} user={user} />)}
-              {hiddenUserCount > 0 ? <div className="org-person-chip">+{hiddenUserCount} 人</div> : null}
+              {users.map(user => <PersonCard key={user.id} user={user} onClick={onSelectUser} />)}
             </div>
           ) : (
             <div className="org-node-card__empty">当前节点暂无人员</div>
@@ -440,6 +464,7 @@ function OrgChartNode({
                 canManageOrg={canManageOrg}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onSelectUser={onSelectUser}
               />
             </li>
           ))}
@@ -460,6 +485,7 @@ export default function OrgPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [orgModal, setOrgModal] = useState(false);
   const [editOrg, setEditOrg] = useState<OrgItem | null>(null);
+  const [selectedUser, setSelectedUser] = useState<OrgUser | null>(null);
   const [orgForm] = Form.useForm();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef({
@@ -538,7 +564,7 @@ export default function OrgPage() {
   const handleViewportMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (target.closest('.org-canvas-toolbar, .ant-btn, .ant-slider, .ant-input, .ant-input-number, .ant-select, .ant-tree-select')) {
+    if (target.closest('.org-canvas-toolbar, .ant-btn, .ant-slider, .ant-input, .ant-input-number, .ant-select, .ant-tree-select, .org-person-card')) {
       return;
     }
     dragStateRef.current = {
@@ -617,6 +643,7 @@ export default function OrgPage() {
                         canManageOrg={canManageOrg}
                         onEdit={openOrgModal}
                         onDelete={deleteOrg}
+                        onSelectUser={setSelectedUser}
                       />
                     </div>
                   ) : (
@@ -671,6 +698,22 @@ export default function OrgPage() {
           <Form.Item name="sortOrder" label="排序"><InputNumber style={{ width: '100%' }} /></Form.Item>
         </Form>
       </Modal>
+
+      <Drawer title={selectedUser ? `${selectedUser.name} · 人员详情` : '人员详情'} width={420} open={!!selectedUser} onClose={() => setSelectedUser(null)}>
+        {selectedUser ? (
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label="姓名">{selectedUser.name}</Descriptions.Item>
+            <Descriptions.Item label="工号">{selectedUser.emp_no || '-'}</Descriptions.Item>
+            <Descriptions.Item label="手机号">{selectedUser.phone || '-'}</Descriptions.Item>
+            <Descriptions.Item label="邮箱">{selectedUser.email || '-'}</Descriptions.Item>
+            <Descriptions.Item label="角色">{formatRoleLabel(selectedUser.role || undefined, selectedUser.role || undefined)}</Descriptions.Item>
+            <Descriptions.Item label="所属组织">{selectedUser.org_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="主岗位">{selectedUser.primary_position_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="辅助岗位">{selectedUser.extra_position_names || '-'}</Descriptions.Item>
+            <Descriptions.Item label="入职日期">{selectedUser.hired_at || '-'}</Descriptions.Item>
+          </Descriptions>
+        ) : null}
+      </Drawer>
     </div>
   );
 }
