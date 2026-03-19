@@ -52,13 +52,13 @@ export default function PositionTab() {
             overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 56px 12px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
             <Table
               dataSource={data}
               rowKey="id"
               pagination={false}
               tableLayout="fixed"
-              scroll={{ y: 'calc(100dvh - 485px)' }}
+              scroll={{ y: 'calc(100dvh - 455px)' }}
               columns={[
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '岗位名称', dataIndex: 'name', ellipsis: true },
