@@ -94,25 +94,21 @@ export default function ProductPage() {
             label: option.label,
             children: (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden' }}>
-                    <Form
-                      form={searchForm}
-                      layout="inline"
-                      style={{ display: 'flex', flexWrap: 'wrap', rowGap: 12, columnGap: 8, minWidth: 0 }}
-                    >
-                      <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
-                      <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
-                      <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
-                      <Form.Item>
-                        <Button type="primary" onClick={onSearch}>搜索</Button>
-                      </Form.Item>
-                    </Form>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
+                  <Form
+                    form={searchForm}
+                    layout="inline"
+                    style={{ display: 'flex', flex: '1 1 0', minWidth: 0, flexWrap: 'wrap', rowGap: 12, columnGap: 8 }}
+                  >
+                    <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
+                    <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
+                    <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
+                    <Form.Item>
+                      <Button type="primary" onClick={onSearch}>搜索</Button>
+                    </Form.Item>
+                  </Form>
 
-                  <div style={{ flex: '0 0 auto', minWidth: 88, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button type="primary" onClick={openCreate}>新增</Button>
-                  </div>
+                  <Button type="primary" onClick={openCreate} style={{ marginLeft: 'auto', flex: '0 0 auto' }}>新增</Button>
                 </div>
 
                 <div
