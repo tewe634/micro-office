@@ -172,7 +172,6 @@ export default function MainLayout() {
         <Header className="app-header">
           <div className="app-header__title">
             <div className="app-header__heading">{currentTitle}</div>
-            <div className="app-header__caption">AI 风格极简工作台</div>
           </div>
           <Space size={12}>
             <div className="app-user-chip">
