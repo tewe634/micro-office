@@ -26,6 +26,7 @@ export const objectApi = {
   list: (type?: string, deptId?: string) => api.get('/objects', { params: { type, deptId } }),
   page: (params?: { current?: number; size?: number; type?: string; deptId?: string; orgId?: string }) => api.get('/objects/page', { params }),
   departments: () => api.get('/objects/departments'),
+  orgStructure: () => api.get('/objects/org-structure'),
   get: (id: string | number) => api.get(`/objects/${id}`),
   create: (data: any) => api.post('/objects', data),
   update: (id: string | number, data: any) => api.put(`/objects/${id}`, data),

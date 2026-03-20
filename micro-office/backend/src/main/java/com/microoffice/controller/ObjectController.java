@@ -17,14 +17,25 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/objects")
 @RequiredArgsConstructor
 public class ObjectController {
+    private static final Set<String> OBJECT_ROOT_ORG_NAMES = Set.of(
+        "管理体系",
+        "业务一部",
+        "业务二部",
+        "业务三部",
+        "产品支持体系"
+    );
+
     private final ExternalObjectService service;
     private final SysUserMapper userMapper;
     private final JdbcTemplate jdbc;
@@ -105,12 +116,168 @@ public class ObjectController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "对象名称不能为空");
         }
 
-        if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null && currentUser != null) {
-            obj.setOrgId(trimToNull(currentUser.getOrgId()));
-        }
+        normalizeObjectOrganization(obj, currentUser);
+
         if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未设置负责人时，至少需要选择组织或部门");
         }
+    }
+
+    private void normalizeObjectOrganization(ExternalObject obj, SysUser currentUser) {
+        Map<String, OrgNode> allNodes = loadAllOrganizationNodeMap();
+
+        if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null && currentUser != null) {
+            obj.setOrgId(trimToNull(findObjectRootOrgId(currentUser.getOrgId(), allNodes)));
+        }
+
+        if (obj.getOrgId() != null) {
+            OrgNode orgNode = allNodes.get(obj.getOrgId());
+            if (orgNode == null) {
+                throw badRequest("所属组织不存在");
+            }
+            String normalizedOrgId = findObjectRootOrgId(obj.getOrgId(), allNodes);
+            if (normalizedOrgId == null) {
+                throw badRequest("所属组织不在外部对象可用组织架构内");
+            }
+            if (!normalizedOrgId.equals(obj.getOrgId())) {
+                if (obj.getDeptId() == null) {
+                    obj.setDeptId(obj.getOrgId());
+                    obj.setOrgId(normalizedOrgId);
+                } else if (obj.getOrgId().equals(obj.getDeptId())) {
+                    obj.setOrgId(normalizedOrgId);
+                } else {
+                    throw badRequest("所属组织与部门不匹配");
+                }
+            }
+        }
+
+        if (obj.getDeptId() != null) {
+            OrgNode deptNode = allNodes.get(obj.getDeptId());
+            if (deptNode == null) {
+                throw badRequest("所属部门不存在");
+            }
+            String departmentOrgId = findObjectRootOrgId(obj.getDeptId(), allNodes);
+            if (departmentOrgId == null) {
+                throw badRequest("所属部门不在外部对象可用组织架构内");
+            }
+            if (isObjectRootOrg(deptNode)) {
+                if (obj.getOrgId() == null || obj.getDeptId().equals(obj.getOrgId())) {
+                    obj.setOrgId(departmentOrgId);
+                    obj.setDeptId(null);
+                } else {
+                    throw badRequest("所属组织与部门不匹配");
+                }
+            } else if (obj.getOrgId() == null) {
+                obj.setOrgId(departmentOrgId);
+            } else if (!obj.getOrgId().equals(departmentOrgId)) {
+                throw badRequest("所属组织与部门不匹配");
+            }
+        }
+
+        if (obj.getOrgId() != null) {
+            OrgNode orgNode = allNodes.get(obj.getOrgId());
+            String normalizedOrgId = findObjectRootOrgId(obj.getOrgId(), allNodes);
+            if (orgNode == null || normalizedOrgId == null || !normalizedOrgId.equals(obj.getOrgId()) || !isObjectRootOrg(orgNode)) {
+                throw badRequest("所属组织必须选择外部对象可用组织");
+            }
+        }
+    }
+
+    private OrgStructureResponse buildObjectOrgStructure(List<String> visibleOrgIds) {
+        List<OrgNode> allNodes = loadAllOrganizationNodes();
+        Map<String, OrgNode> allNodeMap = indexOrganizationNodes(allNodes);
+        LinkedHashMap<String, OrgNode> visibleNodeMap = new LinkedHashMap<>();
+        for (String id : visibleOrgIds) {
+            OrgNode node = allNodeMap.get(id);
+            if (node != null) {
+                visibleNodeMap.put(id, node);
+            }
+        }
+
+        LinkedHashMap<String, OrgNode> visibleRootOrgs = new LinkedHashMap<>();
+        for (OrgNode node : visibleNodeMap.values()) {
+            String rootOrgId = findObjectRootOrgId(node.id(), allNodeMap);
+            if (rootOrgId != null) {
+                visibleRootOrgs.putIfAbsent(rootOrgId, allNodeMap.get(rootOrgId));
+            }
+        }
+
+        List<OrgStructureItem> orgs = allNodes.stream()
+            .filter(node -> visibleRootOrgs.containsKey(node.id()))
+            .map(node -> new OrgStructureItem(node.id(), node.name(), node.parentId()))
+            .collect(Collectors.toList());
+
+        List<DepartmentStructureItem> departments = allNodes.stream()
+            .filter(node -> visibleNodeMap.containsKey(node.id()))
+            .map(node -> {
+                String rootOrgId = findObjectRootOrgId(node.id(), allNodeMap);
+                if (rootOrgId == null || rootOrgId.equals(node.id()) || !visibleRootOrgs.containsKey(rootOrgId)) {
+                    return null;
+                }
+                return new DepartmentStructureItem(node.id(), node.name(), node.parentId(), rootOrgId);
+            })
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+
+        LinkedHashMap<String, OrgNode> allNodesForResponse = new LinkedHashMap<>();
+        for (OrgNode node : allNodes) {
+            if (visibleRootOrgs.containsKey(node.id()) || visibleNodeMap.containsKey(node.id())) {
+                allNodesForResponse.put(node.id(), node);
+            }
+        }
+
+        List<OrgStructureItem> allVisibleNodes = allNodesForResponse.values().stream()
+            .map(node -> new OrgStructureItem(node.id(), node.name(), node.parentId()))
+            .collect(Collectors.toList());
+
+        return new OrgStructureResponse(orgs, departments, allVisibleNodes);
+    }
+
+    private List<OrgNode> loadAllOrganizationNodes() {
+        return jdbc.query(
+            "SELECT id, name, parent_id FROM organization ORDER BY sort_order, id",
+            (rs, rowNum) -> new OrgNode(
+                rs.getString("id"),
+                rs.getString("name"),
+                rs.getString("parent_id")
+            )
+        );
+    }
+
+    private Map<String, OrgNode> loadAllOrganizationNodeMap() {
+        return indexOrganizationNodes(loadAllOrganizationNodes());
+    }
+
+    private Map<String, OrgNode> indexOrganizationNodes(List<OrgNode> nodes) {
+        return nodes.stream().collect(Collectors.toMap(
+            OrgNode::id,
+            node -> node,
+            (left, right) -> left,
+            LinkedHashMap::new
+        ));
+    }
+
+    private String findObjectRootOrgId(String nodeId, Map<String, OrgNode> allNodes) {
+        String currentId = nodeId;
+        while (currentId != null) {
+            OrgNode node = allNodes.get(currentId);
+            if (node == null) {
+                return null;
+            }
+            if (isObjectRootOrg(node)) {
+                return node.id();
+            }
+            currentId = node.parentId();
+        }
+        return null;
+    }
+
+    private boolean isObjectRootOrg(OrgNode node) {
+        return node != null && OBJECT_ROOT_ORG_NAMES.contains(node.name());
+    }
+
+    private ResponseStatusException badRequest(String message) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
     }
 
     private void applyPatch(ExternalObject target, Map<String, Object> body) {
@@ -142,20 +309,16 @@ public class ObjectController {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    @GetMapping("/departments")
-    public ApiResponse<List<Map<String, Object>>> departments(Authentication auth) {
+    @GetMapping("/org-structure")
+    public ApiResponse<OrgStructureResponse> orgStructure(Authentication auth) {
         String userId = (String) auth.getPrincipal();
-        List<String> orgIds = dataScopeService.getScopeOrgIds(userId);
-        if (orgIds.isEmpty()) {
-            return ApiResponse.ok(Collections.emptyList());
-        }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, name, parent_id FROM organization WHERE id = ANY(?::varchar[]) ORDER BY sort_order, id",
-            (Object) orgIds.toArray(new String[0])
-        );
-        return ApiResponse.ok(rows.stream()
-            .filter(r -> r.get("parent_id") != null)
-            .collect(Collectors.toList()));
+        return ApiResponse.ok(buildObjectOrgStructure(dataScopeService.getVisibleOrgIds(userId)));
+    }
+
+    @GetMapping("/departments")
+    public ApiResponse<List<DepartmentStructureItem>> departments(Authentication auth) {
+        String userId = (String) auth.getPrincipal();
+        return ApiResponse.ok(buildObjectOrgStructure(dataScopeService.getVisibleOrgIds(userId)).departments());
     }
 
     @GetMapping
@@ -227,5 +390,17 @@ public class ObjectController {
         List<String> allowedTypes,
         List<String> scopeOrgIds,
         ExternalObjectAccessService.AccessContext objectAccessContext
+    ) {}
+
+    private record OrgNode(String id, String name, String parentId) {}
+
+    private record OrgStructureItem(String id, String name, String parentId) {}
+
+    private record DepartmentStructureItem(String id, String name, String parentId, String orgId) {}
+
+    private record OrgStructureResponse(
+        List<OrgStructureItem> orgs,
+        List<DepartmentStructureItem> departments,
+        List<OrgStructureItem> allNodes
     ) {}
 }

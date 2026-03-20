@@ -12,7 +12,32 @@ const allTypeOptions = [
   { value: 'OTHER', label: '其他' },
 ];
 
-function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: any[]; users: any[]; departments: any[] }) {
+type OrgNode = {
+  id: string;
+  name: string;
+  parentId?: string;
+};
+
+type DepartmentNode = {
+  id: string;
+  name: string;
+  parentId?: string;
+  orgId: string;
+};
+
+function ObjectTable({
+  type,
+  orgs,
+  allNodes,
+  users,
+  departments,
+}: {
+  type: string;
+  orgs: OrgNode[];
+  allNodes: OrgNode[];
+  users: any[];
+  departments: DepartmentNode[];
+}) {
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
@@ -21,12 +46,22 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   const [edit, setEdit] = useState<any>(null);
   const [filterDept, setFilterDept] = useState<string | undefined>();
   const [form] = Form.useForm();
+  const selectedOrgId = Form.useWatch('orgId', form);
 
   const isCustomerType = type === 'CUSTOMER';
   const typeLabel = allTypeOptions.find(o => o.value === type)?.label || '对象';
-  const orgOptions = orgs.map(o => ({ value: o.id, label: o.name }));
-  const departmentOptions = departments.map(o => ({ value: o.id, label: o.name }));
-  const userOptions = users.map(u => ({ value: u.id, label: u.name }));
+  const orgIdSet = useMemo(() => new Set(orgs.map(o => o.id)), [orgs]);
+  const allNodeMap = useMemo(() => new Map(allNodes.map(node => [node.id, node])), [allNodes]);
+  const departmentMap = useMemo(() => new Map(departments.map(dept => [dept.id, dept])), [departments]);
+  const orgOptions = useMemo(() => orgs.map(o => ({ value: o.id, label: o.name })), [orgs]);
+  const allDepartmentOptions = useMemo(() => departments.map(o => ({ value: o.id, label: o.name })), [departments]);
+  const filteredDepartmentOptions = useMemo(
+    () => departments
+      .filter(o => !selectedOrgId || o.orgId === selectedOrgId)
+      .map(o => ({ value: o.id, label: o.name })),
+    [departments, selectedOrgId],
+  );
+  const userOptions = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
 
   const load = async (c = current, s = size, deptId = filterDept) => {
     const r: any = await objectApi.page({ current: c, size: s, type, deptId });
@@ -39,6 +74,52 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   useEffect(() => {
     load(1, size, filterDept);
   }, [type, filterDept]);
+
+  const normalizeRecordForForm = (record: any) => {
+    const next = { ...record };
+
+    if (next.orgId && !orgIdSet.has(next.orgId)) {
+      const mistakenDept = departmentMap.get(next.orgId);
+      if (mistakenDept) {
+        next.deptId = next.deptId ?? mistakenDept.id;
+        next.orgId = mistakenDept.orgId;
+      }
+    }
+
+    if (next.deptId && orgIdSet.has(next.deptId)) {
+      next.orgId = next.deptId;
+      next.deptId = undefined;
+    }
+
+    if (next.deptId && next.orgId) {
+      const dept = departmentMap.get(next.deptId);
+      if (!dept || dept.orgId !== next.orgId) {
+        next.deptId = undefined;
+      }
+    }
+
+    return next;
+  };
+
+  const openEditor = (record?: any) => {
+    setEdit(record || null);
+    setModal(true);
+    form.resetFields();
+    if (record) {
+      form.setFieldsValue(normalizeRecordForForm(record));
+    }
+  };
+
+  const handleOrgChange = (orgId?: string) => {
+    const deptId = form.getFieldValue('deptId');
+    if (!deptId) {
+      return;
+    }
+    const department = departmentMap.get(deptId);
+    if (!department || !orgId || department.orgId !== orgId) {
+      form.setFieldValue('deptId', undefined);
+    }
+  };
 
   const save = async (values: any) => {
     const payload = {
@@ -72,9 +153,31 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
     load(nextCurrent, size, filterDept);
   };
 
-  const orgName = (id: string) => orgs.find(o => o.id === id)?.name || '-';
-  const deptName = (id: string) => departments.find(o => o.id === id)?.name || orgName(id);
   const userName = (id: string) => users.find(u => u.id === id)?.name || '-';
+
+  const resolveOrgName = (record: any) => {
+    if (!record?.orgId) {
+      return '-';
+    }
+    if (orgIdSet.has(record.orgId)) {
+      return allNodeMap.get(record.orgId)?.name || '-';
+    }
+    const mistakenDept = departmentMap.get(record.orgId);
+    if (mistakenDept) {
+      return allNodeMap.get(mistakenDept.orgId)?.name || allNodeMap.get(record.orgId)?.name || '-';
+    }
+    return allNodeMap.get(record.orgId)?.name || '-';
+  };
+
+  const resolveDeptName = (record: any) => {
+    if (record?.deptId) {
+      return allNodeMap.get(record.deptId)?.name || '-';
+    }
+    if (record?.orgId && !orgIdSet.has(record.orgId) && departmentMap.has(record.orgId)) {
+      return allNodeMap.get(record.orgId)?.name || '-';
+    }
+    return '-';
+  };
 
   const columns = useMemo(() => {
     const baseColumns: any[] = [
@@ -82,8 +185,20 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
       { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
       { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
       { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
-      { title: '所属组织', dataIndex: 'orgId', width: 120, render: (v: string) => v ? <Tag color="blue">{orgName(v)}</Tag> : '-' },
-      { title: '所属部门', dataIndex: 'deptId', width: 120, render: (v: string) => v ? <Tag color="purple">{deptName(v)}</Tag> : '-' },
+      {
+        title: '所属组织',
+        dataIndex: 'orgId',
+        width: 120,
+        render: (_: string, record: any) => record?.orgId ? <Tag color="blue">{resolveOrgName(record)}</Tag> : '-',
+      },
+      {
+        title: '所属部门',
+        dataIndex: 'deptId',
+        width: 120,
+        render: (_: string, record: any) => (record?.deptId || (record?.orgId && !orgIdSet.has(record.orgId) && departmentMap.has(record.orgId)))
+          ? <Tag color="purple">{resolveDeptName(record)}</Tag>
+          : '-',
+      },
       { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
     ];
 
@@ -96,7 +211,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
       width: 140,
       render: (_: any, r: any) => (
         <Space>
-          <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
+          <Button size="small" onClick={() => openEditor(r)}>编辑</Button>
           <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
             <Button size="small" danger>删除</Button>
           </Popconfirm>
@@ -105,7 +220,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
     });
 
     return baseColumns;
-  }, [current, size, isCustomerType, orgs, departments, users]);
+  }, [current, size, isCustomerType, orgIdSet, departmentMap, allNodeMap, users]);
 
   return (
     <>
@@ -113,14 +228,16 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
         <div className="page-toolbar">
           <Select
             allowClear
+            showSearch
+            optionFilterProp="label"
             placeholder="按所属部门筛选"
             style={{ width: 220 }}
             value={filterDept}
             onChange={v => setFilterDept(v)}
-            options={departmentOptions}
+            options={allDepartmentOptions}
           />
           <div className="page-toolbar-right">
-            <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
+            <Button type="primary" onClick={() => openEditor()}>
               新增{typeLabel}
             </Button>
           </div>
@@ -192,14 +309,28 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
           <Form.Item name="address" label="地址"><Input /></Form.Item>
           {isCustomerType ? <Form.Item name="industry" label="行业"><Input /></Form.Item> : null}
           <Form.Item name="orgId" label="所属组织">
-            <Select allowClear placeholder="选择组织" options={orgOptions} />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="选择组织"
+              options={orgOptions}
+              onChange={handleOrgChange}
+            />
           </Form.Item>
           <Form.Item
             name="deptId"
             label="所属部门"
-            extra="负责人留空时，请至少选择组织或部门中的一个；共享范围会向下包含子节点。"
+            extra="请选择对应组织后再选部门；负责人留空时，可按组织/部门共享。"
           >
-            <Select allowClear placeholder="选择部门" options={departmentOptions} />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder={selectedOrgId ? '选择部门' : '请先选择组织'}
+              options={filteredDepartmentOptions}
+              disabled={!selectedOrgId}
+            />
           </Form.Item>
           <Form.Item
             name="ownerId"
@@ -217,9 +348,10 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
 
 export default function ObjectPage() {
   const [objectTypes, setObjectTypes] = useState<string[]>([]);
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<OrgNode[]>([]);
+  const [allNodes, setAllNodes] = useState<OrgNode[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<DepartmentNode[]>([]);
 
   useEffect(() => {
     userApi.me().then((r: any) => {
@@ -231,11 +363,13 @@ export default function ObjectPage() {
       }
     });
     userApi.lookups().then((r: any) => {
-      setOrgs(r.data?.orgs || []);
       setUsers(r.data?.users || []);
+      setAllNodes(prev => prev.length > 0 ? prev : (r.data?.orgs || []));
     }).catch(() => {});
-    objectApi.departments().then((r: any) => {
-      setDepartments(r.data || []);
+    objectApi.orgStructure().then((r: any) => {
+      setOrgs(r.data?.orgs || []);
+      setDepartments(r.data?.departments || []);
+      setAllNodes(r.data?.allNodes || []);
     }).catch(() => {});
   }, []);
 
@@ -263,7 +397,7 @@ export default function ObjectPage() {
             label: t.label,
             children: (
               <div className="page-fill">
-                <ObjectTable type={t.value} orgs={orgs} users={users} departments={departments} />
+                <ObjectTable type={t.value} orgs={orgs} allNodes={allNodes} users={users} departments={departments} />
               </div>
             ),
           }))}
