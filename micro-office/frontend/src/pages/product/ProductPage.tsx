@@ -81,7 +81,6 @@ export default function ProductPage() {
 
   return (
     <Card
-      title="产品与服务"
       className="page-card page-fill"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >

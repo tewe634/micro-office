@@ -377,7 +377,7 @@ export default function ObjectPage() {
 
   if (visibleTypes.length === 0) {
     return (
-      <Card title="外部对象管理" className="page-card page-fill" styles={{ body: { minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
+      <Card className="page-card page-fill" styles={{ body: { minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
         <p style={{ color: '#888' }}>您当前岗位没有可查看的外部对象类型，请联系管理员配置。</p>
       </Card>
     );
@@ -385,7 +385,6 @@ export default function ObjectPage() {
 
   return (
     <Card
-      title="外部对象管理"
       className="page-card page-fill"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >

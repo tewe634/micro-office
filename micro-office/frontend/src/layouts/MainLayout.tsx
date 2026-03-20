@@ -22,6 +22,15 @@ const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
   '/users': { icon: <UserOutlined />, label: '人员管理' },
   '/objects': { icon: <ContactsOutlined />, label: '外部对象' },
   '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
+  '/admin/permissions': { icon: <SettingOutlined />, label: '权限配置' },
+};
+
+const pageTitles: Record<string, string> = {
+  '/org': '公司整体组织架构',
+  '/users': '人员管理',
+  '/objects': '外部对象管理',
+  '/products': '产品与服务',
+  '/admin/permissions': '权限配置',
 };
 
 const menuOrder = ['/org', '/users', '/objects', '/products'];
@@ -72,6 +81,7 @@ export default function MainLayout() {
 
   const selectedKeys = [loc.pathname];
   const openKeys = loc.pathname.startsWith('/admin') ? ['/admin'] : [];
+  const currentTitle = pageTitles[loc.pathname] || '东华微办公';
 
   const handleLogout = () => {
     logout();
@@ -198,10 +208,11 @@ export default function MainLayout() {
             background: '#fff',
             padding: '0 24px',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>{currentTitle}</div>
           <Space size={12}>
             <span style={{ color: '#888', fontSize: 13 }}>您好，{userName}</span>
           </Space>

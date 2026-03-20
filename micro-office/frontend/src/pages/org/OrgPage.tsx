@@ -659,12 +659,16 @@ export default function OrgPage() {
     <div className="page-fill">
       <style>{orgChartStyles}</style>
       <Card
-        title="公司整体组织架构"
         className="page-card page-fill"
         styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
-        extra={canManageOrg ? <Button type="primary" onClick={() => openOrgModal()}>新增组织</Button> : null}
       >
         <div className="page-card-body page-card-body--flush">
+          <div className="page-toolbar" style={{ padding: '16px 20px 0' }}>
+            <div />
+            <div className="page-toolbar-right">
+              {canManageOrg ? <Button type="primary" onClick={() => openOrgModal()}>新增组织</Button> : null}
+            </div>
+          </div>
           <div className="org-canvas-page">
             <div
               className={`org-canvas-viewport${isDragging ? ' org-canvas-viewport--dragging' : ''}`}

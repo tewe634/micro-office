@@ -5,7 +5,6 @@ import PositionTab from './PositionTab';
 export default function UserAndPositionPage() {
   return (
     <Card
-      title="人员管理"
       className="page-card page-fill"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >
