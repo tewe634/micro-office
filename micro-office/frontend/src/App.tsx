@@ -60,24 +60,6 @@ export default function App() {
   return (
     <ConfigProvider
       locale={appLocale}
-      theme={{
-        token: {
-          colorPrimary: '#2563eb',
-          colorText: '#0f172a',
-          colorTextSecondary: '#64748b',
-          colorBgLayout: '#f6f8fb',
-          colorBgContainer: '#ffffff',
-          colorBgElevated: '#ffffff',
-          colorBorder: '#e6ebf2',
-          colorBorderSecondary: '#eef2f7',
-          colorFillTertiary: '#f8fafc',
-          borderRadius: 16,
-          controlHeight: 40,
-          fontSize: 14,
-          boxShadowSecondary: '0 18px 40px rgba(15, 23, 42, 0.08)',
-          boxShadowTertiary: '0 10px 24px rgba(15, 23, 42, 0.06)',
-        },
-      }}
       renderEmpty={() => <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={uiText.appEmpty} />}
     >
       <BrowserRouter>

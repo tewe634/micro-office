@@ -77,36 +77,34 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
   };
 
   return (
-    <div className="admin-permission-page__section">
-      <p className="admin-permission-page__hint">角色模块权限已同步系统角色表。组织架构模块固定为全员可见；人员管理仍走权限配置，与组织架构查看权限相互独立。</p>
-      <div className="fixed-table-page__frame admin-permission-page__table-area">
-        <div className="fixed-table-page__table">
-          <Table
-            dataSource={menus}
-            rowKey="key"
-            pagination={false}
-            bordered
-            size="middle"
-            scroll={{ x: Math.max(900, 140 + roles.length * 110), y: 'calc(100dvh - 465px)' }}
-            columns={[
-              { title: '功能模块', dataIndex: 'label', width: 140, fixed: 'left' as const },
-              ...roles.map(r => ({
-                title: <Tag color={r.color}>{r.label}</Tag>,
-                width: 110,
-                align: 'center' as const,
-                render: (_: any, record: any) => (
-                  <Checkbox
-                    checked={(perms[r.key] || []).includes(record.key)}
-                    onChange={e => toggle(r.key, record.key, e.target.checked)}
-                  />
-                ),
-              })),
-            ]}
-          />
-        </div>
-        <div className="fixed-table-page__footer">
-          <Button type="primary" loading={loading} onClick={save}>保存角色权限</Button>
-        </div>
+    <div className="page-fill" style={{ gap: 16 }}>
+      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织架构模块固定为全员可见；人员管理仍走权限配置，与组织架构查看权限相互独立。</p>
+      <div className="page-card-scroll">
+        <Table
+          dataSource={menus}
+          rowKey="key"
+          pagination={false}
+          bordered
+          size="middle"
+          scroll={{ x: Math.max(900, 140 + roles.length * 110) }}
+          columns={[
+            { title: '功能模块', dataIndex: 'label', width: 140, fixed: 'left' as const },
+            ...roles.map(r => ({
+              title: <Tag color={r.color}>{r.label}</Tag>,
+              width: 110,
+              align: 'center' as const,
+              render: (_: any, record: any) => (
+                <Checkbox
+                  checked={(perms[r.key] || []).includes(record.key)}
+                  onChange={e => toggle(r.key, record.key, e.target.checked)}
+                />
+              ),
+            })),
+          ]}
+        />
+      </div>
+      <div>
+        <Button type="primary" loading={loading} onClick={save}>保存角色权限</Button>
       </div>
     </div>
   );
@@ -200,7 +198,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
   };
 
   return (
-    <div className="split-panel" style={{ height: 'calc(100dvh - 390px)' }}>
+    <div className="split-panel">
       <div className="split-panel__aside">
         <Select
           allowClear
@@ -216,7 +214,8 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
               rowKey="id"
               size="small"
               pagination={{ pageSize: 10 }}
-              scroll={{ y: 'calc(100dvh - 495px)' }}
+              scroll={{ y: '100%' }}
+              style={{ height: '100%' }}
               onRow={r => ({
                 onClick: () => selectUser(r),
                 style: { cursor: 'pointer', background: selectedUser?.id === r.id ? '#e6f4ff' : undefined },
@@ -241,7 +240,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
       <div className="split-panel__content">
         <div className="split-panel__scroll">
           {selectedUser ? (
-            <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ paddingRight: 8 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>{selectedUser.name} 的权限配置</h4>
 
               <div style={{ marginBottom: 8 }}>
@@ -299,7 +298,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
               </Space>
             </div>
           ) : (
-            <div className="admin-permission-page__empty">← 点击左侧人员查看 / 编辑其权限（模块 + 对象类型）</div>
+            <p style={{ color: '#888', marginTop: 40 }}>← 点击左侧人员查看/编辑其权限（模块 + 对象类型）</p>
           )}
         </div>
       </div>
@@ -343,36 +342,34 @@ function ObjectTypePermTab() {
   };
 
   return (
-    <div className="admin-permission-page__section">
-      <p className="admin-permission-page__hint">配置每个岗位默认可见的外部对象类型。用户如果没有个人对象类型配置，则根据岗位汇总。</p>
-      <div className="fixed-table-page__frame admin-permission-page__table-area">
-        <div className="fixed-table-page__table">
-          <Table
-            dataSource={positions}
-            rowKey="id"
-            pagination={false}
-            bordered
-            size="middle"
-            scroll={{ x: 900, y: 'calc(100dvh - 465px)' }}
-            columns={[
-              { title: '岗位', width: 140, render: (_: any, r: any) => `${r.name} (${r.code})` },
-              ...objectTypes.map(ot => ({
-                title: ot.label,
-                width: 90,
-                align: 'center' as const,
-                render: (_: any, record: any) => (
-                  <Checkbox
-                    checked={(perms[String(record.id)] || []).includes(ot.key)}
-                    onChange={e => toggle(record.id, ot.key, e.target.checked)}
-                  />
-                ),
-              })),
-            ]}
-          />
-        </div>
-        <div className="fixed-table-page__footer">
-          <Button type="primary" loading={loading} onClick={save}>保存岗位对象类型权限</Button>
-        </div>
+    <div className="page-fill" style={{ gap: 16 }}>
+      <p style={{ color: '#888', margin: 0 }}>配置每个岗位默认可见的外部对象类型。用户如果没有个人对象类型配置，则根据岗位汇总。</p>
+      <div className="page-card-scroll">
+        <Table
+          dataSource={positions}
+          rowKey="id"
+          pagination={false}
+          bordered
+          size="middle"
+          scroll={{ x: 900 }}
+          columns={[
+            { title: '岗位', width: 140, render: (_: any, r: any) => `${r.name} (${r.code})` },
+            ...objectTypes.map(ot => ({
+              title: ot.label,
+              width: 90,
+              align: 'center' as const,
+              render: (_: any, record: any) => (
+                <Checkbox
+                  checked={(perms[String(record.id)] || []).includes(ot.key)}
+                  onChange={e => toggle(record.id, ot.key, e.target.checked)}
+                />
+              ),
+            })),
+          ]}
+        />
+      </div>
+      <div>
+        <Button type="primary" loading={loading} onClick={save}>保存岗位对象类型权限</Button>
       </div>
     </div>
   );
@@ -395,16 +392,16 @@ export default function AdminPermissionPage() {
   return (
     <Card
       title="权限配置"
-      className="page-card page-fill admin-permission-page"
+      className="page-card page-fill"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >
       <div className="page-card-body">
         <Tabs
           className="page-tabs"
           items={[
-            { key: 'role', label: '角色模块权限', children: <div className="admin-permission-page__tab-pane"><RolePermTab roles={roles} /></div> },
-            { key: 'user', label: '人员权限', children: <div className="admin-permission-page__tab-pane"><UserPermTab roles={roles} /></div> },
-            { key: 'object', label: '岗位对象类型', children: <div className="admin-permission-page__tab-pane"><ObjectTypePermTab /></div> },
+            { key: 'role', label: '角色模块权限', children: <RolePermTab roles={roles} /> },
+            { key: 'user', label: '人员权限', children: <UserPermTab roles={roles} /> },
+            { key: 'object', label: '岗位对象类型', children: <ObjectTypePermTab /> },
           ]}
         />
       </div>
