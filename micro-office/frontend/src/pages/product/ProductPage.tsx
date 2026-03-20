@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination, Tabs } from 'antd';
 import { productApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
 const productLineOptions = [
@@ -93,41 +94,32 @@ export default function ProductPage() {
             key: option.key,
             label: option.label,
             children: (
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div className="page-toolbar">
-                  <Form form={searchForm} layout="inline" style={{ flex: 1, rowGap: 12 }}>
-                    <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
-                    <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
-                    <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
-                    <Form.Item>
-                      <Button type="primary" onClick={onSearch}>搜索</Button>
-                    </Form.Item>
-                  </Form>
+              <div className="product-page__table-wrap">
+                <FixedTablePage
+                  top={(
+                    <div className="page-toolbar product-page__toolbar">
+                      <Form form={searchForm} layout="inline" className="product-page__search-form">
+                        <Form.Item name="categoryCode" label="物料类别"><Input style={{ width: 180 }} placeholder="请输入物料类别" allowClear /></Form.Item>
+                        <Form.Item name="code" label="物料号"><Input style={{ width: 180 }} placeholder="请输入物料号" allowClear /></Form.Item>
+                        <Form.Item name="name" label="物料名称"><Input style={{ width: 200 }} placeholder="请输入物料名称" allowClear /></Form.Item>
+                        <Form.Item>
+                          <Button type="primary" onClick={onSearch}>搜索</Button>
+                        </Form.Item>
+                      </Form>
 
-                  <div className="page-toolbar-right">
-                    <Button type="primary" onClick={openCreate}>新增</Button>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    background: '#fff',
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+                      <div className="page-toolbar-right product-page__toolbar-actions">
+                        <Button type="primary" onClick={openCreate}>新增</Button>
+                      </div>
+                    </div>
+                  )}
+                  table={(
                     <Table
                       dataSource={data}
                       rowKey="id"
                       pagination={false}
                       tableLayout="fixed"
-                      scroll={{ x: 1600, y: 'calc(100dvh - 495px)' }}
+                      scroll={{ x: 1600, y: '100%' }}
+                      style={{ height: '100%' }}
                       columns={[
                         { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                         { title: '物料号', dataIndex: 'code', width: 180, ellipsis: true },
@@ -152,29 +144,21 @@ export default function ProductPage() {
                         },
                       ]}
                     />
-                  </div>
-
-                  <div
-                    style={{
-                      flex: '0 0 auto',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      padding: '12px 16px 16px',
-                      borderTop: '1px solid #f0f0f0',
-                      background: '#fff',
-                    }}
-                  >
-                    <Pagination
-                      locale={paginationLocale}
-                      current={current}
-                      pageSize={size}
-                      total={total}
-                      showSizeChanger
-                      showTotal={(t) => formatPaginationTotal(t)}
-                      onChange={(page, pageSize) => load({ current: page, size: pageSize, filters, productLine: activeLine })}
-                    />
-                  </div>
-                </div>
+                  )}
+                  pagination={(
+                    <div className="product-page__pagination">
+                      <Pagination
+                        locale={paginationLocale}
+                        current={current}
+                        pageSize={size}
+                        total={total}
+                        showSizeChanger
+                        showTotal={(t) => formatPaginationTotal(t)}
+                        onChange={(page, pageSize) => load({ current: page, size: pageSize, filters, productLine: activeLine })}
+                      />
+                    </div>
+                  )}
+                />
               </div>
             ),
           }))}
