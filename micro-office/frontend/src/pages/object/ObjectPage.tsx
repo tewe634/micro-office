@@ -301,9 +301,9 @@ function ObjectTable({
           form.resetFields();
         }}
         onOk={() => form.submit()}
-        width={760}
-        style={{ top: 24 }}
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingBottom: 8 } }}
+        width={720}
+        style={{ top: 20 }}
+        styles={{ body: { maxHeight: '72vh', overflowY: 'auto', overflowX: 'hidden', paddingBottom: 8 } }}
       >
         <Form form={form} onFinish={save} layout="vertical">
           <Row gutter={16}>

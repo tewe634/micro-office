@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination, Row, Col } from 'antd';
 import { userApi, orgApi, positionApi } from '../../api';
 import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
@@ -179,25 +179,59 @@ export default function UserTab() {
         </div>
       </div>
 
-      {canManagePersonnel ? <Modal okText="确定" cancelText="取消" title={edit ? '编辑人员' : '新增人员'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()} width={520}>
+      {canManagePersonnel ? <Modal
+        okText="确定"
+        cancelText="取消"
+        title={edit ? '编辑人员' : '新增人员'}
+        open={modal}
+        onCancel={() => setModal(false)}
+        onOk={() => form.submit()}
+        width={720}
+        style={{ top: 20 }}
+        styles={{ body: { maxHeight: '72vh', overflowY: 'auto', overflowX: 'hidden', paddingBottom: 8 } }}
+      >
         <Form form={form} onFinish={save} layout="vertical">
-          <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
-          {!edit && <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>}
-          {!edit && <Form.Item name="password" label="密码" extra="不填默认123456"><Input.Password /></Form.Item>}
-          <Form.Item name="phone" label="手机号"><Input /></Form.Item>
-          <Form.Item name="role" label="角色">
-            <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
-          </Form.Item>
-          <Form.Item name="orgId" label="所属组织">
-            <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
-          </Form.Item>
-          <Form.Item name="primaryPositionId" label="主岗位">
-            <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
-          </Form.Item>
-          <Form.Item name="extraPositionIds" label="辅助岗位（可多选）">
-            <Select mode="multiple" allowClear placeholder="选择辅助岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
-          </Form.Item>
-          <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
+            </Col>
+            {!edit && (
+              <Col xs={24} sm={12}>
+                <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>
+              </Col>
+            )}
+            {!edit && (
+              <Col xs={24} sm={12}>
+                <Form.Item name="password" label="密码" extra="不填默认123456"><Input.Password /></Form.Item>
+              </Col>
+            )}
+            <Col xs={24} sm={12}>
+              <Form.Item name="phone" label="手机号"><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="role" label="角色">
+                <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="orgId" label="所属组织">
+                <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="primaryPositionId" label="主岗位">
+                <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="extraPositionIds" label="辅助岗位（可多选）">
+                <Select mode="multiple" allowClear placeholder="选择辅助岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal> : null}
 
