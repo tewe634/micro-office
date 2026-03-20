@@ -2,7 +2,6 @@ package com.microoffice.service;
 
 import com.microoffice.entity.ExternalObject;
 import com.microoffice.entity.SysUser;
-import com.microoffice.enums.ObjectType;
 import com.microoffice.mapper.SysUserMapper;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -34,16 +33,6 @@ public class ExternalObjectAccessService {
         if (obj == null || ctx == null) {
             return false;
         }
-        if (obj.getType() == ObjectType.CUSTOMER) {
-            return canAccessCustomer(obj, ctx);
-        }
-        return canAccessDefault(obj, ctx.getUserId(), scopeOrgIds);
-    }
-
-    public boolean canAccessCustomer(ExternalObject obj, AccessContext ctx) {
-        if (obj == null || ctx == null) {
-            return false;
-        }
         if (hasText(obj.getOwnerId())) {
             if (obj.getOwnerId().equals(ctx.getUserId())) {
                 return true;
@@ -59,14 +48,6 @@ public class ExternalObjectAccessService {
         }
         return isSameOrDescendant(ctx.getViewerOrgId(), obj.getOrgId(), ctx.getOrgParentMap())
             || isSameOrDescendant(ctx.getViewerOrgId(), obj.getDeptId(), ctx.getOrgParentMap());
-    }
-
-    private boolean canAccessDefault(ExternalObject obj, String userId, Collection<String> scopeOrgIds) {
-        return userId != null && (
-            userId.equals(obj.getOwnerId())
-                || (scopeOrgIds != null && scopeOrgIds.contains(obj.getOrgId()))
-                || (scopeOrgIds != null && scopeOrgIds.contains(obj.getDeptId()))
-        );
     }
 
     private String getUserOrgId(String userId, AccessContext ctx) {

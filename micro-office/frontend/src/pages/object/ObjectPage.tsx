@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import { objectApi, userApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
@@ -110,20 +110,6 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   return (
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {isCustomerType ? (
-          <Alert
-            showIcon
-            type="info"
-            message="客户可见范围说明"
-            description={(
-              <div>
-                <div>1. 设置负责人后：仅负责人本人或其领导可查看。</div>
-                <div>2. 不设置负责人时：按所选组织 / 部门共享，范围内成员可查看。</div>
-              </div>
-            )}
-          />
-        ) : null}
-
         <div className="page-toolbar">
           <Select
             allowClear
@@ -159,7 +145,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ y: isCustomerType ? 'calc(100dvh - 505px)' : 'calc(100dvh - 455px)' }}
+              scroll={{ y: 'calc(100dvh - 455px)' }}
               columns={columns}
             />
           </div>
@@ -211,14 +197,14 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
           <Form.Item
             name="deptId"
             label="所属部门"
-            extra={isCustomerType ? '负责人留空时，请至少选择组织或部门中的一个。' : undefined}
+            extra="负责人留空时，请至少选择组织或部门中的一个；共享范围会向下包含子节点。"
           >
             <Select allowClear placeholder="选择部门" options={departmentOptions} />
           </Form.Item>
           <Form.Item
             name="ownerId"
             label="负责人"
-            extra={isCustomerType ? '设置负责人后，仅负责人本人或其领导可见；清空负责人后，客户按组织/部门共享。' : undefined}
+            extra="设置负责人后，仅负责人本人或其领导可见；清空负责人后，按组织/部门共享。"
           >
             <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
           </Form.Item>

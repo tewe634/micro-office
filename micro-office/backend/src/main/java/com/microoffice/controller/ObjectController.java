@@ -105,21 +105,11 @@ public class ObjectController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "对象名称不能为空");
         }
 
-        if (obj.getType() == ObjectType.CUSTOMER) {
-            if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null && currentUser != null) {
-                obj.setOrgId(trimToNull(currentUser.getOrgId()));
-            }
-            if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "客户未设置负责人时，至少需要选择组织或部门");
-            }
-            return;
-        }
-
-        if (obj.getOwnerId() == null && currentUser != null) {
-            obj.setOwnerId(currentUser.getId());
-        }
-        if (obj.getOrgId() == null && currentUser != null) {
+        if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null && currentUser != null) {
             obj.setOrgId(trimToNull(currentUser.getOrgId()));
+        }
+        if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未设置负责人时，至少需要选择组织或部门");
         }
     }
 
