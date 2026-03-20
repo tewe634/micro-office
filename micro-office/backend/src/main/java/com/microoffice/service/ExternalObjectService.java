@@ -5,6 +5,7 @@ import com.microoffice.entity.ExternalObject;
 import com.microoffice.enums.ObjectType;
 import com.microoffice.mapper.ExternalObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExternalObjectService {
     private final ExternalObjectMapper mapper;
+    private final JdbcTemplate jdbc;
 
     public List<ExternalObject> list(ObjectType type, String orgId, String deptId) {
         LambdaQueryWrapper<ExternalObject> q = new LambdaQueryWrapper<>();
@@ -37,7 +39,26 @@ public class ExternalObjectService {
 
     public void update(ExternalObject obj) {
         sanitizeByType(obj);
-        mapper.updateById(obj);
+        jdbc.update(
+            "UPDATE external_object SET " +
+                "type = ?::object_type, " +
+                "name = ?, contact = ?, phone = ?, address = ?, remark = ?, " +
+                "account_no = ?, subject_code = ?, org_id = ?, dept_id = ?, owner_id = ?, industry = ?, updated_at = NOW() " +
+            "WHERE id = ?",
+            obj.getType() == null ? null : obj.getType().name(),
+            obj.getName(),
+            obj.getContact(),
+            obj.getPhone(),
+            obj.getAddress(),
+            obj.getRemark(),
+            obj.getAccountNo(),
+            obj.getSubjectCode(),
+            obj.getOrgId(),
+            obj.getDeptId(),
+            obj.getOwnerId(),
+            obj.getIndustry(),
+            obj.getId()
+        );
     }
 
     public void delete(String id) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tabs, Tag, Pagination } from 'antd';
+import { Alert, Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import { objectApi, userApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
@@ -23,6 +23,10 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   const [form] = Form.useForm();
 
   const isCustomerType = type === 'CUSTOMER';
+  const typeLabel = allTypeOptions.find(o => o.value === type)?.label || '对象';
+  const orgOptions = orgs.map(o => ({ value: o.id, label: o.name }));
+  const departmentOptions = departments.map(o => ({ value: o.id, label: o.name }));
+  const userOptions = users.map(u => ({ value: u.id, label: u.name }));
 
   const load = async (c = current, s = size, deptId = filterDept) => {
     const r: any = await objectApi.page({ current: c, size: s, type, deptId });
@@ -38,9 +42,16 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
 
   const save = async (values: any) => {
     const payload = {
-      ...values,
       type,
-      industry: isCustomerType ? values.industry : null,
+      name: values.name,
+      contact: values.contact ?? null,
+      phone: values.phone ?? null,
+      address: values.address ?? null,
+      orgId: values.orgId ?? null,
+      deptId: values.deptId ?? null,
+      ownerId: values.ownerId ?? null,
+      remark: values.remark ?? null,
+      industry: isCustomerType ? values.industry ?? null : null,
     };
     if (edit) {
       await objectApi.update(edit.id, payload);
@@ -99,17 +110,32 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
   return (
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {isCustomerType ? (
+          <Alert
+            showIcon
+            type="info"
+            message="客户可见范围说明"
+            description={(
+              <div>
+                <div>1. 设置负责人后：仅负责人本人或其领导可查看。</div>
+                <div>2. 不设置负责人时：按所选组织 / 部门共享，范围内成员可查看。</div>
+              </div>
+            )}
+          />
+        ) : null}
+
         <div className="page-toolbar">
           <Select
             allowClear
             placeholder="按所属部门筛选"
             style={{ width: 220 }}
+            value={filterDept}
             onChange={v => setFilterDept(v)}
-            options={departments.map(o => ({ value: o.id, label: o.name }))}
+            options={departmentOptions}
           />
           <div className="page-toolbar-right">
             <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>
-              新增{allTypeOptions.find(o => o.value === type)?.label}
+              新增{typeLabel}
             </Button>
           </div>
         </div>
@@ -133,7 +159,7 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ y: 'calc(100dvh - 455px)' }}
+              scroll={{ y: isCustomerType ? 'calc(100dvh - 505px)' : 'calc(100dvh - 455px)' }}
               columns={columns}
             />
           </div>
@@ -161,22 +187,40 @@ function ObjectTable({ type, orgs, users, departments }: { type: string; orgs: a
         </div>
       </div>
 
-      <Modal okText="确定" cancelText="取消" title={edit ? '编辑' : '新增'} open={modal} onCancel={() => setModal(false)} onOk={() => form.submit()}>
+      <Modal
+        okText="确定"
+        cancelText="取消"
+        title={edit ? `编辑${typeLabel}` : `新增${typeLabel}`}
+        open={modal}
+        onCancel={() => {
+          setModal(false);
+          setEdit(null);
+          form.resetFields();
+        }}
+        onOk={() => form.submit()}
+      >
         <Form form={form} onFinish={save} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
           <Form.Item name="contact" label="联系人"><Input /></Form.Item>
           <Form.Item name="phone" label="电话"><Input /></Form.Item>
           <Form.Item name="address" label="地址"><Input /></Form.Item>
           {isCustomerType ? <Form.Item name="industry" label="行业"><Input /></Form.Item> : null}
           <Form.Item name="orgId" label="所属组织">
-            <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+            <Select allowClear placeholder="选择组织" options={orgOptions} />
           </Form.Item>
-          <Form.Item name="deptId" label="所属部门">
-            <Select allowClear placeholder="选择部门" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+          <Form.Item
+            name="deptId"
+            label="所属部门"
+            extra={isCustomerType ? '负责人留空时，请至少选择组织或部门中的一个。' : undefined}
+          >
+            <Select allowClear placeholder="选择部门" options={departmentOptions} />
           </Form.Item>
-          <Form.Item name="ownerId" label="负责人">
-            <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label"
-              options={users.map(u => ({ value: u.id, label: u.name }))} />
+          <Form.Item
+            name="ownerId"
+            label="负责人"
+            extra={isCustomerType ? '设置负责人后，仅负责人本人或其领导可见；清空负责人后，客户按组织/部门共享。' : undefined}
+          >
+            <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
           </Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea /></Form.Item>
         </Form>
