@@ -108,7 +108,7 @@ export default function ProductPage() {
                     </Form.Item>
                   </Form>
 
-                  <Button type="primary" onClick={openCreate} style={{ marginLeft: 'auto', flex: '0 0 auto' }}>新增</Button>
+                  <Button type="primary" onClick={openCreate} style={{ marginLeft: 'auto', flex: '0 0 auto', position: 'relative', right: '-40px' }}>新增</Button>
                 </div>
 
                 <div
