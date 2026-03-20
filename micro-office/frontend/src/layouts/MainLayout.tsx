@@ -22,6 +22,7 @@ const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
   '/users': { icon: <UserOutlined />, label: '人员管理' },
   '/objects': { icon: <ContactsOutlined />, label: '外部对象' },
   '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
+  '/admin/permissions': { icon: <SettingOutlined />, label: '权限配置' },
 };
 
 const menuOrder = ['/org', '/users', '/objects', '/products'];
@@ -72,6 +73,8 @@ export default function MainLayout() {
 
   const selectedKeys = [loc.pathname];
   const openKeys = loc.pathname.startsWith('/admin') ? ['/admin'] : [];
+  const currentTitle = menuDefs[loc.pathname]?.label || '东华微办公';
+  const userInitial = (userName || '我').trim().charAt(0) || '我';
 
   const handleLogout = () => {
     logout();
@@ -99,52 +102,39 @@ export default function MainLayout() {
   ]), []);
 
   return (
-    <Layout style={{ height: '100dvh', minHeight: '100dvh' }}>
+    <Layout className="app-shell">
       <Sider
+        className="app-sider"
+        theme="light"
         collapsed={collapsed}
+        collapsedWidth={84}
         collapsible
         trigger={null}
-        width={220}
-        style={{ overflow: 'hidden' }}
+        width={236}
       >
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div className="app-sider__inner">
           <Button
+            className="app-collapse-button"
             type="text"
             shape="circle"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(v => !v)}
-            style={{
-              position: 'absolute',
-              top: 16,
-              right: 12,
-              zIndex: 20,
-              color: '#001529',
-              background: '#fff',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)',
-              border: '1px solid #f0f0f0',
-            }}
           />
 
-          <div
-            style={{
-              height: 64,
-              padding: collapsed ? '16px 12px' : '16px 48px 16px 16px',
-              color: '#fff',
-              fontWeight: 'bold',
-              fontSize: collapsed ? 14 : 16,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-            }}
-          >
-            {collapsed ? '东华' : '东华微办公'}
+          <div className={`app-brand${collapsed ? ' is-collapsed' : ''}`}>
+            <div className="app-brand__mark">微</div>
+            {!collapsed ? (
+              <div className="app-brand__meta">
+                <div className="app-brand__title">东华微办公</div>
+                <div className="app-brand__subtitle">简单、清晰、好用</div>
+              </div>
+            ) : null}
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <div className="app-menu-wrap">
             <Menu
-              theme="dark"
+              className="app-menu"
+              theme="light"
               mode="inline"
               selectedKeys={selectedKeys}
               defaultOpenKeys={openKeys}
@@ -153,7 +143,7 @@ export default function MainLayout() {
             />
           </div>
 
-          <div style={{ padding: collapsed ? '12px 8px 16px' : '12px 12px 16px' }}>
+          <div className="app-settings-wrap">
             <Dropdown
               trigger={['click']}
               placement="topRight"
@@ -170,20 +160,7 @@ export default function MainLayout() {
                 },
               }}
             >
-              <Button
-                type="text"
-                icon={<SettingOutlined />}
-                style={{
-                  width: '100%',
-                  height: 40,
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  gap: 8,
-                  paddingInline: collapsed ? 0 : 12,
-                }}
-              >
+              <Button className="app-settings-button" type="text" icon={<SettingOutlined />}>
                 {!collapsed ? '设置' : null}
               </Button>
             </Dropdown>
@@ -191,24 +168,22 @@ export default function MainLayout() {
         </div>
       </Sider>
 
-      <Layout style={{ minHeight: 0 }}>
-        <Header
-          style={{
-            flex: '0 0 64px',
-            background: '#fff',
-            padding: '0 24px',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-          }}
-        >
+      <Layout className="app-main">
+        <Header className="app-header">
+          <div className="app-header__title">
+            <div className="app-header__heading">{currentTitle}</div>
+            <div className="app-header__caption">AI 风格极简工作台</div>
+          </div>
           <Space size={12}>
-            <span style={{ color: '#888', fontSize: 13 }}>您好，{userName}</span>
+            <div className="app-user-chip">
+              <span className="app-user-chip__avatar">{userInitial}</span>
+              <span className="app-user-chip__text">{userName || '当前用户'}</span>
+            </div>
           </Space>
         </Header>
 
-        <Content style={{ flex: 1, minHeight: 0, margin: 24, overflow: 'hidden', display: 'flex' }}>
-          <div className="page-fill" style={{ flex: 1, minHeight: 0 }}>
+        <Content className="app-content">
+          <div className="page-fill app-content__inner">
             <Outlet />
           </div>
         </Content>
