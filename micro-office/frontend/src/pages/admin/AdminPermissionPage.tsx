@@ -243,7 +243,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
       <div className="split-panel__content">
         <div className="split-panel__scroll">
           {selectedUser ? (
-            <div style={{ paddingRight: 8, minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>{selectedUser.name} 的权限配置</h4>
 
               <div style={{ marginBottom: 8 }}>
@@ -398,7 +398,7 @@ export default function AdminPermissionPage() {
   return (
     <Card
       title="权限配置"
-      className="page-card page-fill admin-permission-page"
+      className="page-card admin-permission-page"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >
       <div className="page-card-body">
