@@ -87,8 +87,7 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
             pagination={false}
             bordered
             size="middle"
-            scroll={{ x: Math.max(900, 140 + roles.length * 110), y: '100%' }}
-            style={{ height: '100%' }}
+            scroll={{ x: Math.max(900, 140 + roles.length * 110), y: 'calc(100dvh - 465px)' }}
             columns={[
               { title: '功能模块', dataIndex: 'label', width: 140, fixed: 'left' as const },
               ...roles.map(r => ({
@@ -201,7 +200,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
   };
 
   return (
-    <div className="split-panel">
+    <div className="split-panel" style={{ height: 'calc(100dvh - 390px)' }}>
       <div className="split-panel__aside">
         <Select
           allowClear
@@ -217,8 +216,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
               rowKey="id"
               size="small"
               pagination={{ pageSize: 10 }}
-              scroll={{ y: '100%' }}
-              style={{ height: '100%' }}
+              scroll={{ y: 'calc(100dvh - 495px)' }}
               onRow={r => ({
                 onClick: () => selectUser(r),
                 style: { cursor: 'pointer', background: selectedUser?.id === r.id ? '#e6f4ff' : undefined },
@@ -355,8 +353,7 @@ function ObjectTypePermTab() {
             pagination={false}
             bordered
             size="middle"
-            scroll={{ x: 900, y: '100%' }}
-            style={{ height: '100%' }}
+            scroll={{ x: 900, y: 'calc(100dvh - 465px)' }}
             columns={[
               { title: '岗位', width: 140, render: (_: any, r: any) => `${r.name} (${r.code})` },
               ...objectTypes.map(ot => ({
