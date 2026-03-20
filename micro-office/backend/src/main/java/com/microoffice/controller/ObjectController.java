@@ -325,9 +325,10 @@ public class ObjectController {
     public ApiResponse<List<ExternalObject>> list(@RequestParam(required = false) ObjectType type,
                                                   @RequestParam(required = false) String orgId,
                                                   @RequestParam(required = false) String deptId,
+                                                  @RequestParam(required = false) String name,
                                                   Authentication auth) {
         RequestAccessContext ctx = buildRequestContext(auth);
-        List<ExternalObject> all = service.list(type, orgId, deptId);
+        List<ExternalObject> all = service.list(type, orgId, deptId, name);
         return ApiResponse.ok(filterAccessibleObjects(all, ctx));
     }
 
@@ -337,9 +338,10 @@ public class ObjectController {
                                                           @RequestParam(required = false) ObjectType type,
                                                           @RequestParam(required = false) String orgId,
                                                           @RequestParam(required = false) String deptId,
+                                                          @RequestParam(required = false) String name,
                                                           Authentication auth) {
         RequestAccessContext ctx = buildRequestContext(auth);
-        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId), ctx);
+        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId, name), ctx);
         long total = all.size();
         int fromIndex = (int) Math.max(0, (current - 1) * size);
         int toIndex = (int) Math.min(total, fromIndex + size);

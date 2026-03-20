@@ -16,11 +16,12 @@ public class ExternalObjectService {
     private final ExternalObjectMapper mapper;
     private final JdbcTemplate jdbc;
 
-    public List<ExternalObject> list(ObjectType type, String orgId, String deptId) {
+    public List<ExternalObject> list(ObjectType type, String orgId, String deptId, String name) {
         LambdaQueryWrapper<ExternalObject> q = new LambdaQueryWrapper<>();
         if (type != null) q.eq(ExternalObject::getType, type);
         if (orgId != null) q.eq(ExternalObject::getOrgId, orgId);
         if (deptId != null) q.eq(ExternalObject::getDeptId, deptId);
+        if (name != null && !name.isBlank()) q.like(ExternalObject::getName, name.trim());
         q.orderByDesc(ExternalObject::getUpdatedAt)
             .orderByDesc(ExternalObject::getCreatedAt)
             .orderByDesc(ExternalObject::getId);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message, Row, Col } from 'antd';
 import { objectApi, userApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
@@ -25,6 +25,11 @@ type DepartmentNode = {
   orgId: string;
 };
 
+type SearchFilters = {
+  deptId?: string;
+  name?: string;
+};
+
 function ObjectTable({
   type,
   orgs,
@@ -44,7 +49,8 @@ function ObjectTable({
   const [size, setSize] = useState(20);
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
-  const [filterDept, setFilterDept] = useState<string | undefined>();
+  const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
+  const [searchForm] = Form.useForm();
   const [form] = Form.useForm();
   const selectedOrgId = Form.useWatch('orgId', form);
 
@@ -54,7 +60,7 @@ function ObjectTable({
   const allNodeMap = useMemo(() => new Map(allNodes.map(node => [node.id, node])), [allNodes]);
   const departmentMap = useMemo(() => new Map(departments.map(dept => [dept.id, dept])), [departments]);
   const orgOptions = useMemo(() => orgs.map(o => ({ value: o.id, label: o.name })), [orgs]);
-  const allDepartmentOptions = useMemo(() => departments.map(o => ({ value: o.id, label: o.name })), [departments]);
+  const departmentOptions = useMemo(() => departments.map(o => ({ value: o.id, label: o.name })), [departments]);
   const filteredDepartmentOptions = useMemo(
     () => departments
       .filter(o => !selectedOrgId || o.orgId === selectedOrgId)
@@ -63,8 +69,14 @@ function ObjectTable({
   );
   const userOptions = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
 
-  const load = async (c = current, s = size, deptId = filterDept) => {
-    const r: any = await objectApi.page({ current: c, size: s, type, deptId });
+  const load = async (c = current, s = size, filters: SearchFilters = activeFilters) => {
+    const r: any = await objectApi.page({
+      current: c,
+      size: s,
+      type,
+      deptId: filters.deptId || undefined,
+      name: filters.name?.trim() || undefined,
+    });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
     setCurrent(c);
@@ -72,8 +84,20 @@ function ObjectTable({
   };
 
   useEffect(() => {
-    load(1, size, filterDept);
-  }, [type, filterDept]);
+    setActiveFilters({});
+    searchForm.resetFields();
+    load(1, size, {});
+  }, [type]);
+
+  const onSearch = async () => {
+    const values = searchForm.getFieldsValue();
+    const nextFilters = {
+      deptId: values.deptId || undefined,
+      name: values.name?.trim() || undefined,
+    };
+    setActiveFilters(nextFilters);
+    await load(1, size, nextFilters);
+  };
 
   const normalizeRecordForForm = (record: any) => {
     const next = { ...record };
@@ -143,14 +167,14 @@ function ObjectTable({
     setModal(false);
     form.resetFields();
     setEdit(null);
-    load(current, size, filterDept);
+    load(current, size, activeFilters);
   };
 
   const reloadAfterDelete = async (id: string) => {
     await objectApi.delete(id);
     message.success('已删除');
     const nextCurrent = current > 1 && data.length === 1 ? current - 1 : current;
-    load(nextCurrent, size, filterDept);
+    load(nextCurrent, size, activeFilters);
   };
 
   const userName = (id: string) => users.find(u => u.id === id)?.name || '-';
@@ -226,16 +250,28 @@ function ObjectTable({
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="page-toolbar">
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="按所属部门筛选"
-            style={{ width: 220 }}
-            value={filterDept}
-            onChange={v => setFilterDept(v)}
-            options={allDepartmentOptions}
-          />
+          <Form
+            form={searchForm}
+            layout="inline"
+            style={{ display: 'flex', flexWrap: 'wrap', rowGap: 12, columnGap: 8, minWidth: 0, flex: '1 1 0' }}
+          >
+            <Form.Item name="deptId" label="所属部门">
+              <Select
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                placeholder="请选择部门"
+                style={{ width: 220 }}
+                options={departmentOptions}
+              />
+            </Form.Item>
+            <Form.Item name="name" label="名称">
+              <Input allowClear placeholder="请输入名称" style={{ width: 220 }} />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" onClick={onSearch}>搜索</Button>
+            </Form.Item>
+          </Form>
           <div className="page-toolbar-right">
             <Button type="primary" onClick={() => openEditor()}>
               新增{typeLabel}
@@ -262,7 +298,7 @@ function ObjectTable({
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ y: 'calc(100dvh - 455px)' }}
+              scroll={{ x: 1300, y: 'calc(100dvh - 495px)' }}
               columns={columns}
             />
           </div>
@@ -284,7 +320,7 @@ function ObjectTable({
               total={total}
               showSizeChanger
               showTotal={(t) => formatPaginationTotal(t)}
-              onChange={(page, pageSize) => load(page, pageSize, filterDept)}
+              onChange={(page, pageSize) => load(page, pageSize, activeFilters)}
             />
           </div>
         </div>
@@ -301,45 +337,70 @@ function ObjectTable({
           form.resetFields();
         }}
         onOk={() => form.submit()}
+        width={720}
+        style={{ top: 20 }}
+        styles={{ body: { maxHeight: '72vh', overflowY: 'auto', overflowX: 'hidden', paddingBottom: 8 } }}
       >
         <Form form={form} onFinish={save} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
-          <Form.Item name="contact" label="联系人"><Input /></Form.Item>
-          <Form.Item name="phone" label="电话"><Input /></Form.Item>
-          <Form.Item name="address" label="地址"><Input /></Form.Item>
-          {isCustomerType ? <Form.Item name="industry" label="行业"><Input /></Form.Item> : null}
-          <Form.Item name="orgId" label="所属组织">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择组织"
-              options={orgOptions}
-              onChange={handleOrgChange}
-            />
-          </Form.Item>
-          <Form.Item
-            name="deptId"
-            label="所属部门"
-            extra="请选择对应组织后再选部门；负责人留空时，可按组织/部门共享。"
-          >
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder={selectedOrgId ? '选择部门' : '请先选择组织'}
-              options={filteredDepartmentOptions}
-              disabled={!selectedOrgId}
-            />
-          </Form.Item>
-          <Form.Item
-            name="ownerId"
-            label="负责人"
-            extra="设置负责人后，仅负责人本人或其领导可见；清空负责人后，按组织/部门共享。"
-          >
-            <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
-          </Form.Item>
-          <Form.Item name="remark" label="备注"><Input.TextArea /></Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="contact" label="联系人"><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="phone" label="电话"><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="address" label="地址"><Input /></Form.Item>
+            </Col>
+            {isCustomerType ? (
+              <Col xs={24} sm={12}>
+                <Form.Item name="industry" label="行业"><Input /></Form.Item>
+              </Col>
+            ) : null}
+            <Col xs={24} sm={12}>
+              <Form.Item name="orgId" label="所属组织">
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="选择组织"
+                  options={orgOptions}
+                  onChange={handleOrgChange}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="deptId"
+                label="所属部门"
+                extra="请选择对应组织后再选部门；负责人留空时，可按组织/部门共享。"
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={selectedOrgId ? '选择部门' : '请先选择组织'}
+                  options={filteredDepartmentOptions}
+                  disabled={!selectedOrgId}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="ownerId"
+                label="负责人"
+                extra="设置负责人后，仅负责人本人或其领导可见；清空负责人后，按组织/部门共享。"
+              >
+                <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item name="remark" label="备注"><Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} /></Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </>
