@@ -229,7 +229,12 @@ body {
 }
 
 .ant-layout-sider {
-  background: #111827 !important;
+  background: #f5f6f8 !important;
+  border-right: 1px solid #e5e7eb;
+}
+
+.ant-layout-sider .ant-layout-sider-children {
+  background: #f5f6f8;
 }
 
 .ant-layout-header {
@@ -238,17 +243,35 @@ body {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
-.ant-menu.ant-menu-dark {
-  background: #111827;
+.ant-menu.ant-menu-light {
+  background: transparent;
+  border-inline-end: none;
 }
 
-.ant-menu-dark .ant-menu-item,
-.ant-menu-dark .ant-menu-submenu-title {
+.ant-menu-light .ant-menu-item,
+.ant-menu-light .ant-menu-submenu-title {
   border-radius: 10px;
+  color: #6b7280;
 }
 
-.ant-menu-dark .ant-menu-item-selected {
-  background: rgba(255, 255, 255, 0.12) !important;
+.ant-menu-light .ant-menu-item:hover,
+.ant-menu-light .ant-menu-submenu-title:hover,
+.ant-menu-light .ant-menu-item-active,
+.ant-menu-light .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  color: #111827 !important;
+  background: #eef2f7 !important;
+}
+
+.ant-menu-light .ant-menu-item-selected {
+  color: #111827 !important;
+  background: #e9edf5 !important;
+  font-weight: 600;
+}
+
+.ant-menu-light .ant-menu-item .ant-menu-item-icon,
+.ant-menu-light .ant-menu-submenu-title .ant-menu-item-icon,
+.ant-menu-light .ant-menu-submenu-title .ant-menu-submenu-arrow {
+  color: inherit;
 }
 
 .ant-btn {
@@ -265,6 +288,11 @@ body {
 .ant-btn-default,
 .ant-btn-text {
   border-color: #e5e7eb !important;
+}
+
+.ant-layout-sider .ant-btn.ant-btn-text:hover {
+  color: #111827 !important;
+  background: #eef2f7 !important;
 }
 
 .ant-input,

@@ -105,7 +105,7 @@ export default function MainLayout() {
         collapsible
         trigger={null}
         width={220}
-        style={{ overflow: 'hidden' }}
+        style={{ overflow: 'hidden', background: '#f5f6f8', borderRight: '1px solid #e5e7eb' }}
       >
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
           <Button
@@ -118,10 +118,10 @@ export default function MainLayout() {
               top: 16,
               right: 12,
               zIndex: 20,
-              color: '#001529',
-              background: '#fff',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)',
-              border: '1px solid #f0f0f0',
+              color: '#4b5563',
+              background: '#ffffff',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
+              border: '1px solid #e5e7eb',
             }}
           />
 
@@ -129,7 +129,7 @@ export default function MainLayout() {
             style={{
               height: 64,
               padding: collapsed ? '16px 12px' : '16px 48px 16px 16px',
-              color: '#fff',
+              color: '#111827',
               fontWeight: 'bold',
               fontSize: collapsed ? 14 : 16,
               display: 'flex',
@@ -144,7 +144,7 @@ export default function MainLayout() {
 
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <Menu
-              theme="dark"
+              theme="light"
               mode="inline"
               selectedKeys={selectedKeys}
               defaultOpenKeys={openKeys}
@@ -176,7 +176,7 @@ export default function MainLayout() {
                 style={{
                   width: '100%',
                   height: 40,
-                  color: '#fff',
+                  color: '#4b5563',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: collapsed ? 'center' : 'flex-start',
