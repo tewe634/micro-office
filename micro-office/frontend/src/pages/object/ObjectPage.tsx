@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message, Row, Col } from 'antd';
 import { objectApi, userApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
@@ -301,45 +301,70 @@ function ObjectTable({
           form.resetFields();
         }}
         onOk={() => form.submit()}
+        width={760}
+        style={{ top: 24 }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingBottom: 8 } }}
       >
         <Form form={form} onFinish={save} layout="vertical">
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
-          <Form.Item name="contact" label="联系人"><Input /></Form.Item>
-          <Form.Item name="phone" label="电话"><Input /></Form.Item>
-          <Form.Item name="address" label="地址"><Input /></Form.Item>
-          {isCustomerType ? <Form.Item name="industry" label="行业"><Input /></Form.Item> : null}
-          <Form.Item name="orgId" label="所属组织">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择组织"
-              options={orgOptions}
-              onChange={handleOrgChange}
-            />
-          </Form.Item>
-          <Form.Item
-            name="deptId"
-            label="所属部门"
-            extra="请选择对应组织后再选部门；负责人留空时，可按组织/部门共享。"
-          >
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder={selectedOrgId ? '选择部门' : '请先选择组织'}
-              options={filteredDepartmentOptions}
-              disabled={!selectedOrgId}
-            />
-          </Form.Item>
-          <Form.Item
-            name="ownerId"
-            label="负责人"
-            extra="设置负责人后，仅负责人本人或其领导可见；清空负责人后，按组织/部门共享。"
-          >
-            <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
-          </Form.Item>
-          <Form.Item name="remark" label="备注"><Input.TextArea /></Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="contact" label="联系人"><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="phone" label="电话"><Input /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="address" label="地址"><Input /></Form.Item>
+            </Col>
+            {isCustomerType ? (
+              <Col xs={24} sm={12}>
+                <Form.Item name="industry" label="行业"><Input /></Form.Item>
+              </Col>
+            ) : null}
+            <Col xs={24} sm={12}>
+              <Form.Item name="orgId" label="所属组织">
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="选择组织"
+                  options={orgOptions}
+                  onChange={handleOrgChange}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="deptId"
+                label="所属部门"
+                extra="请选择对应组织后再选部门；负责人留空时，可按组织/部门共享。"
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={selectedOrgId ? '选择部门' : '请先选择组织'}
+                  options={filteredDepartmentOptions}
+                  disabled={!selectedOrgId}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="ownerId"
+                label="负责人"
+                extra="设置负责人后，仅负责人本人或其领导可见；清空负责人后，按组织/部门共享。"
+              >
+                <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item name="remark" label="备注"><Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} /></Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </>
