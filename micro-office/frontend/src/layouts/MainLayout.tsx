@@ -1,4 +1,4 @@
-import { Layout, Menu, Dropdown, Modal, Form, Input, Button, Space, message } from 'antd';
+import { Layout, Menu, Button, Dropdown, Modal, Form, Input, Space, message } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   TeamOutlined,
@@ -6,6 +6,8 @@ import {
   ContactsOutlined,
   ShoppingOutlined,
   SettingOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   LockOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
@@ -99,15 +101,47 @@ export default function MainLayout() {
   return (
     <Layout style={{ height: '100dvh', minHeight: '100dvh' }}>
       <Sider
-        collapsible
         collapsed={collapsed}
-        onCollapse={setCollapsed}
+        collapsible
+        trigger={null}
+        width={220}
         style={{ overflow: 'hidden' }}
       >
-        <div style={{ height: 'calc(100% - 48px)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ height: 32, margin: 16, color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: 16 }}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <Button
+            type="text"
+            shape="circle"
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setCollapsed(v => !v)}
+            style={{
+              position: 'absolute',
+              top: 16,
+              right: 12,
+              zIndex: 20,
+              color: '#001529',
+              background: '#fff',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)',
+              border: '1px solid #f0f0f0',
+            }}
+          />
+
+          <div
+            style={{
+              height: 64,
+              padding: collapsed ? '16px 12px' : '16px 48px 16px 16px',
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: collapsed ? 14 : 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            }}
+          >
             {collapsed ? '东华' : '东华微办公'}
           </div>
+
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <Menu
               theme="dark"
@@ -118,7 +152,8 @@ export default function MainLayout() {
               onClick={e => nav(e.key)}
             />
           </div>
-          <div style={{ padding: collapsed ? '8px' : '12px 12px 16px' }}>
+
+          <div style={{ padding: collapsed ? '12px 8px 16px' : '12px 12px 16px' }}>
             <Dropdown
               trigger={['click']}
               placement="topRight"
@@ -155,12 +190,23 @@ export default function MainLayout() {
           </div>
         </div>
       </Sider>
+
       <Layout style={{ minHeight: 0 }}>
-        <Header style={{ flex: '0 0 64px', background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <Header
+          style={{
+            flex: '0 0 64px',
+            background: '#fff',
+            padding: '0 24px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+          }}
+        >
           <Space size={12}>
             <span style={{ color: '#888', fontSize: 13 }}>您好，{userName}</span>
           </Space>
         </Header>
+
         <Content style={{ flex: 1, minHeight: 0, margin: 24, overflow: 'hidden', display: 'flex' }}>
           <div className="page-fill" style={{ flex: 1, minHeight: 0 }}>
             <Outlet />
