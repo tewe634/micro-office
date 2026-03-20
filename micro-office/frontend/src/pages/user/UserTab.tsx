@@ -90,8 +90,8 @@ export default function UserTab() {
 
   return (
     <>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="page-toolbar">
+      <div className="fixed-table-page">
+        <div className="page-toolbar fixed-table-page__section">
           <Select
             allowClear
             placeholder="按组织筛选"
@@ -104,25 +104,15 @@ export default function UserTab() {
           </div>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            background: '#fff',
-            border: '1px solid #f0f0f0',
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+        <div className="fixed-table-page__frame">
+          <div className="fixed-table-page__table">
             <Table
               dataSource={users}
               rowKey="id"
               pagination={false}
               tableLayout="fixed"
-              scroll={{ y: 'calc(100dvh - 455px)' }}
+              scroll={{ y: '100%' }}
+              style={{ height: '100%' }}
               columns={[
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '工号', dataIndex: 'empNo', width: 110, ellipsis: true },
@@ -156,16 +146,7 @@ export default function UserTab() {
             />
           </div>
 
-          <div
-            style={{
-              flex: '0 0 auto',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              padding: '12px 16px 16px',
-              borderTop: '1px solid #f0f0f0',
-              background: '#fff',
-            }}
-          >
+          <div className="fixed-table-page__footer">
             <Pagination
               locale={paginationLocale}
               current={current}

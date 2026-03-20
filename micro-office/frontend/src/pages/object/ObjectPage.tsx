@@ -224,8 +224,8 @@ function ObjectTable({
 
   return (
     <>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="page-toolbar">
+      <div className="fixed-table-page">
+        <div className="page-toolbar fixed-table-page__section">
           <Select
             allowClear
             showSearch
@@ -243,40 +243,21 @@ function ObjectTable({
           </div>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            background: '#fff',
-            border: '1px solid #f0f0f0',
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+        <div className="fixed-table-page__frame">
+          <div className="fixed-table-page__table">
             <Table
               dataSource={data}
               rowKey="id"
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ y: 'calc(100dvh - 455px)' }}
+              scroll={{ y: '100%' }}
+              style={{ height: '100%' }}
               columns={columns}
             />
           </div>
 
-          <div
-            style={{
-              flex: '0 0 auto',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              padding: '12px 16px 16px',
-              borderTop: '1px solid #f0f0f0',
-              background: '#fff',
-            }}
-          >
+          <div className="fixed-table-page__footer">
             <Pagination
               locale={paginationLocale}
               current={current}

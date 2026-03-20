@@ -398,7 +398,7 @@ export default function AdminPermissionPage() {
   return (
     <Card
       title="权限配置"
-      className="page-card admin-permission-page"
+      className="page-card page-fill admin-permission-page"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >
       <div className="page-card-body">
