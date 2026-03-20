@@ -94,8 +94,8 @@ export default function ProductPage() {
             label: option.label,
             children: (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div className="page-toolbar">
-                  <Form form={searchForm} layout="inline" style={{ flex: 1, rowGap: 12 }}>
+                <div className="page-toolbar product-page__toolbar">
+                  <Form form={searchForm} layout="inline" className="product-page__search-form" style={{ flex: '1 1 0', minWidth: 0, rowGap: 12 }}>
                     <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
                     <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
                     <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
@@ -104,12 +104,13 @@ export default function ProductPage() {
                     </Form.Item>
                   </Form>
 
-                  <div className="page-toolbar-right">
+                  <div className="page-toolbar-right product-page__toolbar-actions">
                     <Button type="primary" onClick={openCreate}>新增</Button>
                   </div>
                 </div>
 
                 <div
+                  className="product-page__table-frame"
                   style={{
                     flex: 1,
                     minHeight: 0,
@@ -121,7 +122,7 @@ export default function ProductPage() {
                     overflow: 'hidden',
                   }}
                 >
-                  <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+                  <div className="product-page__table-inner" style={{ flex: 1, minHeight: 0, padding: '12px 12px 12px 12px', overflow: 'hidden' }}>
                     <Table
                       dataSource={data}
                       rowKey="id"
@@ -155,11 +156,12 @@ export default function ProductPage() {
                   </div>
 
                   <div
+                    className="product-page__pagination-wrap"
                     style={{
                       flex: '0 0 auto',
                       display: 'flex',
                       justifyContent: 'flex-end',
-                      padding: '12px 16px 16px',
+                      padding: '8px 16px 12px',
                       borderTop: '1px solid #f0f0f0',
                       background: '#fff',
                     }}

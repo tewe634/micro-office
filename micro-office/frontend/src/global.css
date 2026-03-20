@@ -412,3 +412,37 @@ body {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+
+.product-page__toolbar {
+  align-items: flex-start;
+}
+
+.product-page__search-form.ant-form-inline {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.product-page__search-form.ant-form-inline .ant-form-item {
+  margin-bottom: 0;
+}
+
+.product-page__toolbar-actions {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
+.product-page__table-inner {
+  padding-bottom: 12px !important;
+}
+
+.product-page__pagination-wrap {
+  padding-top: 8px !important;
+  padding-bottom: 12px !important;
+}
+
+@media (max-width: 1400px) {
+  .product-page__toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
