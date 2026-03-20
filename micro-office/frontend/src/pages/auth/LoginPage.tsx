@@ -42,14 +42,16 @@ export default function LoginPage() {
       setObjectTypes(objectTypes);
       message.success('注册成功');
       nav(resolveHomePath());
-    } catch { message.error('注册失败'); }
+    } catch {
+      message.error('注册失败');
+    }
     setLoading(false);
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5' }}>
-      <Card style={{ width: 420 }}>
-        <h2 style={{ textAlign: 'center', marginBottom: 24 }}>东华微办公</h2>
+    <div className="auth-shell">
+      <Card className="auth-card">
+        <h2 className="auth-title">东华微办公</h2>
         <Tabs centered items={[
           { key: 'login', label: '登录', children: (
             <Form onFinish={onLogin} layout="vertical">

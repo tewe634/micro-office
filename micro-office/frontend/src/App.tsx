@@ -60,6 +60,30 @@ export default function App() {
   return (
     <ConfigProvider
       locale={appLocale}
+      theme={{
+        token: {
+          colorPrimary: '#2563eb',
+          colorInfo: '#2563eb',
+          colorSuccess: '#16a34a',
+          colorWarning: '#d97706',
+          colorError: '#dc2626',
+          colorText: '#111827',
+          colorTextSecondary: '#6b7280',
+          colorBgLayout: '#f6f7fb',
+          colorBgContainer: '#ffffff',
+          colorBgElevated: '#ffffff',
+          colorFillSecondary: '#f8fafc',
+          colorFillTertiary: '#f3f4f6',
+          colorBorder: '#e5e7eb',
+          colorBorderSecondary: '#eef2f7',
+          borderRadius: 12,
+          controlHeight: 38,
+          fontSize: 14,
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+          boxShadowSecondary: '0 12px 28px rgba(15, 23, 42, 0.08)',
+          boxShadowTertiary: '0 8px 18px rgba(15, 23, 42, 0.05)',
+        },
+      }}
       renderEmpty={() => <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={uiText.appEmpty} />}
     >
       <BrowserRouter>
