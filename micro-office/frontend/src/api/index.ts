@@ -84,6 +84,7 @@ export const clockApi = {
 export const userApi = {
   me: () => api.get('/users/me'),
   lookups: () => api.get('/users/me/lookups'),
+  changeMyPassword: (password: string) => api.put('/users/me/password', { password }),
   list: (orgId?: number) => api.get('/users', { params: { orgId } }),
   page: (params?: { current?: number; size?: number; orgId?: string | number }) => api.get('/users/page', { params }),
   get: (id: number) => api.get(`/users/${id}`),

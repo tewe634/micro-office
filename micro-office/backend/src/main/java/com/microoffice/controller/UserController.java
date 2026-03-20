@@ -76,6 +76,19 @@ public class UserController {
         return ApiResponse.ok(m);
     }
 
+    @PutMapping("/me/password")
+    public ApiResponse<Void> changeMyPassword(@RequestBody Map<String, Object> body) {
+        String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        SysUser u = userMapper.selectById(currentUserId);
+        if (u == null) throw new RuntimeException("用户不存在");
+        String password = body.get("password") != null ? body.get("password").toString().trim() : "";
+        if (password.isBlank()) throw new RuntimeException("新密码不能为空");
+        if (password.length() < 6) throw new RuntimeException("密码至少6位");
+        u.setPasswordHash(passwordEncoder.encode(password));
+        userMapper.updateById(u);
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/page")
     public ApiResponse<com.microoffice.dto.response.PageResponse<Map<String, Object>>> page(
         @RequestParam(defaultValue = "1") long current,
