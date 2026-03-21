@@ -8,6 +8,7 @@ import UserAndPositionPage from './pages/user/UserAndPositionPage';
 import ObjectPage from './pages/object/ObjectPage';
 import ProductPage from './pages/product/ProductPage';
 import AdminPermissionPage from './pages/admin/AdminPermissionPage';
+import PortalPage from './pages/portal/PortalPage';
 import { useAuthStore } from './store/auth';
 import { uiText } from './constants/ui';
 
@@ -93,8 +94,11 @@ export default function App() {
             <Route index element={<HomeRedirect />} />
             <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
             <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserAndPositionPage /></MenuRouteGuard>} />
+            <Route path="users/:id/portal" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
             <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
+            <Route path="objects/:id/portal" element={<MenuRouteGuard menuKey="/objects"><PortalPage entityType="objects" /></MenuRouteGuard>} />
             <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
+            <Route path="products/:id/portal" element={<MenuRouteGuard menuKey="/products"><PortalPage entityType="products" /></MenuRouteGuard>} />
             <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />
             <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
           </Route>

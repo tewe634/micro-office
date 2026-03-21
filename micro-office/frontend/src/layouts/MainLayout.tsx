@@ -39,6 +39,22 @@ const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
 ];
 
+function resolveSelectedKey(pathname: string) {
+  if (pathname.startsWith('/admin')) return pathname.startsWith('/admin/permissions') ? '/admin/permissions' : '/admin';
+  if (pathname.startsWith('/users')) return '/users';
+  if (pathname.startsWith('/objects')) return '/objects';
+  if (pathname.startsWith('/products')) return '/products';
+  if (pathname.startsWith('/org')) return '/org';
+  return pathname;
+}
+
+function resolvePageTitle(pathname: string) {
+  if (/^\/users\/[^/]+\/portal$/.test(pathname)) return '人员门户';
+  if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '外部对象门户';
+  if (/^\/products\/[^/]+\/portal$/.test(pathname)) return '产品门户';
+  return pageTitles[pathname] || '东华微办公';
+}
+
 export default function MainLayout() {
   const nav = useNavigate();
   const loc = useLocation();
@@ -79,9 +95,9 @@ export default function MainLayout() {
     } as any);
   }
 
-  const selectedKeys = [loc.pathname];
+  const selectedKeys = [resolveSelectedKey(loc.pathname)];
   const openKeys = loc.pathname.startsWith('/admin') ? ['/admin'] : [];
-  const currentTitle = pageTitles[loc.pathname] || '东华微办公';
+  const currentTitle = resolvePageTitle(loc.pathname);
 
   const handleLogout = () => {
     logout();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { userApi, orgApi, positionApi } from '../../api';
 import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
@@ -7,6 +8,7 @@ import { useAuthStore } from '../../store/auth';
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
 export default function UserTab() {
+  const nav = useNavigate();
   const role = useAuthStore(s => s.role);
   const canManagePersonnel = role === 'ADMIN' || role === 'HR';
   const [users, setUsers] = useState<any[]>([]);
@@ -139,19 +141,24 @@ export default function UserTab() {
                   ellipsis: true,
                   render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-',
                 },
-                ...(canManagePersonnel ? [{
+                {
                   title: '操作',
-                  width: 210,
+                  width: canManagePersonnel ? 270 : 110,
                   render: (_: any, r: any) => (
                     <Space size={6} wrap>
+                      <Button size="small" onClick={() => nav(`/users/${r.id}/portal`)}>门户</Button>
+                      {canManagePersonnel ? (
+                        <>
                       <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
                       <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
                       <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); const nextCurrent = current > 1 && users.length === 1 ? current - 1 : current; loadUsers(nextCurrent, size, filterOrg); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
+                        </>
+                      ) : null}
                     </Space>
                   ),
-                }] : []),
+                },
               ]}
             />
           </div>

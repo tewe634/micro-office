@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination, Tabs } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
@@ -9,6 +10,7 @@ const productLineOptions = [
 ];
 
 export default function ProductPage() {
+  const nav = useNavigate();
   const [activeLine, setActiveLine] = useState('ABB');
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -142,10 +144,11 @@ export default function ProductPage() {
                         { title: '三级类别名称', dataIndex: 'categoryLevel3', width: 220, ellipsis: true },
                         {
                           title: '操作',
-                          width: 140,
+                          width: 200,
                           fixed: 'right',
                           render: (_: any, r: any) => (
-                            <Space>
+                            <Space size={6} wrap>
+                              <Button size="small" onClick={() => nav(`/products/${r.id}/portal`)}>门户</Button>
                               <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
                               <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await productApi.delete(r.id); message.success('已删除'); load({ current, size, filters, productLine: activeLine }); }}>
                                 <Button size="small" danger>删除</Button>

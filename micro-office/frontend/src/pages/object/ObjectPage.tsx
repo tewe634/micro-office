@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message, Row, Col } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { objectApi, userApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 
@@ -43,6 +44,7 @@ function ObjectTable({
   users: any[];
   departments: DepartmentNode[];
 }) {
+  const nav = useNavigate();
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
@@ -232,9 +234,10 @@ function ObjectTable({
 
     baseColumns.push({
       title: '操作',
-      width: 140,
+      width: 200,
       render: (_: any, r: any) => (
-        <Space>
+        <Space size={6} wrap>
+          <Button size="small" onClick={() => nav(`/objects/${r.id}/portal`)}>门户</Button>
           <Button size="small" onClick={() => openEditor(r)}>编辑</Button>
           <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
             <Button size="small" danger>删除</Button>

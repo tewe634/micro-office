@@ -120,10 +120,9 @@ export const adminApi = {
 };
 
 export const portalApi = {
-  get: () => api.get('/portal'),
-  addAchievement: (data: any) => api.post('/portal/achievements', data),
-  updateAchievement: (id: number, data: any) => api.put(`/portal/achievements/${id}`, data),
-  deleteAchievement: (id: number) => api.delete(`/portal/achievements/${id}`),
+  user: (id: string | number) => api.get(`/portal/users/${id}`),
+  object: (id: string | number) => api.get(`/portal/objects/${id}`),
+  product: (id: string | number) => api.get(`/portal/products/${id}`),
 };
 
 export const dashboardApi = {
