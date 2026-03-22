@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Col, Descriptions, Empty, List, Row, Space, Statistic, Table, Tag } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { portalApi } from '../../api';
@@ -112,6 +113,20 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const header = data?.header || {};
   const summaryCards = data?.summaryCards || [];
   const workSummary = data?.workSummary || {};
+
+  const listRoute = useMemo(() => {
+    if (entityType === 'users') return '/users';
+    if (entityType === 'objects') return '/objects';
+    return '/products';
+  }, [entityType]);
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.state?.idx > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate(listRoute);
+  };
 
   const headerTags = () => {
     if (entityType === 'users') {
@@ -571,11 +586,11 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         {!loading && error ? <Alert type="error" showIcon message={error} /> : null}
         {!loading && !error && data ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Alert
-              type="info"
-              showIcon
-              message="门户主体内容为稳定 Mock 数据生成，头部基础信息来自当前系统记录。"
-            />
+            <div className="page-toolbar" style={{ justifyContent: 'flex-start' }}>
+              <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
+                返回
+              </Button>
+            </div>
 
             <Card>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
