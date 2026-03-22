@@ -1,16 +1,18 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, Empty } from 'antd';
+import { ConfigProvider, Empty, Flex, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import MainLayout from './layouts/MainLayout';
-import LoginPage from './pages/auth/LoginPage';
-import OrgPage from './pages/org/OrgPage';
-import UserAndPositionPage from './pages/user/UserAndPositionPage';
-import ObjectPage from './pages/object/ObjectPage';
-import ProductPage from './pages/product/ProductPage';
-import AdminPermissionPage from './pages/admin/AdminPermissionPage';
-import PortalPage from './pages/portal/PortalPage';
 import { useAuthStore } from './store/auth';
 import { uiText } from './constants/ui';
+
+const MainLayout = lazy(() => import('./layouts/MainLayout'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const OrgPage = lazy(() => import('./pages/org/OrgPage'));
+const UserAndPositionPage = lazy(() => import('./pages/user/UserAndPositionPage'));
+const ObjectPage = lazy(() => import('./pages/object/ObjectPage'));
+const ProductPage = lazy(() => import('./pages/product/ProductPage'));
+const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage'));
+const PortalPage = lazy(() => import('./pages/portal/PortalPage'));
 
 const appLocale = {
   ...zhCN,
@@ -40,6 +42,14 @@ const appLocale = {
     cancelText: '取消',
   },
 };
+
+function PageFallback() {
+  return (
+    <Flex align="center" justify="center" style={{ minHeight: '100dvh', width: '100%' }}>
+      <Spin size="large" />
+    </Flex>
+  );
+}
 
 function HomeRedirect() {
   return <Navigate to="/org" replace />;
@@ -88,21 +98,23 @@ export default function App() {
       renderEmpty={() => <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={uiText.appEmpty} />}
     >
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
-            <Route index element={<HomeRedirect />} />
-            <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
-            <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserAndPositionPage /></MenuRouteGuard>} />
-            <Route path="users/:id/portal" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
-            <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
-            <Route path="objects/:id/portal" element={<MenuRouteGuard menuKey="/objects"><PortalPage entityType="objects" /></MenuRouteGuard>} />
-            <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
-            <Route path="products/:id/portal" element={<MenuRouteGuard menuKey="/products"><PortalPage entityType="products" /></MenuRouteGuard>} />
-            <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />
-            <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
-          </Route>
-        </Routes>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+              <Route index element={<HomeRedirect />} />
+              <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
+              <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserAndPositionPage /></MenuRouteGuard>} />
+              <Route path="users/:id/portal" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
+              <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
+              <Route path="objects/:id/portal" element={<MenuRouteGuard menuKey="/objects"><PortalPage entityType="objects" /></MenuRouteGuard>} />
+              <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
+              <Route path="products/:id/portal" element={<MenuRouteGuard menuKey="/products"><PortalPage entityType="products" /></MenuRouteGuard>} />
+              <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />
+              <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </ConfigProvider>
   );

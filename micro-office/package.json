@@ -1,0 +1,7 @@
+{
+  "name": "micro-office-tools",
+  "private": true,
+  "scripts": {
+    "smoke:api": "node scripts/api-smoke.mjs"
+  }
+}

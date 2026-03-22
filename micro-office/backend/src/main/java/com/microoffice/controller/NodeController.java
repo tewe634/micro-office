@@ -195,7 +195,22 @@ public class NodeController {
     // === 字段可见性配置 (ADMIN) ===
     @GetMapping("/admin/field-visibility")
     public ApiResponse<List<Map<String, Object>>> listFieldVisibility() {
-        return ApiResponse.ok(jdbc.queryForList("SELECT fv.*, p.name AS position_name FROM field_visibility fv JOIN position p ON p.id = fv.position_id ORDER BY fv.position_id"));
+        return ApiResponse.ok(jdbc.query(
+            "SELECT fv.id, fv.position_id, fv.entity_type, fv.hidden_fields, p.name AS position_name " +
+                "FROM field_visibility fv JOIN position p ON p.id = fv.position_id ORDER BY fv.position_id",
+            (rs, rowNum) -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", rs.getString("id"));
+                row.put("positionId", rs.getString("position_id"));
+                row.put("entityType", rs.getString("entity_type"));
+                java.sql.Array hiddenFields = rs.getArray("hidden_fields");
+                row.put("hiddenFields", hiddenFields == null
+                    ? List.of()
+                    : Arrays.asList((String[]) hiddenFields.getArray()));
+                row.put("positionName", rs.getString("position_name"));
+                return row;
+            }
+        ));
     }
 
     @PutMapping("/admin/field-visibility")

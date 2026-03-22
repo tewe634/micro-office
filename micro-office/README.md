@@ -60,6 +60,31 @@ docker compose up --build -d
 停止: `docker compose down`
 清除数据: `docker compose down -v`
 
+## API 回归冒烟脚本
+
+在本地栈已经启动后，可从仓库根目录运行：
+
+```bash
+npm run smoke:api
+```
+
+默认会登录 `http://127.0.0.1:8080/api`，使用当前本地演示栈默认管理员账号 `13305713391 / 123456`，并自动创建/清理临时数据，覆盖以下后端流转：
+
+- auth（register/login）
+- org / positions / users
+- objects / products / portal
+- threads / nodes / comments / taskpool
+- admin permissions / user object types / position object types / field visibility
+
+如需覆盖其他地址或管理员账号，可设置环境变量：
+
+```bash
+MICRO_OFFICE_BASE_URL=http://127.0.0.1:8080/api \
+MICRO_OFFICE_ADMIN_LOGIN=13305713391 \
+MICRO_OFFICE_ADMIN_PASSWORD=123456 \
+npm run smoke:api
+```
+
 ## 本地开发启动
 
 ### 后端
