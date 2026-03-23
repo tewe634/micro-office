@@ -1,8 +1,9 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, Empty, Flex, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { useAuthStore } from './store/auth';
+import { userApi } from './api';
+import { isTokenExpired, useAuthStore } from './store/auth';
 import { uiText } from './constants/ui';
 
 const MainLayout = lazy(() => import('./layouts/MainLayout'));
@@ -57,6 +58,8 @@ function HomeRedirect() {
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore(s => s.token);
+  const isAuthReady = useAuthStore(s => s.isAuthReady);
+  if (!isAuthReady) return <PageFallback />;
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
@@ -67,7 +70,60 @@ function MenuRouteGuard({ menuKey, children }: { menuKey: string; children: Reac
   return <>{children}</>;
 }
 
+function LoginRoute() {
+  const token = useAuthStore(s => s.token);
+  const isAuthReady = useAuthStore(s => s.isAuthReady);
+  if (!isAuthReady) return <PageFallback />;
+  return token ? <HomeRedirect /> : <LoginPage />;
+}
+
 export default function App() {
+  const token = useAuthStore(s => s.token);
+  const isAuthReady = useAuthStore(s => s.isAuthReady);
+  const setProfile = useAuthStore(s => s.setProfile);
+  const markAuthReady = useAuthStore(s => s.markAuthReady);
+  const logout = useAuthStore(s => s.logout);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrapAuth = async () => {
+      if (!token) {
+        if (!isAuthReady) markAuthReady();
+        return;
+      }
+      if (isAuthReady) return;
+      if (isTokenExpired(token)) {
+        logout();
+        return;
+      }
+      try {
+        const me: any = await userApi.me();
+        if (cancelled) return;
+        setProfile({
+          userId: me.data?.id ?? null,
+          name: me.data?.name ?? null,
+          role: me.data?.role ?? null,
+          menus: me.data?.menus || [],
+          objectTypes: me.data?.objectTypes || [],
+        });
+      } catch (error: any) {
+        if (cancelled) return;
+        if (error?.response?.status === 401) {
+          logout();
+          return;
+        }
+        markAuthReady();
+      }
+    };
+
+    void bootstrapAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isAuthReady, markAuthReady, setProfile, logout]);
+
   return (
     <ConfigProvider
       locale={appLocale}
@@ -100,7 +156,7 @@ export default function App() {
       <BrowserRouter>
         <Suspense fallback={<PageFallback />}>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<LoginRoute />} />
             <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
               <Route index element={<HomeRedirect />} />
               <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />

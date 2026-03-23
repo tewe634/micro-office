@@ -1,8 +1,12 @@
 package com.microoffice.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.microoffice.dto.response.ApiResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -19,9 +23,11 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtFilter jwtFilter) {
+    public SecurityConfig(JwtFilter jwtFilter, ObjectMapper objectMapper) {
         this.jwtFilter = jwtFilter;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -35,8 +41,15 @@ public class SecurityConfig {
                 return cors;
             }))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint((request, response, ex) ->
+                    writeJson(response, HttpStatus.UNAUTHORIZED, ApiResponse.error(401, "未登录或登录已失效")))
+                .accessDeniedHandler((request, response, ex) ->
+                    writeJson(response, HttpStatus.FORBIDDEN, ApiResponse.error(403, "无权限访问")))
+            )
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
+                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                 // 基础模块: 所有登录用户可访问
                 .requestMatchers("/api/users/me", "/api/users/me/**").authenticated()
                 .requestMatchers("/api/portal/**").authenticated()
@@ -61,5 +74,13 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    private void writeJson(jakarta.servlet.http.HttpServletResponse response, HttpStatus status, ApiResponse<Void> body)
+            throws java.io.IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getWriter(), body);
     }
 }

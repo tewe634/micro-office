@@ -11,9 +11,9 @@ import {
   LockOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
+import { authApi, userApi } from '../api';
 import { useAuthStore } from '../store/auth';
-import { useEffect, useMemo, useState } from 'react';
-import { userApi } from '../api';
+import { useMemo, useState } from 'react';
 
 const { Header, Sider, Content } = Layout;
 
@@ -59,28 +59,15 @@ export default function MainLayout() {
   const nav = useNavigate();
   const loc = useLocation();
   const logout = useAuthStore(s => s.logout);
-  const setRole = useAuthStore(s => s.setRole);
-  const setMenus = useAuthStore(s => s.setMenus);
-  const storedMenus = useAuthStore(s => s.menus);
-  const [allowedMenus, setAllowedMenus] = useState<string[]>(storedMenus);
-  const [userName, setUserName] = useState('');
+  const userMenus = useAuthStore(s => s.menus);
+  const userName = useAuthStore(s => s.name);
   const [collapsed, setCollapsed] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordForm] = Form.useForm();
 
   const baseMenus: string[] = ['/org'];
 
-  useEffect(() => {
-    userApi.me().then((r: any) => {
-      if (r.data?.role) setRole(r.data.role);
-      if (r.data?.name) setUserName(r.data.name);
-      if (r.data?.menus) {
-        const merged = [...new Set([...baseMenus, ...r.data.menus])];
-        setMenus(merged);
-        setAllowedMenus(merged);
-      }
-    });
-  }, []);
+  const allowedMenus = useMemo(() => [...new Set([...baseMenus, ...userMenus])], [userMenus]);
 
   const menuItems = menuOrder
     .filter(key => allowedMenus.includes(key) && menuDefs[key])
@@ -99,9 +86,19 @@ export default function MainLayout() {
   const openKeys = loc.pathname.startsWith('/admin') ? ['/admin'] : [];
   const currentTitle = resolvePageTitle(loc.pathname);
 
-  const handleLogout = () => {
-    logout();
-    nav('/login');
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+      logout();
+      nav('/login', { replace: true });
+    } catch (error) {
+      if ((error as any)?.response?.status === 401) {
+        logout();
+        nav('/login', { replace: true });
+        return;
+      }
+      message.error('退出登录失败，请重试');
+    }
   };
 
   const handleChangePassword = async (values: any) => {
@@ -230,7 +227,7 @@ export default function MainLayout() {
         >
           <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>{currentTitle}</div>
           <Space size={12}>
-            <span style={{ color: '#888', fontSize: 13 }}>您好，{userName}</span>
+            <span style={{ color: '#888', fontSize: 13 }}>您好，{userName || ''}</span>
           </Space>
         </Header>
 
