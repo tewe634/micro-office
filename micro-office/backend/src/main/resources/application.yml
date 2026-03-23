@@ -27,7 +27,7 @@ mybatis-plus:
 
 jwt:
   secret: change-this-in-production-use-a-long-random-string
-  expiration: 0
+  expiration: 86400000
 
 logging:
   level:
