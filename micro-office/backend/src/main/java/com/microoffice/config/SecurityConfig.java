@@ -40,12 +40,6 @@ public class SecurityConfig {
                 // 基础模块: 所有登录用户可访问
                 .requestMatchers("/api/users/me", "/api/users/me/**").authenticated()
                 .requestMatchers("/api/portal/**").authenticated()
-                .requestMatchers("/api/workbench/**").authenticated()
-                .requestMatchers("/api/clock/**").authenticated()
-                .requestMatchers("/api/dashboard/**").authenticated()
-                .requestMatchers("/api/threads/**").authenticated()
-                .requestMatchers("/api/nodes/**").authenticated()
-                .requestMatchers("/api/templates/**").authenticated()
                 // 组织架构: 全员可查看；变更操作仍保留给 HR 和 ADMIN
                 .requestMatchers(HttpMethod.GET, "/api/orgs/**").authenticated()
                 .requestMatchers("/api/orgs/**").hasAnyRole("HR", "ADMIN")

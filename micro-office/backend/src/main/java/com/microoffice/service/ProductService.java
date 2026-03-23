@@ -3,9 +3,7 @@ package com.microoffice.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.microoffice.entity.Product;
-import com.microoffice.entity.WorkThread;
 import com.microoffice.mapper.ProductMapper;
-import com.microoffice.mapper.WorkThreadMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -16,7 +14,6 @@ public class ProductService {
     private static final String DEFAULT_PRODUCT_LINE = "ABB";
 
     private final ProductMapper mapper;
-    private final WorkThreadMapper workThreadMapper;
 
     public Page<Product> list(long current, long size, String categoryCode, String code, String name, String productLine) {
         LambdaQueryWrapper<Product> q = new LambdaQueryWrapper<>();
@@ -55,12 +52,6 @@ public class ProductService {
             .eq(Product::getParentId, id));
         if (childProductCount > 0) {
             throw new RuntimeException("该产品下还有子产品，不能删除");
-        }
-
-        long threadCount = workThreadMapper.selectCount(new LambdaQueryWrapper<WorkThread>()
-            .eq(WorkThread::getProductId, id));
-        if (threadCount > 0) {
-            throw new RuntimeException("该产品已被工作流引用，不能删除");
         }
 
         mapper.deleteById(id);
