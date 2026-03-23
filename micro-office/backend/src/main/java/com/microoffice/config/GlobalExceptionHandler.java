@@ -1,6 +1,7 @@
 package com.microoffice.config;
 
 import com.microoffice.dto.response.ApiResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,6 +15,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleAccessDenied(AccessDeniedException e) {
         return ApiResponse.error(403, "无权限访问");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        return ApiResponse.error(400, "存在关联数据，无法删除，请先清理依赖项");
     }
 
     @ExceptionHandler(RuntimeException.class)
