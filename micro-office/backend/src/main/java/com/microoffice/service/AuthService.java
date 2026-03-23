@@ -18,6 +18,7 @@ public class AuthService {
     private final SysUserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final AuthSessionService authSessionService;
 
     public Map<String, Object> register(RegisterRequest req) {
         SysUser user = new SysUser();
@@ -29,17 +30,30 @@ public class AuthService {
         user.setPrimaryPositionId(req.getPrimaryPositionId());
         user.setRole("STAFF");
         userMapper.insert(user);
-        String token = jwtUtil.generateToken(user.getId(), user.getRole());
-        return Map.of("token", token, "userId", user.getId(), "role", user.getRole());
+        return createAuthResponse(user);
     }
 
     public Map<String, Object> login(LoginRequest req) {
+        // 支持手机号或邮箱登录
         SysUser user = userMapper.selectOne(
-            new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, req.getEmail()));
-        if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("邮箱或密码错误");
+            new LambdaQueryWrapper<SysUser>().eq(SysUser::getPhone, req.getEmail()));
+        if (user == null) {
+            user = userMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, req.getEmail()));
         }
-        String token = jwtUtil.generateToken(user.getId(), user.getRole());
+        if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("手机号/邮箱或密码错误");
+        }
+        return createAuthResponse(user);
+    }
+
+    public void logout(String userId, String sessionId) {
+        authSessionService.revokeSession(sessionId, userId);
+    }
+
+    private Map<String, Object> createAuthResponse(SysUser user) {
+        String sessionId = authSessionService.createSession(user.getId());
+        String token = jwtUtil.generateToken(user.getId(), user.getRole(), sessionId);
         return Map.of("token", token, "userId", user.getId(), "role", user.getRole());
     }
 }

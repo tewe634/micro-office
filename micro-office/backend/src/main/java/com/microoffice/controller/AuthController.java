@@ -6,7 +6,9 @@ import com.microoffice.dto.response.ApiResponse;
 import com.microoffice.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 
 @RestController
@@ -23,5 +25,11 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@Valid @RequestBody LoginRequest req) {
         return ApiResponse.ok(authService.login(req));
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(Authentication authentication) {
+        authService.logout((String) authentication.getPrincipal(), (String) authentication.getDetails());
+        return ApiResponse.ok(null);
     }
 }

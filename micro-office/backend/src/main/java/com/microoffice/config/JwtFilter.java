@@ -1,5 +1,6 @@
 package com.microoffice.config;
 
+import com.microoffice.service.AuthSessionService;
 import com.microoffice.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,9 +18,11 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final AuthSessionService authSessionService;
 
-    public JwtFilter(JwtUtil jwtUtil) {
+    public JwtFilter(JwtUtil jwtUtil, AuthSessionService authSessionService) {
         this.jwtUtil = jwtUtil;
+        this.authSessionService = authSessionService;
     }
 
     @Override
@@ -28,11 +31,13 @@ public class JwtFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
-            Integer userId = jwtUtil.parseToken(token);
-            if (userId != null) {
-                String role = jwtUtil.parseRole(token);
-                var authorities = role != null ? List.of(new SimpleGrantedAuthority("ROLE_" + role)) : List.<SimpleGrantedAuthority>of();
-                var auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+            JwtUtil.TokenClaims claims = jwtUtil.parseToken(token);
+            if (claims != null && authSessionService.isSessionActive(claims.sessionId(), claims.userId())) {
+                var authorities = claims.role() != null
+                        ? List.of(new SimpleGrantedAuthority("ROLE_" + claims.role()))
+                        : List.<SimpleGrantedAuthority>of();
+                var auth = new UsernamePasswordAuthenticationToken(claims.userId(), null, authorities);
+                auth.setDetails(claims.sessionId());
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
         }

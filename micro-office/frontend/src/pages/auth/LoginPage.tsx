@@ -10,42 +10,61 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const nav = useNavigate();
   const setAuth = useAuthStore(s => s.setAuth);
-  const setMenus = useAuthStore(s => s.setMenus);
-  const setObjectTypes = useAuthStore(s => s.setObjectTypes);
+  const setProfile = useAuthStore(s => s.setProfile);
+  const markAuthReady = useAuthStore(s => s.markAuthReady);
+  const logout = useAuthStore(s => s.logout);
+
+  const completeLogin = async (authData: { token: string; userId: string; role: string }) => {
+    setAuth(authData.token, authData.userId, authData.role);
+    try {
+      const me: any = await userApi.me();
+      setProfile({
+        userId: me.data?.id ?? authData.userId,
+        name: me.data?.name ?? null,
+        role: me.data?.role ?? authData.role,
+        menus: me.data?.menus || [],
+        objectTypes: me.data?.objectTypes || [],
+      });
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        logout();
+        throw error;
+      }
+      setProfile({
+        userId: authData.userId,
+        role: authData.role,
+        menus: [],
+        objectTypes: [],
+      });
+      markAuthReady();
+    }
+  };
 
   const onLogin = async (values: any) => {
     setLoading(true);
     try {
       const res: any = await authApi.login(values);
-      setAuth(res.data.token, res.data.userId, res.data.role);
-      const me: any = await userApi.me();
-      const menus = me.data?.menus || [];
-      const objectTypes = me.data?.objectTypes || [];
-      setMenus(menus);
-      setObjectTypes(objectTypes);
-      nav(resolveHomePath());
+      await completeLogin(res.data);
+      nav(resolveHomePath(), { replace: true });
     } catch {
       message.error('登录失败，请检查手机号/邮箱或密码');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const onRegister = async (values: any) => {
     setLoading(true);
     try {
       const res: any = await authApi.register(values);
-      setAuth(res.data.token, res.data.userId, res.data.role);
-      const me: any = await userApi.me();
-      const menus = me.data?.menus || [];
-      const objectTypes = me.data?.objectTypes || [];
-      setMenus(menus);
-      setObjectTypes(objectTypes);
+      await completeLogin(res.data);
       message.success('注册成功');
-      nav(resolveHomePath());
+      nav(resolveHomePath(), { replace: true });
     } catch {
       message.error('注册失败');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
