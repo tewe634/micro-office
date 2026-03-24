@@ -12,10 +12,8 @@ export default function UserPage() {
   const [roles, setRoles] = useState<any[]>([]);
   const [filterOrg, setFilterOrg] = useState<number>();
   const [modal, setModal] = useState(false);
-  const [pwdModal, setPwdModal] = useState<{ open: boolean; userId: number | null; name: string }>({ open: false, userId: null, name: '' });
   const [edit, setEdit] = useState<any>(null);
   const [form] = Form.useForm();
-  const [pwdForm] = Form.useForm();
 
   const loadUsers = async () => { const r: any = await userApi.list(filterOrg); setUsers(r.data || []); };
   const loadOrgs = async () => { const r: any = await orgApi.list(); setOrgs(r.data || []); };
@@ -31,12 +29,6 @@ export default function UserPage() {
   const save = async (values: any) => {
     if (edit) { await userApi.update(edit.id, values); } else { await userApi.create(values); }
     message.success('保存成功'); setModal(false); form.resetFields(); setEdit(null); loadUsers();
-  };
-
-  const changePwd = async (values: any) => {
-    if (!pwdModal.userId) return;
-    await userApi.update(pwdModal.userId, { password: values.password });
-    message.success('密码修改成功'); setPwdModal({ open: false, userId: null, name: '' }); pwdForm.resetFields();
   };
 
   const orgName = (id: number | null) => orgs.find(o => o.id === id)?.name || '-';
@@ -73,10 +65,9 @@ export default function UserPage() {
         { title: '辅助岗位', dataIndex: 'extraPositionIds', render: (ids: number[]) =>
           ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-'
         },
-        { title: '操作', width: 200, render: (_: any, r: any) => (
+        { title: '操作', width: 140, render: (_: any, r: any) => (
           <Space>
             <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
-            <Button size="small" onClick={() => { setPwdModal({ open: true, userId: r.id, name: r.name }); pwdForm.resetFields(); }}>改密码</Button>
             <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); loadUsers(); }}>
               <Button size="small" danger>删除</Button>
             </Popconfirm>
@@ -105,21 +96,6 @@ export default function UserPage() {
               options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
           </Form.Item>
           <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal okText="确定" cancelText="取消" title={`修改密码 - ${pwdModal.name}`} open={pwdModal.open}
-        onCancel={() => setPwdModal({ open: false, userId: null, name: '' })} onOk={() => pwdForm.submit()}>
-        <Form form={pwdForm} onFinish={changePwd} layout="vertical">
-          <Form.Item name="password" label="新密码" rules={[{ required: true, min: 6, message: '密码至少6位' }]}>
-            <Input.Password />
-          </Form.Item>
-          <Form.Item name="confirm" label="确认密码" dependencies={['password']}
-            rules={[{ required: true }, ({ getFieldValue }) => ({
-              validator(_, value) { return !value || getFieldValue('password') === value ? Promise.resolve() : Promise.reject('两次密码不一致'); }
-            })]}>
-            <Input.Password />
-          </Form.Item>
         </Form>
       </Modal>
     </Card>
