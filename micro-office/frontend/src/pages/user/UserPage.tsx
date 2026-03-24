@@ -91,7 +91,11 @@ export default function UserPage() {
           <Form.Item name="primaryPositionId" label="主岗位">
             <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
           </Form.Item>
-          <Form.Item name="extraPositionIds" label="辅助岗位（可多选）">
+          <Form.Item
+            name="extraPositionIds"
+            label="辅助岗位（可多选）"
+            extra="辅助岗位会出现在人员门户的岗位切换中，可用于多岗位门户测试。"
+          >
             <Select mode="multiple" allowClear placeholder="选择辅助岗位"
               options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
           </Form.Item>

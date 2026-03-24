@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Descriptions, Empty, List, Row, Space, Statistic, Table, Tag } from 'antd';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Alert, Button, Card, Col, Descriptions, Empty, List, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { portalApi } from '../../api';
+import type { PortalOptionItem, PortalPayload, PortalRequestParams, PortalSelection } from '../../api';
 import { formatObjectType, formatRoleLabel } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
 
 type PortalEntityType = 'users' | 'objects' | 'products';
+
+type NormalizedContextOption = {
+  key: string;
+  requestValue?: string;
+  label: string;
+  hint?: string;
+  badge?: string;
+  tone?: string;
+};
 
 const roleColorMap: Record<string, string> = {
   ADMIN: 'red',
@@ -25,7 +35,29 @@ const statusColorMap: Record<string, string> = {
   CANCELLED: 'error',
 };
 
-function formatStatValue(value: any, suffix?: string) {
+const scopeLabelMap: Record<string, string> = {
+  personal: '个人',
+  department: '部门',
+  business: '业务',
+  system: '全局',
+};
+
+const scopeColorMap: Record<string, string> = {
+  personal: 'blue',
+  department: 'cyan',
+  business: 'geekblue',
+  system: 'purple',
+};
+
+const portalTypeLabelMap: Record<string, string> = {
+  USER_SALES: '销售视图',
+  USER_WORK: '工作视图',
+  PRODUCT: '销售视图',
+  OBJECT_CUSTOMER: '销售视图',
+  OBJECT_WORK: '工作视图',
+};
+
+function formatStatValue(value: unknown, suffix?: string) {
   const numericValue = Number(value || 0);
   if (suffix === '元') {
     return new Intl.NumberFormat('zh-CN', {
@@ -37,7 +69,7 @@ function formatStatValue(value: any, suffix?: string) {
   return `${new Intl.NumberFormat('zh-CN').format(numericValue)}${suffix || ''}`;
 }
 
-function formatAmount(value: any) {
+function formatAmount(value: unknown) {
   return formatStatValue(value, '元');
 }
 
@@ -45,19 +77,177 @@ function isRealEntityId(id?: string | number | null) {
   return !!id && !String(id).startsWith('mock-');
 }
 
+function normalizeText(value: unknown) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  return undefined;
+}
+
+function normalizeSelectionObject(value: PortalSelection | undefined | null) {
+  if (!value || Array.isArray(value) || typeof value !== 'object') {
+    return null;
+  }
+  return value as PortalOptionItem;
+}
+
+function buildHint(parts: Array<string | undefined>) {
+  const items = parts.filter(Boolean) as string[];
+  return items.length ? items.join(' · ') : undefined;
+}
+
+function buildSelectionCandidates(value: PortalSelection | undefined | null) {
+  const candidates = new Set<string>();
+  const scalar = normalizeText(value);
+  if (scalar) {
+    candidates.add(scalar);
+  }
+
+  const record = normalizeSelectionObject(value);
+  if (!record) {
+    return Array.from(candidates);
+  }
+
+  ['positionId', 'scope', 'id', 'value', 'key', 'portalType', 'type', 'label', 'name', 'title', 'code'].forEach((field) => {
+    const candidate = normalizeText(record[field]);
+    if (candidate) {
+      candidates.add(candidate);
+    }
+  });
+
+  return Array.from(candidates);
+}
+
+function normalizePortalOption(item: PortalOptionItem, index: number): NormalizedContextOption {
+  const portalType = normalizeText(item.portalType) ?? normalizeText(item.type);
+  const requestValue = normalizeText(item.positionId) ?? normalizeText(item.id) ?? normalizeText(item.value) ?? normalizeText(item.key);
+  const label = normalizeText(item.label) ?? normalizeText(item.positionName) ?? normalizeText(item.name) ?? normalizeText(item.title) ?? `岗位 ${index + 1}`;
+  const roleCode = normalizeText(item.role);
+  const roleText = normalizeText(item.roleName) ?? (roleCode ? formatRoleLabel(roleCode) : undefined);
+  const orgText = normalizeText(item.deptName) ?? normalizeText(item.orgName);
+  const portalText = portalType ? portalTypeLabelMap[portalType] || portalType : undefined;
+  const codeText = normalizeText(item.code);
+
+  return {
+    key: requestValue ?? normalizeText(item.key) ?? `portal-${index}`,
+    requestValue,
+    label,
+    hint: buildHint([roleText, orgText, portalText, codeText]),
+    badge: item.primary === true || item.isPrimary === true ? '主岗位' : undefined,
+  };
+}
+
+function normalizeScopeOption(item: PortalOptionItem, index: number): NormalizedContextOption {
+  const scopeValue = normalizeText(item.scope) ?? normalizeText(item.value) ?? normalizeText(item.key) ?? normalizeText(item.id);
+  const label = normalizeText(item.label) ?? normalizeText(item.name) ?? normalizeText(item.title) ?? (scopeValue ? scopeLabelMap[scopeValue] || scopeValue : `范围 ${index + 1}`);
+
+  return {
+    key: scopeValue ?? `scope-${index}`,
+    requestValue: scopeValue,
+    label,
+    hint: normalizeText(item.description),
+    tone: scopeValue ? scopeColorMap[scopeValue] || 'cyan' : 'cyan',
+  };
+}
+
+function dedupeOptions(options: NormalizedContextOption[]) {
+  const seen = new Set<string>();
+  const result: NormalizedContextOption[] = [];
+
+  options.forEach((option) => {
+    if (seen.has(option.key)) {
+      return;
+    }
+    seen.add(option.key);
+    result.push(option);
+  });
+
+  return result;
+}
+
+function findMatchedOption(options: NormalizedContextOption[], candidates: Array<string | undefined>) {
+  const candidateSet = new Set(candidates.filter(Boolean) as string[]);
+  if (!candidateSet.size) {
+    return null;
+  }
+
+  return (
+    options.find(option => option.requestValue && candidateSet.has(option.requestValue))
+    || options.find(option => candidateSet.has(option.key))
+    || options.find(option => candidateSet.has(option.label))
+    || null
+  );
+}
+
+function normalizePortalSelection(value: PortalSelection | undefined | null) {
+  const record = normalizeSelectionObject(value);
+  if (record) {
+    return normalizePortalOption(record, 0);
+  }
+
+  const scalar = normalizeText(value);
+  if (!scalar) {
+    return null;
+  }
+
+  return {
+    key: scalar,
+    requestValue: scalar,
+    label: scalar,
+  };
+}
+
+function normalizeScopeSelection(value: PortalSelection | undefined | null) {
+  const record = normalizeSelectionObject(value);
+  if (record) {
+    return normalizeScopeOption(record, 0);
+  }
+
+  const scalar = normalizeText(value);
+  if (!scalar) {
+    return null;
+  }
+
+  return {
+    key: scalar,
+    requestValue: scalar,
+    label: scopeLabelMap[scalar] || scalar,
+    tone: scopeColorMap[scalar] || 'cyan',
+  };
+}
+
 export default function PortalPage({ entityType }: { entityType: PortalEntityType }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const menus = useAuthStore(s => s.menus);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const positionIdParam = searchParams.get('positionId') || undefined;
+  const scopeParam = searchParams.get('scope') || undefined;
 
   const loader = useMemo(() => {
     if (entityType === 'users') return portalApi.user;
     if (entityType === 'objects') return portalApi.object;
     return portalApi.product;
   }, [entityType]);
+
+  const requestParams = useMemo<PortalRequestParams>(() => {
+    const params: PortalRequestParams = {};
+    if (entityType === 'users' && positionIdParam) {
+      params.positionId = positionIdParam;
+    }
+    if (entityType !== 'users' && scopeParam) {
+      params.scope = scopeParam;
+    }
+    return params;
+  }, [entityType, positionIdParam, scopeParam]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,13 +257,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       setLoading(true);
       setError('');
       try {
-        const response: any = await loader(id);
+        const response: any = await loader(id, requestParams);
         if (!cancelled) {
-          setData(response.data);
+          setData((response?.data || null) as PortalPayload | null);
         }
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.response?.data?.message || err?.message || '门户数据加载失败');
+          setData(null);
         }
       } finally {
         if (!cancelled) {
@@ -82,37 +273,101 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       }
     };
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
-  }, [id, loader]);
+  }, [id, loader, requestParams]);
 
   const goPortal = (kind: PortalEntityType, targetId?: string | number | null) => {
     if (!isRealEntityId(targetId)) return;
     navigate(`/${kind}/${targetId}/portal`);
   };
 
-  const renderPortalLink = (kind: PortalEntityType, targetId: any, label: any) => {
+  const renderPortalLink = (kind: PortalEntityType, targetId: unknown, label: unknown) => {
     const menuKey = `/${kind}`;
-    if (!isRealEntityId(targetId) || !menus.includes(menuKey)) {
-      return <span>{label || '-'}</span>;
+    if (!isRealEntityId(targetId as string | number | null | undefined) || !menus.includes(menuKey)) {
+      return <span>{normalizeText(label) || '-'}</span>;
     }
     return (
       <Button
         type="link"
         size="small"
-        onClick={() => goPortal(kind, targetId)}
+        onClick={() => goPortal(kind, targetId as string | number)}
         style={{ padding: 0, height: 'auto' }}
       >
-        {label}
+        {label as string}
       </Button>
     );
   };
 
-  const header = data?.header || {};
-  const summaryCards = data?.summaryCards || [];
-  const workSummary = data?.workSummary || {};
+  const header = (data?.header || {}) as Record<string, any>;
+  const summaryCards = Array.isArray(data?.summaryCards) ? data.summaryCards : [];
+  const workSummary = (data?.workSummary || {}) as Record<string, any>;
+
+  const portalOptions = useMemo(() => {
+    const primaryOptions = Array.isArray(data?.portalOptions) ? data.portalOptions : [];
+    const fallbackOptions = primaryOptions.length ? primaryOptions : Array.isArray(data?.allPositions) ? data.allPositions : [];
+    return dedupeOptions(fallbackOptions.map((item, index) => normalizePortalOption(item, index)));
+  }, [data]);
+
+  const scopeOptions = useMemo(() => {
+    const options = Array.isArray(data?.scopeOptions) ? data.scopeOptions : [];
+    return dedupeOptions(options.map((item, index) => normalizeScopeOption(item, index)));
+  }, [data]);
+
+  const hasPortalFeature = entityType === 'users'
+    && (portalOptions.length > 0
+      || (Array.isArray(data?.allPositions) && data.allPositions.length > 0)
+      || !!data?.activePortal);
+
+  const hasScopeFeature = entityType !== 'users'
+    && (scopeOptions.length > 0 || !!data?.activeScope || !!normalizeText(data?.scope));
+
+  const activePortalOption = useMemo(() => {
+    if (!hasPortalFeature) {
+      return null;
+    }
+
+    const matched = findMatchedOption(portalOptions, [
+      positionIdParam,
+      ...buildSelectionCandidates(data?.activePortal),
+      normalizeText(header.positionId),
+      normalizeText(header.primaryPositionId),
+    ]);
+
+    if (matched) {
+      return matched;
+    }
+
+    return normalizePortalSelection(data?.activePortal)
+      || portalOptions[0]
+      || null;
+  }, [data, hasPortalFeature, header.positionId, header.primaryPositionId, portalOptions, positionIdParam]);
+
+  const activeScopeOption = useMemo(() => {
+    if (!hasScopeFeature) {
+      return null;
+    }
+
+    const matched = findMatchedOption(scopeOptions, [
+      scopeParam,
+      ...buildSelectionCandidates(data?.activeScope),
+      normalizeText(data?.scope),
+    ]);
+
+    if (matched) {
+      return matched;
+    }
+
+    return normalizeScopeSelection(data?.activeScope ?? data?.scope)
+      || scopeOptions[0]
+      || null;
+  }, [data, hasScopeFeature, scopeOptions, scopeParam]);
+
+  const showPortalSwitch = hasPortalFeature && portalOptions.length > 1;
+  const showScopeSwitch = hasScopeFeature && scopeOptions.length > 1;
+  const showContextPanel = hasPortalFeature || hasScopeFeature;
 
   const listRoute = useMemo(() => {
     if (entityType === 'users') return '/users';
@@ -126,6 +381,43 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       return;
     }
     navigate(listRoute);
+  };
+
+  const updateQueryParams = (updates: { positionId?: string; scope?: string }) => {
+    const next = new URLSearchParams(searchParams);
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'positionId')) {
+      if (updates.positionId) {
+        next.set('positionId', updates.positionId);
+      } else {
+        next.delete('positionId');
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'scope')) {
+      if (updates.scope) {
+        next.set('scope', updates.scope);
+      } else {
+        next.delete('scope');
+      }
+    }
+
+    setSearchParams(next, { replace: true });
+  };
+
+  const handlePortalSwitch = (option: NormalizedContextOption) => {
+    if (!option.requestValue || option.requestValue === positionIdParam) {
+      return;
+    }
+    updateQueryParams({ positionId: option.requestValue });
+  };
+
+  const handleScopeSwitch = (value: string | number) => {
+    const nextValue = String(value);
+    if (!nextValue || nextValue === scopeParam) {
+      return;
+    }
+    updateQueryParams({ scope: nextValue });
   };
 
   const headerTags = () => {
@@ -215,19 +507,19 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       title: '负责人',
       dataIndex: 'ownerName',
       width: 140,
-      render: (_: any, record: any) => renderPortalLink('users', record.ownerId, record.ownerName),
+      render: (_: unknown, record: any) => renderPortalLink('users', record.ownerId, record.ownerName),
     },
     {
       title: '关联对象',
       dataIndex: 'objectName',
       width: 180,
-      render: (_: any, record: any) => record.objectName ? renderPortalLink('objects', record.objectId, record.objectName) : '-',
+      render: (_: unknown, record: any) => (record.objectName ? renderPortalLink('objects', record.objectId, record.objectName) : '-'),
     },
     {
       title: '关联产品',
       dataIndex: 'productName',
       width: 180,
-      render: (_: any, record: any) => record.productName ? renderPortalLink('products', record.productId, record.productName) : '-',
+      render: (_: unknown, record: any) => (record.productName ? renderPortalLink('products', record.productId, record.productName) : '-'),
     },
     {
       title: '最近更新',
@@ -244,7 +536,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             <Statistic
               title={card.label}
               value={Number(card.value || 0)}
-              formatter={(value) => formatStatValue(value, card.suffix)}
+              formatter={value => formatStatValue(value, card.suffix)}
             />
           </Card>
         </Col>
@@ -287,18 +579,18 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               title: '销售',
               dataIndex: 'salespersonName',
               width: 140,
-              render: (_: any, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
+              render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
             },
             {
               title: '客户',
               dataIndex: 'customerName',
-              render: (_: any, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
+              render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
             },
             {
               title: '销售额',
               dataIndex: 'amount',
               width: 150,
-              render: (value: any) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+              render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
             },
             {
               title: '成交次数',
@@ -326,20 +618,20 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               title: '销售',
               dataIndex: 'salespersonName',
               width: 140,
-              render: (_: any, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
+              render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
             },
             {
               title: '客户',
               dataIndex: 'customerName',
               width: 180,
-              render: (_: any, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
+              render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
             },
             { title: '阶段', dataIndex: 'stage', width: 120 },
             {
               title: '金额',
               dataIndex: 'amount',
               width: 150,
-              render: (value: any) => formatAmount(value),
+              render: (value: unknown) => formatAmount(value),
             },
             { title: '说明', dataIndex: 'note' },
           ]}
@@ -365,13 +657,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                   title: '销售',
                   dataIndex: 'salespersonName',
                   width: 140,
-                  render: (_: any, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
+                  render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
                 },
                 {
                   title: '绩效金额',
                   dataIndex: 'amount',
                   width: 150,
-                  render: (value: any) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+                  render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
                 },
                 { title: '涉及产品', dataIndex: 'productCount', width: 100 },
                 { title: '明细数', dataIndex: 'performanceItemCount', width: 90 },
@@ -413,20 +705,20 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               title: '销售',
               dataIndex: 'salespersonName',
               width: 140,
-              render: (_: any, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
+              render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
             },
             {
               title: '产品',
               dataIndex: 'productName',
               width: 180,
-              render: (_: any, record: any) => renderPortalLink('products', record.productId, record.productName),
+              render: (_: unknown, record: any) => renderPortalLink('products', record.productId, record.productName),
             },
             { title: '绩效项', dataIndex: 'achievementType', width: 100 },
             {
               title: '金额',
               dataIndex: 'amount',
               width: 150,
-              render: (value: any) => formatAmount(value),
+              render: (value: unknown) => formatAmount(value),
             },
             { title: '说明', dataIndex: 'note' },
           ]}
@@ -449,7 +741,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             {
               title: '负责人',
               dataIndex: 'ownerName',
-              render: (_: any, record: any) => renderPortalLink('users', record.ownerId, record.ownerName),
+              render: (_: unknown, record: any) => renderPortalLink('users', record.ownerId, record.ownerName),
             },
             { title: '工作总数', dataIndex: 'totalCount', width: 100 },
             { title: '进行中', dataIndex: 'activeCount', width: 100 },
@@ -476,13 +768,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                 {
                   title: '客户',
                   dataIndex: 'name',
-                  render: (_: any, record: any) => renderPortalLink('objects', record.id, record.name),
+                  render: (_: unknown, record: any) => renderPortalLink('objects', record.id, record.name),
                 },
                 {
                   title: '绩效金额',
                   dataIndex: 'amount',
                   width: 150,
-                  render: (value: any) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+                  render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
                 },
                 { title: '涉及产品', dataIndex: 'productCount', width: 100 },
                 { title: '相关工作', dataIndex: 'workItemCount', width: 100 },
@@ -524,20 +816,20 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               title: '客户',
               dataIndex: 'customerName',
               width: 180,
-              render: (_: any, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
+              render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
             },
             {
               title: '产品',
               dataIndex: 'productName',
               width: 180,
-              render: (_: any, record: any) => renderPortalLink('products', record.productId, record.productName),
+              render: (_: unknown, record: any) => renderPortalLink('products', record.productId, record.productName),
             },
             { title: '阶段', dataIndex: 'stage', width: 120 },
             {
               title: '金额',
               dataIndex: 'amount',
               width: 150,
-              render: (value: any) => formatAmount(value),
+              render: (value: unknown) => formatAmount(value),
             },
             { title: '说明', dataIndex: 'note' },
           ]}
@@ -576,6 +868,90 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     return renderWorkUserPortal();
   };
 
+  const contextHint = useMemo(() => {
+    const hints: string[] = [];
+
+    if (activePortalOption) {
+      const portalDetail = buildHint([activePortalOption.badge, activePortalOption.hint]);
+      hints.push(portalDetail ? `岗位上下文：${portalDetail}` : `当前人员门户按“${activePortalOption.label}”岗位展示`);
+    }
+
+    if (activeScopeOption) {
+      hints.push(activeScopeOption.hint ? `统计口径：${activeScopeOption.label}汇总，${activeScopeOption.hint}` : `统计口径：${activeScopeOption.label}汇总`);
+    }
+
+    return hints.join('；');
+  }, [activePortalOption, activeScopeOption]);
+
+  const renderContextPanel = () => {
+    if (!showContextPanel) {
+      return null;
+    }
+
+    return (
+      <Card
+        size="small"
+        className="portal-context-card"
+        styles={{ body: { padding: 16 } }}
+      >
+        <div className="portal-context-card__inner">
+          <div className="portal-context-card__summary">
+            <div className="portal-context-card__eyebrow">当前查看</div>
+            <Space wrap size={[8, 8]}>
+              {activePortalOption ? <Tag color="blue">岗位：{activePortalOption.label}</Tag> : null}
+              {activePortalOption?.badge ? <Tag>{activePortalOption.badge}</Tag> : null}
+              {activeScopeOption ? <Tag color={activeScopeOption.tone || 'cyan'}>范围：{activeScopeOption.label}</Tag> : null}
+            </Space>
+            {contextHint ? <div className="portal-context-card__hint">{contextHint}</div> : null}
+          </div>
+
+          <div className="portal-context-card__controls">
+            {showPortalSwitch ? (
+              <div className="portal-switch">
+                <span className="portal-switch__label">切换岗位门户</span>
+                <Space wrap size={[8, 8]}>
+                  {portalOptions.map(option => {
+                    const checked = option.key === activePortalOption?.key;
+                    return (
+                      <Tag.CheckableTag
+                        key={option.key}
+                        checked={checked}
+                        onChange={(nextChecked) => {
+                          if (nextChecked) {
+                            handlePortalSwitch(option);
+                          }
+                        }}
+                        className={`portal-position-tag${checked ? ' portal-position-tag--active' : ''}`}
+                      >
+                        <span>{option.label}</span>
+                        {option.badge ? <span className="portal-position-tag__badge">{option.badge}</span> : null}
+                      </Tag.CheckableTag>
+                    );
+                  })}
+                </Space>
+              </div>
+            ) : null}
+
+            {showScopeSwitch ? (
+              <div className="portal-switch portal-switch--scope">
+                <span className="portal-switch__label">切换统计范围</span>
+                <Segmented
+                  className="portal-scope-segmented"
+                  value={activeScopeOption?.requestValue ?? scopeOptions[0]?.requestValue}
+                  onChange={value => handleScopeSwitch(value)}
+                  options={scopeOptions.map(option => ({
+                    label: option.label,
+                    value: option.requestValue || option.key,
+                  }))}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
   return (
     <Card
       className="page-card page-fill"
@@ -591,6 +967,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                 返回
               </Button>
             </div>
+
+            {renderContextPanel()}
 
             <Card>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

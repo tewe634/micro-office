@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -45,23 +46,30 @@ public class PortalController {
     private final MenuPermissionService menuPermissionService;
 
     @GetMapping("/products/{id}")
-    public ApiResponse<Map<String, Object>> productPortal(@PathVariable String id) {
+    public ApiResponse<Map<String, Object>> productPortal(@PathVariable String id,
+                                                          @RequestParam(required = false) String scope,
+                                                          Authentication auth) {
+        String viewerId = (String) auth.getPrincipal();
         Product product = productMapper.selectById(id);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "产品不存在");
         }
-        return ApiResponse.ok(buildProductPortal(product));
+        return ApiResponse.ok(buildProductPortal(product, resolveSalesPortalScope(viewerId, scope)));
     }
 
     @GetMapping("/objects/{id}")
-    public ApiResponse<Map<String, Object>> objectPortal(@PathVariable String id, Authentication auth) {
+    public ApiResponse<Map<String, Object>> objectPortal(@PathVariable String id,
+                                                         @RequestParam(required = false) String scope,
+                                                         Authentication auth) {
         String viewerId = (String) auth.getPrincipal();
         ExternalObject object = requireAccessibleObject(id, viewerId);
-        return ApiResponse.ok(buildObjectPortal(object));
+        return ApiResponse.ok(buildObjectPortal(object, resolveSalesPortalScope(viewerId, scope)));
     }
 
     @GetMapping("/users/{id}")
-    public ApiResponse<Map<String, Object>> userPortal(@PathVariable String id, Authentication auth) {
+    public ApiResponse<Map<String, Object>> userPortal(@PathVariable String id,
+                                                       @RequestParam(required = false) String positionId,
+                                                       Authentication auth) {
         String viewerId = (String) auth.getPrincipal();
         menuPermissionService.requireMenu(viewerId, "/users");
 
@@ -74,7 +82,7 @@ public class PortalController {
         if (!dataScopeService.isGlobalAdmin(viewerId) && (user.getOrgId() == null || !visibleOrgIds.contains(user.getOrgId()))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该用户");
         }
-        return ApiResponse.ok(buildUserPortal(user));
+        return ApiResponse.ok(buildUserPortal(user, positionId));
     }
 
     private ExternalObject requireAccessibleObject(String id, String viewerId) {
@@ -123,11 +131,19 @@ public class PortalController {
         );
     }
 
-    private Map<String, Object> buildProductPortal(Product product) {
+    private DataScopeService.SalesPortalScope resolveSalesPortalScope(String userId, String scope) {
+        try {
+            return dataScopeService.resolveSalesPortalScope(userId, scope);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
+    }
+
+    private Map<String, Object> buildProductPortal(Product product, DataScopeService.SalesPortalScope scopeContext) {
         int year = Year.now().getValue();
-        int seed = stableSeed(product.getId(), 11);
-        List<RefItem> salesRefs = pickRefs(loadSalesRefs(), 3 + seed % 2, seed);
-        List<RefItem> customerRefs = pickRefs(loadCustomerRefs(), 4, seed / 3 + 5);
+        int seed = stableSeed(product.getId() + "#" + scopeContext.activeScope().key(), 11);
+        List<RefItem> salesRefs = pickRefs(loadSalesRefs(scopeContext), 3 + seed % 2, seed);
+        List<RefItem> customerRefs = pickRefs(loadCustomerRefs(scopeContext), 4, seed / 3 + 5);
 
         List<Map<String, Object>> salesSummary = new ArrayList<>();
         List<Map<String, Object>> performanceItems = new ArrayList<>();
@@ -176,6 +192,7 @@ public class PortalController {
         result.put("portalType", "PRODUCT");
         result.put("variant", "PRODUCT");
         result.put("header", buildProductHeader(product, year));
+        applyScopeMetadata(result, scopeContext);
         result.put("summaryCards", List.of(
             summaryCard("salesAmount", "年度销售额", totalAmount, "元"),
             summaryCard("salespeople", "销售人数", salesRefs.size(), "人"),
@@ -189,15 +206,16 @@ public class PortalController {
         return result;
     }
 
-    private Map<String, Object> buildObjectPortal(ExternalObject object) {
+    private Map<String, Object> buildObjectPortal(ExternalObject object, DataScopeService.SalesPortalScope scopeContext) {
         int year = Year.now().getValue();
-        int seed = stableSeed(object.getId(), 29);
+        int seed = stableSeed(object.getId() + "#" + scopeContext.activeScope().key(), 29);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("portalType", "OBJECT");
         result.put("header", buildObjectHeader(object, year));
+        applyScopeMetadata(result, object.getType() == ObjectType.CUSTOMER ? scopeContext : DataScopeService.SalesPortalScope.empty());
 
         if (object.getType() == ObjectType.CUSTOMER) {
-            List<RefItem> salesRefs = pickRefs(loadSalesRefs(), 3 + seed % 2, seed);
+            List<RefItem> salesRefs = pickRefs(loadSalesRefs(scopeContext), 3 + seed % 2, seed);
             List<RefItem> productRefs = pickRefs(loadProductRefs(), 4, seed / 5 + 3);
             List<Map<String, Object>> performanceItems = new ArrayList<>();
             Map<String, BigDecimal> salesTotals = new LinkedHashMap<>();
@@ -299,15 +317,23 @@ public class PortalController {
         return result;
     }
 
-    private Map<String, Object> buildUserPortal(SysUser user) {
+    private Map<String, Object> buildUserPortal(SysUser user, String requestedPositionId) {
         int year = Year.now().getValue();
-        int seed = stableSeed(user.getId(), 41);
+        List<PortalPosition> positions = loadPortalPositions(user);
+        PortalPosition activePosition = resolveActivePosition(positions, requestedPositionId);
+        String effectiveRole = effectiveRole(activePosition, user.getRole());
+        String variant = variantForUserRole(effectiveRole);
+        int seed = stableSeed(user.getId() + "#" + Objects.toString(activePosition == null ? null : activePosition.id(), "default"), 41);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("portalType", "USER");
-        result.put("header", buildUserHeader(user, year));
+        List<Map<String, Object>> portalOptions = buildPortalOptions(user, positions);
+        Map<String, Object> activePortal = buildPortalOption(user, activePosition);
+        result.put("portalOptions", portalOptions);
+        result.put("activePortal", activePortal);
+        result.put("header", buildUserHeader(user, year, activePosition, effectiveRole, portalOptions, activePortal));
 
-        if ("SALES".equals(user.getRole())) {
-            List<RefItem> customerRefs = pickRefs(loadCustomerRefs(), 4, seed);
+        if ("SALES".equals(effectiveRole)) {
+            List<RefItem> customerRefs = pickRefs(loadOwnedCustomerRefs(user.getId()), 4, seed);
             List<RefItem> productRefs = pickRefs(loadProductRefs(), 4, seed / 3 + 4);
             List<Map<String, Object>> performanceItems = new ArrayList<>();
             Map<String, BigDecimal> customerTotals = new LinkedHashMap<>();
@@ -370,7 +396,7 @@ public class PortalController {
                 .map(item -> (BigDecimal) item.get("amount"))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            result.put("variant", "USER_SALES");
+            result.put("variant", variant);
             result.put("summaryCards", List.of(
                 summaryCard("performance", "当前绩效", totalAmount, "元"),
                 summaryCard("customers", "关联客户", customerRefs.size(), "家"),
@@ -387,9 +413,9 @@ public class PortalController {
         }
 
         List<RefItem> objectRefs = pickRefs(loadObjectRefs(), 4, seed / 5 + 6);
-        List<String> topics = workTopicsForRole(user.getRole());
+        List<String> topics = workTopicsForRole(effectiveRole);
         List<Map<String, Object>> workItems = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5 && !objectRefs.isEmpty(); i++) {
             RefItem objectRef = objectRefs.get(i % objectRefs.size());
             String status = workStatus(seed, i);
             Map<String, Object> row = new LinkedHashMap<>();
@@ -416,7 +442,7 @@ public class PortalController {
             workBuckets.add(row);
         }
 
-        result.put("variant", "USER_WORK");
+        result.put("variant", variant);
         result.put("summaryCards", List.of(
             summaryCard("workTotal", "关联工作", workItems.size(), "项"),
             summaryCard("active", "进行中", countStatuses(workItems, "ACTIVE"), "项"),
@@ -430,6 +456,9 @@ public class PortalController {
     }
 
     private List<Map<String, Object>> buildProductWorkItems(Product product, List<RefItem> salesRefs, List<RefItem> customerRefs, int seed) {
+        if (salesRefs.isEmpty() || customerRefs.isEmpty()) {
+            return List.of();
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> topics = List.of("报价确认", "合同评审", "交付对接", "回款跟踪", "客户复盘");
         for (int i = 0; i < 5; i++) {
@@ -453,6 +482,9 @@ public class PortalController {
     }
 
     private List<Map<String, Object>> buildCustomerWorkItems(ExternalObject object, List<RefItem> salesRefs, List<RefItem> productRefs, int seed) {
+        if (salesRefs.isEmpty() || productRefs.isEmpty()) {
+            return List.of();
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> topics = List.of("拜访计划", "商务澄清", "技术确认", "回款跟进", "服务复盘");
         for (int i = 0; i < 5; i++) {
@@ -476,6 +508,9 @@ public class PortalController {
     }
 
     private List<Map<String, Object>> buildExternalObjectWorkItems(ExternalObject object, List<RefItem> ownerRefs, int seed) {
+        if (ownerRefs.isEmpty()) {
+            return List.of();
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> topics = workTopicsForObjectType(object.getType());
         for (int i = 0; i < 5; i++) {
@@ -498,6 +533,9 @@ public class PortalController {
     }
 
     private List<Map<String, Object>> buildSalesUserWorkItems(SysUser user, List<RefItem> customerRefs, List<RefItem> productRefs, int seed) {
+        if (customerRefs.isEmpty() || productRefs.isEmpty()) {
+            return List.of();
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> topics = List.of("客户拜访", "报价推进", "合同对齐", "回款确认", "交付复盘");
         for (int i = 0; i < 5; i++) {
@@ -550,6 +588,131 @@ public class PortalController {
         return rows;
     }
 
+    private void applyScopeMetadata(Map<String, Object> result, DataScopeService.SalesPortalScope scopeContext) {
+        List<Map<String, Object>> scopeOptions = new ArrayList<>();
+        for (DataScopeService.ScopeOption option : scopeContext.scopeOptions()) {
+            scopeOptions.add(toScopeMap(option));
+        }
+        result.put("scopeOptions", scopeOptions);
+        result.put("activeScope", toScopeMap(scopeContext.activeScope()));
+    }
+
+    private Map<String, Object> toScopeMap(DataScopeService.ScopeOption option) {
+        Map<String, Object> scope = new LinkedHashMap<>();
+        scope.put("key", option.key());
+        scope.put("label", option.label());
+        scope.put("orgId", option.orgId());
+        scope.put("orgName", option.orgName());
+        scope.put("description", option.description());
+        return scope;
+    }
+
+    private List<PortalPosition> loadPortalPositions(SysUser user) {
+        LinkedHashMap<String, PortalPosition> positions = new LinkedHashMap<>();
+        jdbc.query(
+            "SELECT p.id, p.name, p.code, p.default_role, p.level, TRUE AS primary_flag " +
+                "FROM sys_user su " +
+                "JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.id = ? " +
+                "UNION ALL " +
+                "SELECT p.id, p.name, p.code, p.default_role, p.level, FALSE AS primary_flag " +
+                "FROM user_position up " +
+                "JOIN position p ON p.id = up.position_id " +
+                "WHERE up.user_id = ? " +
+                "ORDER BY primary_flag DESC, name, id",
+            rs -> {
+                String key = rs.getString("id");
+                positions.putIfAbsent(key, new PortalPosition(
+                    rs.getString("id"),
+                    rs.getString("name"),
+                    rs.getString("code"),
+                    rs.getString("default_role"),
+                    rs.getObject("level") == null ? null : rs.getInt("level"),
+                    rs.getBoolean("primary_flag")
+                ));
+            },
+            user.getId(),
+            user.getId()
+        );
+        if (positions.isEmpty()) {
+            positions.put("__default__", new PortalPosition(
+                user.getPrimaryPositionId(),
+                lookupName("SELECT name FROM position WHERE id = ?", user.getPrimaryPositionId()),
+                null,
+                null,
+                null,
+                true
+            ));
+        }
+        return new ArrayList<>(positions.values());
+    }
+
+    private PortalPosition resolveActivePosition(List<PortalPosition> positions, String requestedPositionId) {
+        if (requestedPositionId == null || requestedPositionId.isBlank()) {
+            return positions.isEmpty() ? null : positions.get(0);
+        }
+        for (PortalPosition position : positions) {
+            if (Objects.equals(position.id(), requestedPositionId)) {
+                return position;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "该用户未绑定指定岗位");
+    }
+
+    private List<Map<String, Object>> buildPortalOptions(SysUser user, List<PortalPosition> positions) {
+        List<Map<String, Object>> options = new ArrayList<>();
+        for (PortalPosition position : positions) {
+            options.add(buildPortalOption(user, position));
+        }
+        return options;
+    }
+
+    private Map<String, Object> buildPortalOption(SysUser user, PortalPosition position) {
+        String effectiveRole = effectiveRole(position, user.getRole());
+        Map<String, Object> option = new LinkedHashMap<>();
+        option.put("positionId", position == null ? null : position.id());
+        option.put("positionName", position == null ? null : position.name());
+        option.put("positionCode", position == null ? null : position.code());
+        option.put("primary", position != null && position.primary());
+        option.put("defaultRole", position == null ? null : position.defaultRole());
+        option.put("role", effectiveRole);
+        option.put("level", position == null ? null : position.level());
+        option.put("variant", variantForUserRole(effectiveRole));
+        option.put("label", buildPortalLabel(position, effectiveRole));
+        return option;
+    }
+
+    private String buildPortalLabel(PortalPosition position, String effectiveRole) {
+        String portalName = "SALES".equals(effectiveRole) ? "销售门户" : "工作门户";
+        if (position == null || position.name() == null || position.name().isBlank()) {
+            return portalName;
+        }
+        return position.name() + " · " + portalName;
+    }
+
+    private String effectiveRole(PortalPosition position, String fallbackRole) {
+        if (position != null && position.defaultRole() != null && !position.defaultRole().isBlank()) {
+            return position.defaultRole();
+        }
+        String code = position == null ? "" : Objects.toString(position.code(), "");
+        String name = position == null ? "" : Objects.toString(position.name(), "");
+        if (code.contains("SALES") || name.contains("销售") || name.contains("商务")) {
+            return "SALES";
+        }
+        if (fallbackRole != null && !fallbackRole.isBlank()) {
+            return fallbackRole;
+        }
+        return "STAFF";
+    }
+
+    private String variantForUserRole(String role) {
+        if ("SALES".equals(role)) {
+            return "USER_SALES";
+        }
+        String normalized = role == null || role.isBlank() ? "STAFF" : role.replace('-', '_').toUpperCase();
+        return "USER_WORK_" + normalized;
+    }
+
     private Map<String, Object> buildProductHeader(Product product, int year) {
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("id", product.getId());
@@ -582,16 +745,29 @@ public class PortalController {
         return header;
     }
 
-    private Map<String, Object> buildUserHeader(SysUser user, int year) {
+    private Map<String, Object> buildUserHeader(SysUser user,
+                                                int year,
+                                                PortalPosition activePosition,
+                                                String activeRole,
+                                                List<Map<String, Object>> allPositions,
+                                                Map<String, Object> activePortal) {
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("id", user.getId());
         header.put("name", user.getName());
         header.put("email", user.getEmail());
         header.put("phone", user.getPhone());
-        header.put("role", user.getRole());
+        header.put("role", activeRole);
+        header.put("storedRole", user.getRole());
         header.put("empNo", user.getEmpNo());
         header.put("orgName", lookupName("SELECT name FROM organization WHERE id = ?", user.getOrgId()));
-        header.put("positionName", lookupName("SELECT name FROM position WHERE id = ?", user.getPrimaryPositionId()));
+        header.put("positionName", activePosition == null || activePosition.name() == null
+            ? lookupName("SELECT name FROM position WHERE id = ?", user.getPrimaryPositionId())
+            : activePosition.name());
+        header.put("positionCode", activePosition == null ? null : activePosition.code());
+        header.put("primaryPositionId", user.getPrimaryPositionId());
+        header.put("primaryPositionName", lookupName("SELECT name FROM position WHERE id = ?", user.getPrimaryPositionId()));
+        header.put("activePosition", activePortal);
+        header.put("allPositions", allPositions);
         header.put("hiredAt", user.getHiredAt());
         header.put("year", year);
         return header;
@@ -634,17 +810,6 @@ public class PortalController {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    private List<RefItem> loadSalesRefs() {
-        List<RefItem> refs = jdbc.query(
-            "SELECT id, name, COALESCE(role, '') AS meta FROM sys_user WHERE role = 'SALES' ORDER BY name, id",
-            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta"))
-        );
-        if (!refs.isEmpty()) {
-            return refs;
-        }
-        return fallbackSalesRefs();
-    }
-
     private List<RefItem> loadUserRefs() {
         List<RefItem> refs = jdbc.query(
             "SELECT id, name, COALESCE(role, '') AS meta FROM sys_user ORDER BY name, id LIMIT 12",
@@ -656,15 +821,59 @@ public class PortalController {
         return fallbackUsers();
     }
 
-    private List<RefItem> loadCustomerRefs() {
+    private List<RefItem> loadSalesRefs(DataScopeService.SalesPortalScope scopeContext) {
+        String[] userIds = scopeContext.scopeUserIds().toArray(new String[0]);
         List<RefItem> refs = jdbc.query(
-            "SELECT id, name, 'CUSTOMER' AS meta FROM external_object WHERE type = 'CUSTOMER'::object_type ORDER BY name, id LIMIT 16",
-            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta"))
+            "SELECT DISTINCT su.id, su.name, COALESCE(su.role, '') AS meta " +
+                "FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "LEFT JOIN user_position up ON up.user_id = su.id " +
+                "LEFT JOIN position p2 ON p2.id = up.position_id " +
+                "WHERE su.id = ANY(?::varchar[]) " +
+                "AND (su.role = 'SALES' OR p.default_role = 'SALES' OR p2.default_role = 'SALES') " +
+                "ORDER BY su.name, su.id",
+            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta")),
+            (Object) userIds
         );
         if (!refs.isEmpty()) {
             return refs;
         }
-        return fallbackCustomers();
+        return hasAnySalesUsers() ? List.of() : fallbackSalesRefs();
+    }
+
+    private List<RefItem> loadOwnedCustomerRefs(String userId) {
+        List<RefItem> refs = jdbc.query(
+            "SELECT id, name, 'CUSTOMER' AS meta " +
+                "FROM external_object " +
+                "WHERE type = 'CUSTOMER'::object_type AND owner_id = ? " +
+                "ORDER BY name, id LIMIT 16",
+            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta")),
+            userId
+        );
+        if (!refs.isEmpty()) {
+            return refs;
+        }
+        return hasAnyCustomerObjects() ? List.of() : fallbackCustomers();
+    }
+
+    private List<RefItem> loadCustomerRefs(DataScopeService.SalesPortalScope scopeContext) {
+        String[] userIds = scopeContext.scopeUserIds().toArray(new String[0]);
+        String[] orgIds = scopeContext.scopeOrgIds().toArray(new String[0]);
+        List<RefItem> refs = jdbc.query(
+            "SELECT DISTINCT eo.id, eo.name, 'CUSTOMER' AS meta " +
+                "FROM external_object eo " +
+                "WHERE eo.type = 'CUSTOMER'::object_type " +
+                "AND (eo.owner_id = ANY(?::varchar[]) OR eo.org_id = ANY(?::varchar[]) OR eo.dept_id = ANY(?::varchar[])) " +
+                "ORDER BY eo.name, eo.id LIMIT 32",
+            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta")),
+            (Object) userIds,
+            (Object) orgIds,
+            (Object) orgIds
+        );
+        if (!refs.isEmpty()) {
+            return refs;
+        }
+        return hasAnyCustomerObjects() ? List.of() : fallbackCustomers();
     }
 
     private List<RefItem> loadObjectRefs() {
@@ -687,6 +896,27 @@ public class PortalController {
             return refs;
         }
         return fallbackProducts();
+    }
+
+    private boolean hasAnySalesUsers() {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(DISTINCT su.id) " +
+                "FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "LEFT JOIN user_position up ON up.user_id = su.id " +
+                "LEFT JOIN position p2 ON p2.id = up.position_id " +
+                "WHERE su.role = 'SALES' OR p.default_role = 'SALES' OR p2.default_role = 'SALES'",
+            Integer.class
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean hasAnyCustomerObjects() {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM external_object WHERE type = 'CUSTOMER'::object_type",
+            Integer.class
+        );
+        return count != null && count > 0;
     }
 
     private List<RefItem> pickRefs(List<RefItem> source, int count, int seed) {
@@ -814,6 +1044,15 @@ public class PortalController {
             new RefItem("mock-product-4", "远程监控模块", "INVEX-IOT-4106")
         );
     }
+
+    private record PortalPosition(
+        String id,
+        String name,
+        String code,
+        String defaultRole,
+        Integer level,
+        boolean primary
+    ) {}
 
     private record RefItem(String id, String name, String meta) {}
 }

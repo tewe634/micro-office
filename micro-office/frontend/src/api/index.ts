@@ -1,5 +1,51 @@
 import api from './client';
 
+export type PortalScopeKey = 'personal' | 'department' | 'business' | 'system' | (string & {});
+
+export type PortalSelectableValue = string | number | null | undefined;
+
+export interface PortalOptionItem {
+  key?: PortalSelectableValue;
+  value?: PortalSelectableValue;
+  id?: PortalSelectableValue;
+  label?: string;
+  name?: string;
+  title?: string;
+  positionId?: PortalSelectableValue;
+  positionName?: string;
+  portalType?: string;
+  role?: string;
+  roleName?: string;
+  orgName?: string;
+  deptName?: string;
+  code?: string;
+  scope?: PortalScopeKey;
+  description?: string;
+  primary?: boolean;
+  isPrimary?: boolean;
+  [key: string]: any;
+}
+
+export type PortalSelection = PortalOptionItem | PortalSelectableValue;
+
+export interface PortalRequestParams {
+  positionId?: string | number;
+  scope?: PortalScopeKey;
+}
+
+export interface PortalPayload {
+  header?: Record<string, any>;
+  summaryCards?: Array<Record<string, any>>;
+  workSummary?: Record<string, any>;
+  portalOptions?: PortalOptionItem[];
+  activePortal?: PortalSelection;
+  allPositions?: PortalOptionItem[];
+  scopeOptions?: PortalOptionItem[];
+  activeScope?: PortalSelection;
+  variant?: string;
+  [key: string]: any;
+}
+
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
   register: (data: any) => api.post('/auth/register', data),
@@ -121,9 +167,9 @@ export const adminApi = {
 };
 
 export const portalApi = {
-  user: (id: string | number) => api.get(`/portal/users/${id}`),
-  object: (id: string | number) => api.get(`/portal/objects/${id}`),
-  product: (id: string | number) => api.get(`/portal/products/${id}`),
+  user: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/users/${id}`, { params }),
+  object: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/objects/${id}`, { params }),
+  product: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/products/${id}`, { params }),
 };
 
 export const dashboardApi = {

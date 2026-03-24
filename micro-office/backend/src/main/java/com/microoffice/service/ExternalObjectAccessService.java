@@ -33,6 +33,7 @@ public class ExternalObjectAccessService {
         if (obj == null || ctx == null) {
             return false;
         }
+        Collection<String> scopedOrgIds = scopeOrgIds == null ? List.of() : scopeOrgIds;
         if (hasText(obj.getOwnerId())) {
             if (obj.getOwnerId().equals(ctx.getUserId())) {
                 return true;
@@ -41,13 +42,13 @@ public class ExternalObjectAccessService {
                 return false;
             }
             String ownerOrgId = getUserOrgId(obj.getOwnerId(), ctx);
-            return isSameOrDescendant(ownerOrgId, ctx.getViewerOrgId(), ctx.getOrgParentMap());
+            return hasText(ownerOrgId) && scopedOrgIds.contains(ownerOrgId);
         }
         if (!hasText(ctx.getViewerOrgId())) {
             return false;
         }
-        return isSameOrDescendant(ctx.getViewerOrgId(), obj.getOrgId(), ctx.getOrgParentMap())
-            || isSameOrDescendant(ctx.getViewerOrgId(), obj.getDeptId(), ctx.getOrgParentMap());
+        return matchesScopedOrg(obj.getOrgId(), scopedOrgIds, ctx.getOrgParentMap())
+            || matchesScopedOrg(obj.getDeptId(), scopedOrgIds, ctx.getOrgParentMap());
     }
 
     private String getUserOrgId(String userId, AccessContext ctx) {
@@ -114,6 +115,18 @@ public class ExternalObjectAccessService {
                 return true;
             }
             current = parentMap.get(current);
+        }
+        return false;
+    }
+
+    private boolean matchesScopedOrg(String targetOrgId, Collection<String> scopeOrgIds, Map<String, String> parentMap) {
+        if (!hasText(targetOrgId) || scopeOrgIds == null || scopeOrgIds.isEmpty()) {
+            return false;
+        }
+        for (String scopeOrgId : scopeOrgIds) {
+            if (isSameOrDescendant(scopeOrgId, targetOrgId, parentMap)) {
+                return true;
+            }
         }
         return false;
     }

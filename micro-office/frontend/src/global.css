@@ -96,6 +96,126 @@ body {
   flex-wrap: wrap;
 }
 
+.portal-context-card.ant-card {
+  border-color: rgba(191, 219, 254, 0.95);
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 52%, rgba(240, 249, 255, 0.96) 100%);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+}
+
+.portal-context-card__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+}
+
+.portal-context-card__summary {
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.portal-context-card__eyebrow {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+.portal-context-card__hint {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.portal-context-card__controls {
+  flex: 1;
+  min-width: min(100%, 320px);
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 16px 20px;
+  flex-wrap: wrap;
+}
+
+.portal-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.portal-switch--scope {
+  max-width: 100%;
+}
+
+.portal-switch__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.portal-position-tag.ant-tag-checkable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  background: rgba(255, 255, 255, 0.95);
+  color: #1e3a8a;
+  transition: all 0.2s ease;
+}
+
+.portal-position-tag.ant-tag-checkable:hover {
+  border-color: #60a5fa;
+  color: #1d4ed8;
+}
+
+.portal-position-tag.ant-tag-checkable-checked,
+.portal-position-tag.portal-position-tag--active {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.portal-position-tag__badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.portal-scope-segmented.ant-segmented {
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+@media (max-width: 900px) {
+  .portal-context-card__controls {
+    width: 100%;
+    min-width: 0;
+    justify-content: stretch;
+  }
+
+  .portal-switch {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .portal-scope-segmented.ant-segmented {
+    width: 100%;
+  }
+}
+
 .page-tabs.ant-tabs {
   flex: 1;
   min-height: 0;
