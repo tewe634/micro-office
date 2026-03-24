@@ -63,7 +63,10 @@ public class PortalController {
                                                          Authentication auth) {
         String viewerId = (String) auth.getPrincipal();
         ExternalObject object = requireAccessibleObject(id, viewerId);
-        return ApiResponse.ok(buildObjectPortal(object, resolveSalesPortalScope(viewerId, scope)));
+        if (object.getType() == ObjectType.CUSTOMER) {
+            return ApiResponse.ok(buildCustomerPortal(object, viewerId));
+        }
+        return ApiResponse.ok(buildObjectPortal(object));
     }
 
     @GetMapping("/users/{id}")
@@ -206,99 +209,107 @@ public class PortalController {
         return result;
     }
 
-    private Map<String, Object> buildObjectPortal(ExternalObject object, DataScopeService.SalesPortalScope scopeContext) {
+    private Map<String, Object> buildCustomerPortal(ExternalObject object, String viewerId) {
         int year = Year.now().getValue();
-        int seed = stableSeed(object.getId() + "#" + scopeContext.activeScope().key(), 29);
+        CustomerPortalPerspective perspective = resolveCustomerPortalPerspective(object, viewerId);
+        int seed = stableSeed(object.getId() + "#" + perspective.seedKey(), 29);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("portalType", "OBJECT");
         result.put("header", buildObjectHeader(object, year));
-        applyScopeMetadata(result, object.getType() == ObjectType.CUSTOMER ? scopeContext : DataScopeService.SalesPortalScope.empty());
+        List<RefItem> participantRefs = perspective.users();
+        List<RefItem> productRefs = pickRefs(loadProductRefs(), 4, seed / 5 + 3);
+        List<Map<String, Object>> performanceItems = new ArrayList<>();
+        Map<String, BigDecimal> salesTotals = new LinkedHashMap<>();
+        Map<String, Integer> salesDetailCounts = new LinkedHashMap<>();
+        Map<String, Set<String>> salesProducts = new LinkedHashMap<>();
+        Map<String, BigDecimal> productTotals = new LinkedHashMap<>();
+        Map<String, String> productNames = new LinkedHashMap<>();
+        Map<String, String> productCodes = new LinkedHashMap<>();
 
-        if (object.getType() == ObjectType.CUSTOMER) {
-            List<RefItem> salesRefs = pickRefs(loadSalesRefs(scopeContext), 3 + seed % 2, seed);
-            List<RefItem> productRefs = pickRefs(loadProductRefs(), 4, seed / 5 + 3);
-            List<Map<String, Object>> performanceItems = new ArrayList<>();
-            Map<String, BigDecimal> salesTotals = new LinkedHashMap<>();
-            Map<String, Integer> salesDetailCounts = new LinkedHashMap<>();
-            Map<String, Set<String>> salesProducts = new LinkedHashMap<>();
-            Map<String, BigDecimal> productTotals = new LinkedHashMap<>();
-            Map<String, String> productNames = new LinkedHashMap<>();
-            Map<String, String> productCodes = new LinkedHashMap<>();
+        for (int i = 0; i < participantRefs.size(); i++) {
+            RefItem participant = participantRefs.get(i);
+            int productSpan = Math.min(productRefs.size(), 1 + Math.floorMod(seed + i, Math.max(1, Math.min(3, productRefs.size()))));
+            for (int j = 0; j < productSpan; j++) {
+                RefItem productRef = productRefs.get((i + j) % productRefs.size());
+                BigDecimal amount = money(object.getId() + "#" + perspective.seedKey(), i * 17 + j * 5 + 2, 10, 34);
 
-            for (int i = 0; i < salesRefs.size(); i++) {
-                RefItem salesperson = salesRefs.get(i);
-                int productSpan = Math.min(productRefs.size(), 1 + Math.floorMod(seed + i, Math.max(1, Math.min(3, productRefs.size()))));
-                for (int j = 0; j < productSpan; j++) {
-                    RefItem productRef = productRefs.get((i + j) % productRefs.size());
-                    BigDecimal amount = money(object.getId(), i * 17 + j * 5 + 2, 10, 34);
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("id", "object-performance-" + i + "-" + j);
+                item.put("salespersonId", participant.id());
+                item.put("salespersonName", participant.name());
+                item.put("productId", productRef.id());
+                item.put("productName", productRef.name());
+                item.put("productCode", productRef.meta());
+                item.put("amount", amount);
+                item.put("achievementType", cycle(List.of("签约", "复购", "验收", "回款"), seed + i + j));
+                item.put("achievedAt", mockDate(seed, 8 + i * 19 + j * 13));
+                item.put("note", participant.name() + " 以" + perspective.shortLabel() + "推进 " + object.getName() + " 的 " + productRef.name() + " 业务。");
+                performanceItems.add(item);
 
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("id", "object-performance-" + i + "-" + j);
-                    item.put("salespersonId", salesperson.id());
-                    item.put("salespersonName", salesperson.name());
-                    item.put("productId", productRef.id());
-                    item.put("productName", productRef.name());
-                    item.put("productCode", productRef.meta());
-                    item.put("amount", amount);
-                    item.put("achievementType", cycle(List.of("签约", "复购", "验收", "回款"), seed + i + j));
-                    item.put("achievedAt", mockDate(seed, 8 + i * 19 + j * 13));
-                    item.put("note", salesperson.name() + " 与 " + object.getName() + " 推进 " + productRef.name() + " 业务。");
-                    performanceItems.add(item);
+                salesTotals.merge(refKey(participant), amount, BigDecimal::add);
+                salesDetailCounts.merge(refKey(participant), 1, Integer::sum);
+                salesProducts.computeIfAbsent(refKey(participant), key -> new LinkedHashSet<>()).add(refKey(productRef));
 
-                    salesTotals.merge(refKey(salesperson), amount, BigDecimal::add);
-                    salesDetailCounts.merge(refKey(salesperson), 1, Integer::sum);
-                    salesProducts.computeIfAbsent(refKey(salesperson), key -> new LinkedHashSet<>()).add(refKey(productRef));
-
-                    productTotals.merge(refKey(productRef), amount, BigDecimal::add);
-                    productNames.put(refKey(productRef), productRef.name());
-                    productCodes.put(refKey(productRef), productRef.meta());
-                }
+                productTotals.merge(refKey(productRef), amount, BigDecimal::add);
+                productNames.put(refKey(productRef), productRef.name());
+                productCodes.put(refKey(productRef), productRef.meta());
             }
-
-            List<Map<String, Object>> salesSummary = new ArrayList<>();
-            for (RefItem salesperson : salesRefs) {
-                String key = refKey(salesperson);
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("id", "object-sales-summary-" + key);
-                row.put("salespersonId", salesperson.id());
-                row.put("salespersonName", salesperson.name());
-                row.put("amount", salesTotals.getOrDefault(key, BigDecimal.ZERO));
-                row.put("productCount", salesProducts.getOrDefault(key, Set.of()).size());
-                row.put("performanceItemCount", salesDetailCounts.getOrDefault(key, 0));
-                row.put("lastActiveAt", mockDate(seed, 24 + salesSummary.size() * 9));
-                salesSummary.add(row);
-            }
-
-            List<Map<String, Object>> relatedProducts = new ArrayList<>();
-            for (RefItem productRef : productRefs) {
-                String key = refKey(productRef);
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("id", productRef.id());
-                row.put("name", productNames.getOrDefault(key, productRef.name()));
-                row.put("code", productCodes.getOrDefault(key, productRef.meta()));
-                row.put("amount", productTotals.getOrDefault(key, BigDecimal.ZERO));
-                relatedProducts.add(row);
-            }
-
-            List<Map<String, Object>> workItems = buildCustomerWorkItems(object, salesRefs, productRefs, seed);
-            BigDecimal totalAmount = performanceItems.stream()
-                .map(item -> (BigDecimal) item.get("amount"))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            result.put("variant", "OBJECT_CUSTOMER");
-            result.put("summaryCards", List.of(
-                summaryCard("performance", "年度绩效额", totalAmount, "元"),
-                summaryCard("salespeople", "参与销售", salesRefs.size(), "人"),
-                summaryCard("products", "相关产品", productRefs.size(), "项"),
-                summaryCard("openWork", "待推进工作", countStatuses(workItems, "ACTIVE"), "项")
-            ));
-            result.put("salesSummary", salesSummary);
-            result.put("performanceItems", performanceItems);
-            result.put("relatedProducts", relatedProducts);
-            result.put("workSummary", buildWorkSummary(workItems));
-            result.put("workItems", workItems);
-            return result;
         }
+
+        List<Map<String, Object>> salesSummary = new ArrayList<>();
+        for (RefItem participant : participantRefs) {
+            String key = refKey(participant);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", "object-sales-summary-" + key);
+            row.put("salespersonId", participant.id());
+            row.put("salespersonName", participant.name());
+            row.put("amount", salesTotals.getOrDefault(key, BigDecimal.ZERO));
+            row.put("productCount", salesProducts.getOrDefault(key, Set.of()).size());
+            row.put("performanceItemCount", salesDetailCounts.getOrDefault(key, 0));
+            row.put("lastActiveAt", mockDate(seed, 24 + salesSummary.size() * 9));
+            salesSummary.add(row);
+        }
+
+        List<Map<String, Object>> relatedProducts = new ArrayList<>();
+        for (RefItem productRef : productRefs) {
+            String key = refKey(productRef);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", productRef.id());
+            row.put("name", productNames.getOrDefault(key, productRef.name()));
+            row.put("code", productCodes.getOrDefault(key, productRef.meta()));
+            row.put("amount", productTotals.getOrDefault(key, BigDecimal.ZERO));
+            relatedProducts.add(row);
+        }
+
+        List<Map<String, Object>> workItems = buildCustomerWorkItems(object, participantRefs, productRefs, seed);
+        BigDecimal totalAmount = performanceItems.stream()
+            .map(item -> (BigDecimal) item.get("amount"))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        result.put("variant", "OBJECT_CUSTOMER");
+        result.put("perspectiveMode", perspective.mode());
+        result.put("perspectiveLabel", perspective.label());
+        result.put("perspectiveHint", perspective.hint());
+        result.put("summaryCards", List.of(
+            summaryCard("performance", "年度绩效额", totalAmount, "元"),
+            summaryCard("participants", perspective.summaryLabel(), participantRefs.size(), "人"),
+            summaryCard("products", "相关产品", productRefs.size(), "项"),
+            summaryCard("openWork", "待推进工作", countStatuses(workItems, "ACTIVE"), "项")
+        ));
+        result.put("salesSummary", salesSummary);
+        result.put("performanceItems", performanceItems);
+        result.put("relatedProducts", relatedProducts);
+        result.put("workSummary", buildWorkSummary(workItems));
+        result.put("workItems", workItems);
+        return result;
+    }
+
+    private Map<String, Object> buildObjectPortal(ExternalObject object) {
+        int year = Year.now().getValue();
+        int seed = stableSeed(object.getId(), 29);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("portalType", "OBJECT");
+        result.put("header", buildObjectHeader(object, year));
 
         List<RefItem> ownerRefs = pickRefs(loadUserRefs(), 3 + seed % 2, seed / 7 + 2);
         List<Map<String, Object>> workItems = buildExternalObjectWorkItems(object, ownerRefs, seed);
@@ -315,6 +326,59 @@ public class PortalController {
         result.put("workSummary", buildWorkSummary(workItems));
         result.put("workItems", workItems);
         return result;
+    }
+
+    private CustomerPortalPerspective resolveCustomerPortalPerspective(ExternalObject object, String viewerId) {
+        if (hasText(object.getOwnerId())) {
+            RefItem owner = loadUserRef(object.getOwnerId());
+            if (owner != null) {
+                return new CustomerPortalPerspective(
+                    List.of(owner),
+                    "OWNER",
+                    "负责人个人视角",
+                    "客户门户按负责人个人门户口径组织，不再暴露 personal / department / business / system scope 切换。",
+                    "负责人",
+                    "负责人个人视角",
+                    owner.id()
+                );
+            }
+        }
+
+        List<RefItem> orgFallbackRefs = loadCustomerFallbackRefs(object);
+        if (!orgFallbackRefs.isEmpty()) {
+            return new CustomerPortalPerspective(
+                pickRefs(orgFallbackRefs, Math.min(2, orgFallbackRefs.size()), stableSeed(object.getId(), 61)),
+                "ORG_FALLBACK",
+                "关联组织回退视角",
+                "客户未配置负责人，回退到客户所属组织内的关联岗位视角展示，仍不提供 scope 切换。",
+                "关联人员",
+                "组织回退视角",
+                buildCustomerFallbackSeedKey(object)
+            );
+        }
+
+        RefItem viewer = loadUserRef(viewerId);
+        if (viewer != null) {
+            return new CustomerPortalPerspective(
+                List.of(viewer),
+                "VIEWER_FALLBACK",
+                "访问人个人回退视角",
+                "客户既无负责人也无组织内关联岗位，回退到当前访问人的个人视角展示，仍不提供 scope 切换。",
+                "当前视角",
+                "访问人回退视角",
+                viewer.id()
+            );
+        }
+
+        return new CustomerPortalPerspective(
+            List.of(),
+            "EMPTY",
+            "客户门户",
+            "缺少负责人和可用关联岗位，当前门户没有可展示的负责人视角数据。",
+            "关联人员",
+            "客户门户",
+            object.getId()
+        );
     }
 
     private Map<String, Object> buildUserPortal(SysUser user, String requestedPositionId) {
@@ -738,6 +802,7 @@ public class PortalController {
         header.put("address", object.getAddress());
         header.put("remark", object.getRemark());
         header.put("industry", object.getIndustry());
+        header.put("ownerId", object.getOwnerId());
         header.put("orgName", lookupName("SELECT name FROM organization WHERE id = ?", object.getOrgId()));
         header.put("deptName", lookupName("SELECT name FROM organization WHERE id = ?", object.getDeptId()));
         header.put("ownerName", lookupName("SELECT name FROM sys_user WHERE id = ?", object.getOwnerId()));
@@ -821,6 +886,18 @@ public class PortalController {
         return fallbackUsers();
     }
 
+    private RefItem loadUserRef(String userId) {
+        if (!hasText(userId)) {
+            return null;
+        }
+        List<RefItem> refs = jdbc.query(
+            "SELECT id, name, COALESCE(role, '') AS meta FROM sys_user WHERE id = ?",
+            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta")),
+            userId
+        );
+        return refs.isEmpty() ? null : refs.get(0);
+    }
+
     private List<RefItem> loadSalesRefs(DataScopeService.SalesPortalScope scopeContext) {
         String[] userIds = scopeContext.scopeUserIds().toArray(new String[0]);
         List<RefItem> refs = jdbc.query(
@@ -874,6 +951,32 @@ public class PortalController {
             return refs;
         }
         return hasAnyCustomerObjects() ? List.of() : fallbackCustomers();
+    }
+
+    private List<RefItem> loadCustomerFallbackRefs(ExternalObject object) {
+        List<String> orgIds = new ArrayList<>();
+        if (hasText(object.getDeptId())) {
+            orgIds.add(object.getDeptId());
+        }
+        if (hasText(object.getOrgId()) && !orgIds.contains(object.getOrgId())) {
+            orgIds.add(object.getOrgId());
+        }
+        if (orgIds.isEmpty()) {
+            return List.of();
+        }
+        String[] values = orgIds.toArray(new String[0]);
+        return jdbc.query(
+            "SELECT DISTINCT su.id, su.name, COALESCE(su.role, '') AS meta " +
+                "FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "LEFT JOIN user_position up ON up.user_id = su.id " +
+                "LEFT JOIN position p2 ON p2.id = up.position_id " +
+                "WHERE su.org_id = ANY(?::varchar[]) " +
+                "AND (su.role = 'SALES' OR p.default_role = 'SALES' OR p2.default_role = 'SALES') " +
+                "ORDER BY su.name, su.id LIMIT 8",
+            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta")),
+            (Object) values
+        );
     }
 
     private List<RefItem> loadObjectRefs() {
@@ -965,6 +1068,21 @@ public class PortalController {
         return ref.id() != null ? ref.id() : ref.name();
     }
 
+    private String buildCustomerFallbackSeedKey(ExternalObject object) {
+        List<String> parts = new ArrayList<>();
+        if (hasText(object.getDeptId())) {
+            parts.add(object.getDeptId());
+        }
+        if (hasText(object.getOrgId())) {
+            parts.add(object.getOrgId());
+        }
+        return parts.isEmpty() ? object.getId() : String.join("#", parts);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     private List<String> workTopicsForRole(String role) {
         if ("HR".equals(role)) {
             return List.of("招聘入职", "档案维护", "培训跟进", "考勤校验");
@@ -1052,6 +1170,16 @@ public class PortalController {
         String defaultRole,
         Integer level,
         boolean primary
+    ) {}
+
+    private record CustomerPortalPerspective(
+        List<RefItem> users,
+        String mode,
+        String label,
+        String hint,
+        String summaryLabel,
+        String shortLabel,
+        String seedKey
     ) {}
 
     private record RefItem(String id, String name, String meta) {}

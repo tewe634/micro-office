@@ -160,37 +160,65 @@ body {
   color: #475569;
 }
 
-.portal-position-tag.ant-tag-checkable {
-  display: inline-flex;
-  align-items: center;
+.portal-position-radio-group.ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portal-position-radio.ant-radio-button-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
-  margin-inline-end: 0;
-  padding: 6px 12px;
-  border-radius: 999px;
+  height: auto;
+  min-width: 220px;
+  padding: 10px 14px;
+  border-radius: 14px;
   border: 1px solid rgba(191, 219, 254, 0.95);
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   color: #1e3a8a;
+  line-height: 1.4;
   transition: all 0.2s ease;
 }
 
-.portal-position-tag.ant-tag-checkable:hover {
+.portal-position-radio.ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.portal-position-radio.ant-radio-button-wrapper:hover {
   border-color: #60a5fa;
   color: #1d4ed8;
 }
 
-.portal-position-tag.ant-tag-checkable-checked,
-.portal-position-tag.portal-position-tag--active {
+.portal-position-radio.ant-radio-button-wrapper-checked {
   border-color: #2563eb;
   background: #2563eb;
   color: #fff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.2);
 }
 
-.portal-position-tag__badge {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+.portal-position-radio__title {
+  font-weight: 700;
+}
+
+.portal-position-radio__hint {
+  color: inherit;
+  opacity: 0.78;
   font-size: 12px;
-  line-height: 1.4;
+}
+
+.portal-position-radio__badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.portal-position-radio.ant-radio-button-wrapper-checked .portal-position-radio__badge {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .portal-scope-segmented.ant-segmented {
@@ -207,6 +235,11 @@ body {
   }
 
   .portal-switch {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .portal-position-radio.ant-radio-button-wrapper {
     width: 100%;
     min-width: 0;
   }

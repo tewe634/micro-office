@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Descriptions, Empty, List, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Empty, List, Radio, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { portalApi } from '../../api';
 import type { PortalOptionItem, PortalPayload, PortalRequestParams, PortalSelection } from '../../api';
@@ -14,6 +14,7 @@ type NormalizedContextOption = {
   requestValue?: string;
   label: string;
   hint?: string;
+  portalLabel?: string;
   badge?: string;
   tone?: string;
 };
@@ -51,11 +52,33 @@ const scopeColorMap: Record<string, string> = {
 
 const portalTypeLabelMap: Record<string, string> = {
   USER_SALES: '销售视图',
-  USER_WORK: '工作视图',
   PRODUCT: '销售视图',
   OBJECT_CUSTOMER: '销售视图',
   OBJECT_WORK: '工作视图',
 };
+
+function formatPortalVariantLabel(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+  if (value.startsWith('USER_WORK')) {
+    return '工作视图';
+  }
+  return portalTypeLabelMap[value] || value;
+}
+
+function portalVariantTone(value: string | undefined) {
+  if (!value) {
+    return 'default';
+  }
+  if (value === 'USER_SALES' || value === 'PRODUCT' || value === 'OBJECT_CUSTOMER') {
+    return 'cyan';
+  }
+  if (value.startsWith('USER_WORK') || value === 'OBJECT_WORK') {
+    return 'geekblue';
+  }
+  return 'default';
+}
 
 function formatStatValue(value: unknown, suffix?: string) {
   const numericValue = Number(value || 0);
@@ -112,7 +135,7 @@ function buildSelectionCandidates(value: PortalSelection | undefined | null) {
     return Array.from(candidates);
   }
 
-  ['positionId', 'scope', 'id', 'value', 'key', 'portalType', 'type', 'label', 'name', 'title', 'code'].forEach((field) => {
+  ['positionId', 'scope', 'id', 'value', 'key', 'portalType', 'type', 'variant', 'label', 'name', 'title', 'code'].forEach((field) => {
     const candidate = normalizeText(record[field]);
     if (candidate) {
       candidates.add(candidate);
@@ -123,13 +146,13 @@ function buildSelectionCandidates(value: PortalSelection | undefined | null) {
 }
 
 function normalizePortalOption(item: PortalOptionItem, index: number): NormalizedContextOption {
-  const portalType = normalizeText(item.portalType) ?? normalizeText(item.type);
+  const portalType = normalizeText(item.portalType) ?? normalizeText(item.type) ?? normalizeText(item.variant);
   const requestValue = normalizeText(item.positionId) ?? normalizeText(item.id) ?? normalizeText(item.value) ?? normalizeText(item.key);
   const label = normalizeText(item.label) ?? normalizeText(item.positionName) ?? normalizeText(item.name) ?? normalizeText(item.title) ?? `岗位 ${index + 1}`;
   const roleCode = normalizeText(item.role);
   const roleText = normalizeText(item.roleName) ?? (roleCode ? formatRoleLabel(roleCode) : undefined);
   const orgText = normalizeText(item.deptName) ?? normalizeText(item.orgName);
-  const portalText = portalType ? portalTypeLabelMap[portalType] || portalType : undefined;
+  const portalText = formatPortalVariantLabel(portalType);
   const codeText = normalizeText(item.code);
 
   return {
@@ -137,6 +160,7 @@ function normalizePortalOption(item: PortalOptionItem, index: number): Normalize
     requestValue,
     label,
     hint: buildHint([roleText, orgText, portalText, codeText]),
+    portalLabel: portalText,
     badge: item.primary === true || item.isPrimary === true ? '主岗位' : undefined,
   };
 }
@@ -304,6 +328,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const header = (data?.header || {}) as Record<string, any>;
   const summaryCards = Array.isArray(data?.summaryCards) ? data.summaryCards : [];
   const workSummary = (data?.workSummary || {}) as Record<string, any>;
+  const currentPortalVariant = normalizeText(data?.variant);
+  const currentPortalLabel = formatPortalVariantLabel(currentPortalVariant);
+  const currentPortalTone = portalVariantTone(currentPortalVariant);
+  const customerPerspectiveLabel = normalizeText(data?.perspectiveLabel);
+  const customerPerspectiveHint = normalizeText(data?.perspectiveHint);
+  const isCustomerObjectPortal = entityType === 'objects' && header.type === 'CUSTOMER';
+  const customerParticipantLabel = normalizeText(data?.perspectiveMode) === 'OWNER' ? '负责人' : '关联人员';
 
   const portalOptions = useMemo(() => {
     const primaryOptions = Array.isArray(data?.portalOptions) ? data.portalOptions : [];
@@ -322,6 +353,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       || !!data?.activePortal);
 
   const hasScopeFeature = entityType !== 'users'
+    && !isCustomerObjectPortal
     && (scopeOptions.length > 0 || !!data?.activeScope || !!normalizeText(data?.scope));
 
   const activePortalOption = useMemo(() => {
@@ -367,7 +399,16 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const showPortalSwitch = hasPortalFeature && portalOptions.length > 1;
   const showScopeSwitch = hasScopeFeature && scopeOptions.length > 1;
-  const showContextPanel = hasPortalFeature || hasScopeFeature;
+  const selectedPortalLabel = activePortalOption?.portalLabel || currentPortalLabel;
+  const selectedPortalTone = portalVariantTone(
+    selectedPortalLabel === '工作视图'
+      ? 'USER_WORK'
+      : selectedPortalLabel === '销售视图'
+        ? 'USER_SALES'
+        : currentPortalVariant
+  );
+  const portalSwitchValue = activePortalOption?.requestValue ?? activePortalOption?.key ?? portalOptions[0]?.requestValue ?? portalOptions[0]?.key;
+  const showContextPanel = hasPortalFeature || hasScopeFeature || !!customerPerspectiveLabel;
 
   const listRoute = useMemo(() => {
     if (entityType === 'users') return '/users';
@@ -412,6 +453,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     updateQueryParams({ positionId: option.requestValue });
   };
 
+  const handlePortalSwitchValue = (value: string | number) => {
+    const nextValue = String(value);
+    const option = portalOptions.find(item => (item.requestValue ?? item.key) === nextValue);
+    if (option) {
+      handlePortalSwitch(option);
+    }
+  };
+
   const handleScopeSwitch = (value: string | number) => {
     const nextValue = String(value);
     if (!nextValue || nextValue === scopeParam) {
@@ -425,6 +474,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       return (
         <>
           <Tag color={roleColorMap[header.role] || 'default'}>{formatRoleLabel(header.role)}</Tag>
+          {currentPortalLabel ? <Tag color={currentPortalTone}>{currentPortalLabel}</Tag> : null}
+          {header.positionName ? <Tag>{header.positionName}</Tag> : null}
           {header.empNo ? <Tag>{header.empNo}</Tag> : null}
           <Tag color="processing">{header.year} 门户</Tag>
         </>
@@ -435,6 +486,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       return (
         <>
           <Tag color="blue">{formatObjectType(header.type)}</Tag>
+          {customerPerspectiveLabel ? <Tag color="cyan">{customerPerspectiveLabel}</Tag> : null}
           {header.industry ? <Tag color="geekblue">{header.industry}</Tag> : null}
           <Tag color="processing">{header.year} 门户</Tag>
         </>
@@ -458,6 +510,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         ['所属组织', header.orgName],
         ['岗位', header.positionName],
         ['角色', formatRoleLabel(header.role)],
+        ['当前门户', currentPortalLabel],
         ['入职日期', header.hiredAt],
       ];
     }
@@ -470,6 +523,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         ['所属组织', header.orgName],
         ['所属部门', header.deptName],
         ['负责人', header.ownerName],
+        ['客户门户口径', customerPerspectiveLabel],
         ['地址', header.address],
         ['备注', header.remark],
       ];
@@ -646,7 +700,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     <>
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={16}>
-          <Card title="客户绩效分布" style={{ height: '100%' }}>
+          <Card title={`${customerParticipantLabel}绩效分布`} style={{ height: '100%' }}>
             <Table
               dataSource={data?.salesSummary || []}
               rowKey={(record: any) => String(record.id || record.salespersonName)}
@@ -654,7 +708,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               size="small"
               columns={[
                 {
-                  title: '销售',
+                  title: customerParticipantLabel,
                   dataIndex: 'salespersonName',
                   width: 140,
                   render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
@@ -702,7 +756,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           columns={[
             { title: '日期', dataIndex: 'achievedAt', width: 120 },
             {
-              title: '销售',
+              title: customerParticipantLabel,
               dataIndex: 'salespersonName',
               width: 140,
               render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
@@ -758,7 +812,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     <>
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={16}>
-          <Card title="客户绩效分布" style={{ height: '100%' }}>
+          <Card title={`${header.positionName || '当前岗位'}客户绩效分布`} style={{ height: '100%' }}>
             <Table
               dataSource={data?.customerPerformance || []}
               rowKey={(record: any) => String(record.id || record.name)}
@@ -804,7 +858,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         </Col>
       </Row>
 
-      <Card title="绩效明细">
+      <Card title={`${header.positionName || '当前岗位'}绩效明细`}>
         <Table
           dataSource={data?.performanceItems || []}
           rowKey={(record: any) => String(record.id || `${record.customerName}-${record.productName}`)}
@@ -842,7 +896,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const renderWorkUserPortal = () => (
     <>
-      <Card title="工作分布">
+      <Card title={`${header.positionName || '当前岗位'}工作分布`}>
         <Table
           dataSource={data?.workBuckets || []}
           rowKey={(record: any) => String(record.id || record.label)}
@@ -876,12 +930,20 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       hints.push(portalDetail ? `岗位上下文：${portalDetail}` : `当前人员门户按“${activePortalOption.label}”岗位展示`);
     }
 
+    if (entityType === 'users' && selectedPortalLabel) {
+      hints.push(`当前门户类型：${selectedPortalLabel}`);
+    }
+
+    if (customerPerspectiveLabel) {
+      hints.push(customerPerspectiveHint ? `客户门户口径：${customerPerspectiveLabel}，${customerPerspectiveHint}` : `客户门户口径：${customerPerspectiveLabel}`);
+    }
+
     if (activeScopeOption) {
       hints.push(activeScopeOption.hint ? `统计口径：${activeScopeOption.label}汇总，${activeScopeOption.hint}` : `统计口径：${activeScopeOption.label}汇总`);
     }
 
     return hints.join('；');
-  }, [activePortalOption, activeScopeOption]);
+  }, [activePortalOption, activeScopeOption, customerPerspectiveHint, customerPerspectiveLabel, entityType, selectedPortalLabel]);
 
   const renderContextPanel = () => {
     if (!showContextPanel) {
@@ -900,6 +962,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             <Space wrap size={[8, 8]}>
               {activePortalOption ? <Tag color="blue">岗位：{activePortalOption.label}</Tag> : null}
               {activePortalOption?.badge ? <Tag>{activePortalOption.badge}</Tag> : null}
+              {entityType === 'users' && selectedPortalLabel ? <Tag color={selectedPortalTone}>门户：{selectedPortalLabel}</Tag> : null}
+              {customerPerspectiveLabel ? <Tag color="cyan">客户口径：{customerPerspectiveLabel}</Tag> : null}
               {activeScopeOption ? <Tag color={activeScopeOption.tone || 'cyan'}>范围：{activeScopeOption.label}</Tag> : null}
             </Space>
             {contextHint ? <div className="portal-context-card__hint">{contextHint}</div> : null}
@@ -909,26 +973,26 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             {showPortalSwitch ? (
               <div className="portal-switch">
                 <span className="portal-switch__label">切换岗位门户</span>
-                <Space wrap size={[8, 8]}>
+                <Radio.Group
+                  className="portal-position-radio-group"
+                  value={portalSwitchValue}
+                  onChange={event => handlePortalSwitchValue(event.target.value)}
+                >
                   {portalOptions.map(option => {
-                    const checked = option.key === activePortalOption?.key;
+                    const value = option.requestValue || option.key;
                     return (
-                      <Tag.CheckableTag
+                      <Radio.Button
                         key={option.key}
-                        checked={checked}
-                        onChange={(nextChecked) => {
-                          if (nextChecked) {
-                            handlePortalSwitch(option);
-                          }
-                        }}
-                        className={`portal-position-tag${checked ? ' portal-position-tag--active' : ''}`}
+                        value={value}
+                        className="portal-position-radio"
                       >
-                        <span>{option.label}</span>
-                        {option.badge ? <span className="portal-position-tag__badge">{option.badge}</span> : null}
-                      </Tag.CheckableTag>
+                        <span className="portal-position-radio__title">{option.label}</span>
+                        {option.badge ? <span className="portal-position-radio__badge">{option.badge}</span> : null}
+                        {option.hint ? <span className="portal-position-radio__hint">{option.hint}</span> : null}
+                      </Radio.Button>
                     );
                   })}
-                </Space>
+                </Radio.Group>
               </div>
             ) : null}
 
@@ -952,16 +1016,23 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     );
   };
 
+  const isInitialLoading = loading && !data;
+  const isRefreshing = loading && !!data;
+  const refreshingMessage = entityType === 'users'
+    ? '正在切换岗位门户并刷新数据...'
+    : '正在刷新门户数据...';
+
   return (
     <Card
       className="page-card page-fill"
       styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
     >
       <div className="page-card-body page-card-scroll">
-        {loading ? <Card loading /> : null}
-        {!loading && error ? <Alert type="error" showIcon message={error} /> : null}
-        {!loading && !error && data ? (
+        {isInitialLoading ? <Card loading /> : null}
+        {!isInitialLoading && error ? <Alert type="error" showIcon message={error} /> : null}
+        {!error && data ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {isRefreshing ? <Alert type="info" showIcon message={refreshingMessage} /> : null}
             <div className="page-toolbar" style={{ justifyContent: 'flex-start' }}>
               <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
                 返回
