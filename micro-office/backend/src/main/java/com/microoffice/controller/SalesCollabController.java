@@ -27,6 +27,7 @@ public class SalesCollabController {
     private static final String COLLABORATOR_ROLE = "COLLABORATOR";
     private static final String SOURCE_TYPE_USER = "USER";
     private static final String SOURCE_TYPE_POSITION = "POSITION";
+    private static final String SOURCE_TYPE_LEADER = "LEADER";
     private static final String SOURCE_TYPE_SALES_OWNER = "SALES_OWNER";
     private static final String SCOPE_CURRENT_DEPT = "CURRENT_SALES_DEPT";
     private static final String SCOPE_CURRENT_REGION = "CURRENT_SALES_REGION";
@@ -42,7 +43,8 @@ public class SalesCollabController {
         result.put("groups", loadGroupsWithScenes());
         result.put("sourceTypes", List.of(
             option(SOURCE_TYPE_USER, "指定人员"),
-            option(SOURCE_TYPE_POSITION, "岗位")
+            option(SOURCE_TYPE_POSITION, "岗位"),
+            option(SOURCE_TYPE_LEADER, "领导")
         ));
         result.put("scopeTypes", List.of(
             option(SCOPE_CURRENT_DEPT, "当前销售部门"),
@@ -104,6 +106,34 @@ public class SalesCollabController {
             remark
         );
         return ApiResponse.ok(loadTemplateDetail(id));
+    }
+
+    @PostMapping("/templates/{id}/copy")
+    public ApiResponse<Map<String, Object>> copyTemplate(@PathVariable String id,
+                                                         @RequestBody(required = false) Map<String, Object> body,
+                                                         Authentication auth) {
+        requireAdmin(auth);
+        Map<String, Object> source = loadTemplateDetail(id);
+        String copiedId = UUID.randomUUID().toString();
+        String targetName = body == null ? null : asNullableString(body.get("name"));
+        if (targetName == null) {
+            targetName = asString(source.get("name")) + "（复制）";
+        }
+        jdbc.update(
+            "INSERT INTO sales_collab_template (id, name, applicable_scope, enabled, remark) VALUES (?, ?, 'SALES_DEPARTMENT', ?, ?)",
+            copiedId,
+            targetName,
+            asBoolean(source.get("enabled"), true),
+            asNullableString(source.get("remark"))
+        );
+        List<Map<String, Object>> groups = asListOfMap(source.get("groups"));
+        for (Map<String, Object> group : groups) {
+            String groupId = asString(group.get("id"));
+            for (Map<String, Object> rule : asListOfMap(group.get("rules"))) {
+                insertTemplateRule(copiedId, groupId, rule);
+            }
+        }
+        return ApiResponse.ok(loadTemplateDetail(copiedId));
     }
 
     @PutMapping("/templates/{id}")
@@ -235,6 +265,56 @@ public class SalesCollabController {
             }
         }
         return ApiResponse.ok(loadOrgRuleDetail(orgId));
+    }
+
+    @PostMapping("/org-rules/{orgId}/copy")
+    public ApiResponse<Map<String, Object>> copyOrgRules(@PathVariable String orgId,
+                                                         @RequestBody Map<String, Object> body,
+                                                         Authentication auth) {
+        requireAdmin(auth);
+        List<String> targetOrgIds = asStringList(body.get("targetOrgIds"));
+        List<String> filteredTargetOrgIds = targetOrgIds.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(value -> !value.isBlank() && !Objects.equals(value, orgId))
+            .distinct()
+            .toList();
+        if (filteredTargetOrgIds.isEmpty()) {
+            throw new IllegalArgumentException("请选择至少一个目标销售部门");
+        }
+
+        Map<String, Object> binding = loadOrgBinding(orgId);
+        String templateId = asNullableString(binding.get("templateId"));
+        List<Map<String, Object>> sourceRules = jdbc.queryForList(
+            "SELECT group_id, participant_role, source_type, source_ref_id, source_ref_name, resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark " +
+                "FROM sales_collab_org_rule WHERE org_id = ? ORDER BY group_id, sort_order, created_at",
+            orgId
+        );
+
+        for (String targetOrgId : filteredTargetOrgIds) {
+            jdbc.update("DELETE FROM sales_collab_org_rule WHERE org_id = ?", targetOrgId);
+            jdbc.update("DELETE FROM sales_collab_org_binding WHERE org_id = ?", targetOrgId);
+            if (templateId != null) {
+                jdbc.update(
+                    "INSERT INTO sales_collab_org_binding (id, org_id, template_id, enabled, remark) VALUES (?, ?, ?, ?, ?)",
+                    UUID.randomUUID().toString(),
+                    targetOrgId,
+                    templateId,
+                    asBoolean(binding.get("enabled"), true),
+                    asNullableString(binding.get("remark"))
+                );
+            }
+            for (Map<String, Object> rule : sourceRules) {
+                insertOrgRule(targetOrgId, asString(rule.get("group_id")), toRulePayload(rule));
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sourceOrgId", orgId);
+        result.put("targetOrgIds", filteredTargetOrgIds);
+        result.put("copiedCount", filteredTargetOrgIds.size());
+        result.put("templateId", templateId);
+        return ApiResponse.ok(result);
     }
 
     @PostMapping("/preview")
@@ -488,6 +568,22 @@ public class SalesCollabController {
                 }
                 continue;
             }
+            if (SOURCE_TYPE_LEADER.equals(sourceType)) {
+                List<String> scopeOrgIds = resolveScopeOrgIds(orgId, rule);
+                if (scopeOrgIds.isEmpty()) {
+                    unmatchedRules.add(unmatchedRule(rule, "领导解析范围为空"));
+                    continue;
+                }
+                List<Map<String, Object>> matchedUsers = loadLeaderUsers(scopeOrgIds);
+                if (matchedUsers.isEmpty()) {
+                    unmatchedRules.add(unmatchedRule(rule, "未匹配到领导人员"));
+                    continue;
+                }
+                for (Map<String, Object> user : matchedUsers) {
+                    mergeCollaborator(collaborators, user, rule, "领导解析");
+                }
+                continue;
+            }
             unmatchedRules.add(unmatchedRule(rule, "暂不支持的来源类型"));
         }
         Map<String, Object> result = new LinkedHashMap<>();
@@ -561,6 +657,42 @@ public class SalesCollabController {
             positionId,
             positionId
         );
+    }
+
+    private List<Map<String, Object>> loadLeaderUsers(Collection<String> orgIds) {
+        if (orgIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> orgList = new ArrayList<>(orgIds);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT su.id, su.name, su.org_id, o.name AS org_name, su.role, p.name AS primary_position_name, " +
+                "COALESCE(string_agg(DISTINCT p2.name, '、') FILTER (WHERE p2.name IS NOT NULL), '') AS extra_position_names " +
+                "FROM sys_user su " +
+                "LEFT JOIN organization o ON o.id = su.org_id " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "LEFT JOIN user_position up ON up.user_id = su.id " +
+                "LEFT JOIN position p2 ON p2.id = up.position_id " +
+                "WHERE su.org_id = ANY(?::varchar[]) " +
+                "GROUP BY su.id, su.name, su.org_id, o.name, su.role, p.name " +
+                "ORDER BY o.name, su.name",
+            (Object) orgList.toArray(new String[0])
+        );
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            String positionName = asString(row.get("primary_position_name"));
+            String extraPositionNames = asString(row.get("extra_position_names"));
+            String role = asString(row.get("role"));
+            if (!isLeaderCandidate(positionName, extraPositionNames, role)) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("userId", asString(row.get("id")));
+            item.put("name", asString(row.get("name")));
+            item.put("orgId", asString(row.get("org_id")));
+            item.put("orgName", asString(row.get("org_name")));
+            result.add(item);
+        }
+        return result;
     }
 
     private List<String> resolveScopeOrgIds(String orgId, Map<String, Object> rule) {
@@ -712,6 +844,9 @@ public class SalesCollabController {
     }
 
     private String resolveSourceRefName(String sourceType, String sourceRefId, String fallback) {
+        if (SOURCE_TYPE_LEADER.equals(sourceType)) {
+            return fallback == null ? "领导" : fallback;
+        }
         if (sourceRefId == null || sourceRefId.isBlank()) {
             return fallback;
         }
@@ -724,6 +859,17 @@ public class SalesCollabController {
             return name == null ? fallback : name;
         }
         return fallback;
+    }
+
+    private boolean isLeaderCandidate(String positionName, String extraPositionNames, String role) {
+        String combined = String.format("%s %s", positionName == null ? "" : positionName, extraPositionNames == null ? "" : extraPositionNames);
+        String[] keywords = {"负责人", "总经理", "总监", "经理", "主管", "主任", "部长", "厂长", "组长", "科长"};
+        for (String keyword : keywords) {
+            if (combined.contains(keyword)) {
+                return true;
+            }
+        }
+        return "ADMIN".equals(role);
     }
 
     private Map<String, Object> queryForMapOrNull(String sql, Object... args) {
@@ -796,6 +942,20 @@ public class SalesCollabController {
         for (Object item : rawList) {
             if (item instanceof Map<?, ?> map) {
                 result.add((Map<String, Object>) map);
+            }
+        }
+        return result;
+    }
+
+    private List<String> asStringList(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        List<?> rawList = (List<?>) value;
+        List<String> result = new ArrayList<>();
+        for (Object item : rawList) {
+            if (item != null) {
+                result.add(String.valueOf(item));
             }
         }
         return result;

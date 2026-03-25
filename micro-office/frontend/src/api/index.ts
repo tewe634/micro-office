@@ -173,11 +173,13 @@ export const salesCollabApi = {
   createTemplate: (data: any) => api.post('/admin/sales-collab/templates', data),
   updateTemplate: (id: string | number, data: any) => api.put(`/admin/sales-collab/templates/${id}`, data),
   deleteTemplate: (id: string | number) => api.delete(`/admin/sales-collab/templates/${id}`),
+  duplicateTemplate: (id: string | number, data?: any) => api.post(`/admin/sales-collab/templates/${id}/copy`, data),
   saveTemplateRules: (id: string | number, data: any) => api.put(`/admin/sales-collab/templates/${id}/rules`, data),
   getOrgBinding: (orgId: string | number) => api.get(`/admin/sales-collab/org-binding/${orgId}`),
   saveOrgBinding: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-binding/${orgId}`, data),
   getOrgRules: (orgId: string | number) => api.get(`/admin/sales-collab/org-rules/${orgId}`),
   saveOrgRules: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-rules/${orgId}`, data),
+  copyOrgRules: (orgId: string | number, data: any) => api.post(`/admin/sales-collab/org-rules/${orgId}/copy`, data),
   preview: (data: any) => api.post('/admin/sales-collab/preview', data),
 };
 

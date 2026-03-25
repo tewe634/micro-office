@@ -237,32 +237,37 @@ function RuleSummary({ rules, scopeLabelMap }: { rules: RuleItem[]; scopeLabelMa
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rules.map(rule => (
-        <div
-          key={rule._localKey || rule.id}
-          style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: '10px 12px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 12,
-            alignItems: 'center',
-            background: '#fafafa',
-          }}
-        >
-          <Space size={[8, 4]} wrap>
-            <Tag color="blue">{rule.sourceType === 'POSITION' ? '岗位' : '人员'}</Tag>
-            <span>{rule.sourceRefName || '-'}</span>
-            {rule.sourceType === 'POSITION' && rule.resolveScopeType ? (
-              <Tag>{scopeLabelMap[rule.resolveScopeType] || rule.resolveScopeType}</Tag>
-            ) : null}
-            {rule.dutyLabel ? <Tag color="gold">{rule.dutyLabel}</Tag> : null}
-            {rule.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
-          </Space>
-          <span style={{ color: '#94a3b8' }}>排序 {rule.sortOrder}</span>
-        </div>
-      ))}
+      {rules.map(rule => {
+        const isPosition = rule.sourceType === 'POSITION';
+        const isLeader = rule.sourceType === 'LEADER';
+        const sourceLabel = isPosition ? '岗位' : isLeader ? '领导' : '人员';
+        return (
+          <div
+            key={rule._localKey || rule.id}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              padding: '10px 12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 12,
+              alignItems: 'center',
+              background: '#fafafa',
+            }}
+          >
+            <Space size={[8, 4]} wrap>
+              <Tag color="blue">{sourceLabel}</Tag>
+              <span>{rule.sourceRefName || (isLeader ? '领导' : '-')}</span>
+              {(isPosition || isLeader) && rule.resolveScopeType ? (
+                <Tag>{scopeLabelMap[rule.resolveScopeType] || rule.resolveScopeType}</Tag>
+              ) : null}
+              {rule.dutyLabel ? <Tag color="gold">{rule.dutyLabel}</Tag> : null}
+              {rule.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
+            </Space>
+            <span style={{ color: '#94a3b8' }}>排序 {rule.sortOrder}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -302,6 +307,8 @@ function RuleEditor({
       {rules.map(rule => {
         const ruleKey = rule._localKey || rule.id || localKey();
         const isPosition = rule.sourceType === 'POSITION';
+        const isLeader = rule.sourceType === 'LEADER';
+        const needsScope = isPosition || isLeader;
         return (
           <div
             key={ruleKey}
@@ -322,26 +329,27 @@ function RuleEditor({
                 onChange={value => updateRule(ruleKey, {
                   sourceType: value,
                   sourceRefId: undefined,
-                  sourceRefName: undefined,
-                  resolveScopeType: value === 'POSITION' ? rule.resolveScopeType || 'CURRENT_SALES_DEPT' : undefined,
+                  sourceRefName: value === 'LEADER' ? '领导' : undefined,
+                  resolveScopeType: value === 'POSITION' || value === 'LEADER' ? rule.resolveScopeType || 'CURRENT_SALES_DEPT' : undefined,
                   resolveScopeRefId: undefined,
                 })}
               />
               <Select
                 showSearch
                 optionFilterProp="label"
-                value={rule.sourceRefId}
+                value={isLeader ? undefined : rule.sourceRefId}
                 options={isPosition ? positionOptions : userOptions}
-                placeholder={isPosition ? '选择岗位' : '选择人员'}
+                placeholder={isPosition ? '选择岗位' : isLeader ? '按领导自动解析' : '选择人员'}
+                disabled={isLeader}
                 onChange={(value, option) => updateRule(ruleKey, {
                   sourceRefId: String(value),
                   sourceRefName: Array.isArray(option) ? undefined : String(option?.label || ''),
                 })}
               />
               <Select
-                value={isPosition ? rule.resolveScopeType || 'CURRENT_SALES_DEPT' : undefined}
+                value={needsScope ? rule.resolveScopeType || 'CURRENT_SALES_DEPT' : undefined}
                 options={scopeTypeOptions}
-                disabled={!isPosition}
+                disabled={!needsScope}
                 placeholder="解析范围"
                 onChange={value => updateRule(ruleKey, {
                   resolveScopeType: value,
@@ -349,9 +357,9 @@ function RuleEditor({
                 })}
               />
               <TreeSelect
-                value={isPosition && rule.resolveScopeType === 'FIXED_ORG' ? rule.resolveScopeRefId : undefined}
+                value={needsScope && rule.resolveScopeType === 'FIXED_ORG' ? rule.resolveScopeRefId : undefined}
                 treeData={orgTreeData}
-                disabled={!isPosition || rule.resolveScopeType !== 'FIXED_ORG'}
+                disabled={!needsScope || rule.resolveScopeType !== 'FIXED_ORG'}
                 allowClear
                 placeholder="固定组织"
                 treeDefaultExpandAll
@@ -402,6 +410,10 @@ export default function AdminSalesCollabPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateModalMode, setTemplateModalMode] = useState<TemplateModalMode>('create');
+  const [templateDuplicating, setTemplateDuplicating] = useState(false);
+  const [copyOrgModalOpen, setCopyOrgModalOpen] = useState(false);
+  const [copyOrgTargetIds, setCopyOrgTargetIds] = useState<string[]>([]);
+  const [copyOrgSubmitting, setCopyOrgSubmitting] = useState(false);
   const [templateForm] = Form.useForm<{ name: string; enabled: boolean; remark?: string }>();
 
   const orgNameMap = useMemo(() => Object.fromEntries(orgs.map(org => [org.id, org.name])), [orgs]);
@@ -533,6 +545,18 @@ export default function AdminSalesCollabPage() {
     await salesCollabApi.deleteTemplate(templateDetail.id);
     message.success('模板已删除');
     await refreshTemplates();
+  };
+
+  const duplicateTemplate = async () => {
+    if (!templateDetail) return;
+    setTemplateDuplicating(true);
+    try {
+      const response: any = await salesCollabApi.duplicateTemplate(templateDetail.id);
+      message.success('模板已复制');
+      await refreshTemplates(response.data?.id as string | undefined);
+    } finally {
+      setTemplateDuplicating(false);
+    }
   };
 
   const saveTemplateRules = async () => {
@@ -669,6 +693,23 @@ export default function AdminSalesCollabPage() {
     }
   };
 
+  const submitCopyOrgRules = async () => {
+    if (!selectedOrgId) return;
+    if (!copyOrgTargetIds.length) {
+      message.warning('请选择目标销售部门');
+      return;
+    }
+    setCopyOrgSubmitting(true);
+    try {
+      const response: any = await salesCollabApi.copyOrgRules(selectedOrgId, { targetOrgIds: copyOrgTargetIds });
+      message.success(`已复制到 ${response.data?.copiedCount || copyOrgTargetIds.length} 个销售部门`);
+      setCopyOrgModalOpen(false);
+      setCopyOrgTargetIds([]);
+    } finally {
+      setCopyOrgSubmitting(false);
+    }
+  };
+
   const loadPreview = async () => {
     if (!selectedOrgId || !previewSceneKey || !previewSalesOwnerUserId) {
       message.warning('请选择销售部门、协同场景和业务销售负责人');
@@ -714,6 +755,7 @@ export default function AdminSalesCollabPage() {
                     />
                     <Button type="primary" onClick={openCreateTemplate}>新增模板</Button>
                     <Button onClick={openEditTemplate} disabled={!templateDetail}>编辑模板</Button>
+                    <Button loading={templateDuplicating} disabled={!templateDetail} onClick={() => void duplicateTemplate()}>复制模板</Button>
                     <Button danger disabled={!templateDetail} onClick={() => {
                       void Modal.confirm({
                         title: '确认删除模板？',
@@ -839,9 +881,17 @@ export default function AdminSalesCollabPage() {
                     ))}
 
                     <Card>
-                      <Button type="primary" icon={<SaveOutlined />} loading={orgRulesSaving} onClick={() => void saveOrgRules()}>
-                        保存部门协同规则
-                      </Button>
+                      <Space wrap>
+                        <Button type="primary" icon={<SaveOutlined />} loading={orgRulesSaving} onClick={() => void saveOrgRules()}>
+                          保存部门协同规则
+                        </Button>
+                        <Button disabled={!selectedOrgId} onClick={() => {
+                          setCopyOrgTargetIds([]);
+                          setCopyOrgModalOpen(true);
+                        }}>
+                          复制到其他部门
+                        </Button>
+                      </Space>
                     </Card>
 
                     <Card title="责任人预览">
@@ -951,6 +1001,32 @@ export default function AdminSalesCollabPage() {
             <Switch />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        open={copyOrgModalOpen}
+        title="复制部门协同配置"
+        okText="开始复制"
+        cancelText="取消"
+        confirmLoading={copyOrgSubmitting}
+        onCancel={() => setCopyOrgModalOpen(false)}
+        onOk={() => void submitCopyOrgRules()}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ color: '#64748b' }}>会复制当前部门的模板绑定和自定义协同规则到目标销售部门。</div>
+          <TreeSelect
+            value={copyOrgTargetIds}
+            treeData={salesOrgTree}
+            treeCheckable
+            multiple
+            allowClear
+            showSearch
+            treeDefaultExpandAll
+            placeholder="选择目标销售部门"
+            onChange={value => setCopyOrgTargetIds((value || []) as string[])}
+            style={{ width: '100%' }}
+          />
+        </div>
       </Modal>
     </div>
   );
