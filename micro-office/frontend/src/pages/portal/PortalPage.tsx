@@ -252,6 +252,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const [data, setData] = useState<PortalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingPortalValue, setPendingPortalValue] = useState<string>();
 
   const positionIdParam = searchParams.get('positionId') || undefined;
   const scopeParam = searchParams.get('scope') || undefined;
@@ -292,6 +293,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         }
       } finally {
         if (!cancelled) {
+          setPendingPortalValue(undefined);
           setLoading(false);
         }
       }
@@ -362,10 +364,10 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     }
 
     const matched = findMatchedOption(portalOptions, [
-      positionIdParam,
       ...buildSelectionCandidates(data?.activePortal),
       normalizeText(header.positionId),
       normalizeText(header.primaryPositionId),
+      positionIdParam,
     ]);
 
     if (matched) {
@@ -407,7 +409,18 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         ? 'USER_SALES'
         : currentPortalVariant
   );
+  const activePortalValue = activePortalOption?.requestValue ?? activePortalOption?.key;
   const portalSwitchValue = activePortalOption?.requestValue ?? activePortalOption?.key ?? portalOptions[0]?.requestValue ?? portalOptions[0]?.key;
+  const primaryPortalValue = normalizeText(header.primaryPositionId)
+    ?? portalOptions.find(option => option.badge === '主岗位')?.requestValue;
+  const pendingPortalOption = useMemo(() => {
+    if (!pendingPortalValue) {
+      return null;
+    }
+
+    return portalOptions.find(option => (option.requestValue ?? option.key) === pendingPortalValue) || null;
+  }, [pendingPortalValue, portalOptions]);
+  const isPortalSwitchPending = !!pendingPortalOption && pendingPortalOption.requestValue !== activePortalValue;
   const showContextPanel = hasPortalFeature || hasScopeFeature || !!customerPerspectiveLabel;
 
   const listRoute = useMemo(() => {
@@ -447,10 +460,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   };
 
   const handlePortalSwitch = (option: NormalizedContextOption) => {
-    if (!option.requestValue || option.requestValue === positionIdParam) {
+    if (!option.requestValue || option.requestValue === activePortalValue || loading) {
       return;
     }
-    updateQueryParams({ positionId: option.requestValue });
+
+    setPendingPortalValue(option.requestValue);
+    updateQueryParams({
+      positionId: option.requestValue === primaryPortalValue ? undefined : option.requestValue,
+    });
   };
 
   const handlePortalSwitchValue = (value: string | number) => {
@@ -930,6 +947,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       hints.push(portalDetail ? `岗位上下文：${portalDetail}` : `当前人员门户按“${activePortalOption.label}”岗位展示`);
     }
 
+    if (isPortalSwitchPending && pendingPortalOption) {
+      const pendingDetail = pendingPortalOption.portalLabel
+        ? `${pendingPortalOption.label} · ${pendingPortalOption.portalLabel}`
+        : pendingPortalOption.label;
+      hints.push(`切换中：正在加载“${pendingDetail}”门户数据`);
+    }
+
     if (entityType === 'users' && selectedPortalLabel) {
       hints.push(`当前门户类型：${selectedPortalLabel}`);
     }
@@ -943,7 +967,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     }
 
     return hints.join('；');
-  }, [activePortalOption, activeScopeOption, customerPerspectiveHint, customerPerspectiveLabel, entityType, selectedPortalLabel]);
+  }, [activePortalOption, activeScopeOption, customerPerspectiveHint, customerPerspectiveLabel, entityType, isPortalSwitchPending, pendingPortalOption, selectedPortalLabel]);
 
   const renderContextPanel = () => {
     if (!showContextPanel) {
@@ -976,6 +1000,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                 <Radio.Group
                   className="portal-position-radio-group"
                   value={portalSwitchValue}
+                  disabled={loading}
                   onChange={event => handlePortalSwitchValue(event.target.value)}
                 >
                   {portalOptions.map(option => {
@@ -993,6 +1018,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                     );
                   })}
                 </Radio.Group>
+                {isPortalSwitchPending && pendingPortalOption ? (
+                  <div className="portal-switch__status">
+                    正在切换到 {pendingPortalOption.label}
+                    {pendingPortalOption.portalLabel ? ` · ${pendingPortalOption.portalLabel}` : ''}
+                    ，当前页面会在刷新完成后再更新展示。
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -1019,7 +1051,9 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const isInitialLoading = loading && !data;
   const isRefreshing = loading && !!data;
   const refreshingMessage = entityType === 'users'
-    ? '正在切换岗位门户并刷新数据...'
+    ? isPortalSwitchPending && pendingPortalOption
+      ? `正在切换到 ${pendingPortalOption.label}${pendingPortalOption.portalLabel ? ` · ${pendingPortalOption.portalLabel}` : ''} 并刷新数据...`
+      : '正在刷新人员门户数据...'
     : '正在刷新门户数据...';
 
   return (

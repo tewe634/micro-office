@@ -160,6 +160,12 @@ body {
   color: #475569;
 }
 
+.portal-switch__status {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #475569;
+}
+
 .portal-position-radio-group.ant-radio-group {
   display: flex;
   flex-wrap: wrap;
