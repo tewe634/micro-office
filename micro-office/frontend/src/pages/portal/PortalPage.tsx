@@ -194,17 +194,23 @@ function dedupeOptions(options: NormalizedContextOption[]) {
 }
 
 function findMatchedOption(options: NormalizedContextOption[], candidates: Array<string | undefined>) {
-  const candidateSet = new Set(candidates.filter(Boolean) as string[]);
-  if (!candidateSet.size) {
+  const orderedCandidates = candidates.filter(Boolean) as string[];
+  if (!orderedCandidates.length) {
     return null;
   }
 
-  return (
-    options.find(option => option.requestValue && candidateSet.has(option.requestValue))
-    || options.find(option => candidateSet.has(option.key))
-    || options.find(option => candidateSet.has(option.label))
-    || null
-  );
+  for (const candidate of orderedCandidates) {
+    const matched = options.find(option => (
+      (option.requestValue && option.requestValue === candidate)
+      || option.key === candidate
+      || option.label === candidate
+    ));
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return null;
 }
 
 function normalizePortalSelection(value: PortalSelection | undefined | null) {
