@@ -31,16 +31,20 @@ const pageTitles: Record<string, string> = {
   '/objects': '外部对象管理',
   '/products': '产品与服务',
   '/admin/permissions': '权限配置',
+  '/admin/sales-collab': '销售协同配置',
 };
 
 const menuOrder = ['/org', '/users', '/objects', '/products'];
 
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
+  { key: '/admin/sales-collab', label: '销售协同配置' },
 ];
 
 function resolveSelectedKey(pathname: string) {
-  if (pathname.startsWith('/admin')) return pathname.startsWith('/admin/permissions') ? '/admin/permissions' : '/admin';
+  if (pathname.startsWith('/admin/sales-collab')) return '/admin/sales-collab';
+  if (pathname.startsWith('/admin/permissions')) return '/admin/permissions';
+  if (pathname.startsWith('/admin')) return '/admin';
   if (pathname.startsWith('/users')) return '/users';
   if (pathname.startsWith('/objects')) return '/objects';
   if (pathname.startsWith('/products')) return '/products';

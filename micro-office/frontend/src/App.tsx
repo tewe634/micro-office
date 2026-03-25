@@ -13,6 +13,7 @@ const UserAndPositionPage = lazy(() => import('./pages/user/UserAndPositionPage'
 const ObjectPage = lazy(() => import('./pages/object/ObjectPage'));
 const ProductPage = lazy(() => import('./pages/product/ProductPage'));
 const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage'));
+const AdminSalesCollabPage = lazy(() => import('./pages/admin/AdminSalesCollabPage'));
 const PortalPage = lazy(() => import('./pages/portal/PortalPage'));
 
 const appLocale = {
@@ -168,6 +169,7 @@ export default function App() {
               <Route path="products/:id/portal" element={<MenuRouteGuard menuKey="/products"><PortalPage entityType="products" /></MenuRouteGuard>} />
               <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />
               <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
+              <Route path="admin/sales-collab" element={<MenuRouteGuard menuKey="/admin/sales-collab"><AdminSalesCollabPage /></MenuRouteGuard>} />
             </Route>
           </Routes>
         </Suspense>

@@ -29,6 +29,7 @@ const menus = [
   { key: '/products', label: '产品服务' },
   { key: '/admin', label: '系统管理' },
   { key: '/admin/permissions', label: '权限配置' },
+  { key: '/admin/sales-collab', label: '销售协同配置' },
 ];
 
 const objectTypes = [

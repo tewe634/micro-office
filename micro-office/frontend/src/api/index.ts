@@ -166,6 +166,21 @@ export const adminApi = {
   savePositionObjectTypes: (data: Record<string, string[]>) => api.put('/admin/position-object-types', data),
 };
 
+export const salesCollabApi = {
+  meta: () => api.get('/admin/sales-collab/meta'),
+  listTemplates: () => api.get('/admin/sales-collab/templates'),
+  getTemplate: (id: string | number) => api.get(`/admin/sales-collab/templates/${id}`),
+  createTemplate: (data: any) => api.post('/admin/sales-collab/templates', data),
+  updateTemplate: (id: string | number, data: any) => api.put(`/admin/sales-collab/templates/${id}`, data),
+  deleteTemplate: (id: string | number) => api.delete(`/admin/sales-collab/templates/${id}`),
+  saveTemplateRules: (id: string | number, data: any) => api.put(`/admin/sales-collab/templates/${id}/rules`, data),
+  getOrgBinding: (orgId: string | number) => api.get(`/admin/sales-collab/org-binding/${orgId}`),
+  saveOrgBinding: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-binding/${orgId}`, data),
+  getOrgRules: (orgId: string | number) => api.get(`/admin/sales-collab/org-rules/${orgId}`),
+  saveOrgRules: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-rules/${orgId}`, data),
+  preview: (data: any) => api.post('/admin/sales-collab/preview', data),
+};
+
 export const portalApi = {
   user: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/users/${id}`, { params }),
   object: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/objects/${id}`, { params }),
