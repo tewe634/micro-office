@@ -200,7 +200,7 @@ public class PortalController {
             summaryCard("salesAmount", "年度销售额", totalAmount, "元"),
             summaryCard("salespeople", "销售人数", salesRefs.size(), "人"),
             summaryCard("customers", "覆盖客户", usedCustomerIds.size(), "家"),
-            summaryCard("openWork", "关联工作", countStatuses(workItems, "ACTIVE"), "项")
+            summaryCard("openWork", "关联工作", countStatuses(workItems, "TODO") + countStatuses(workItems, "IN_PROGRESS"), "项")
         ));
         result.put("salesSummary", salesSummary);
         result.put("performanceItems", performanceItems);
@@ -294,7 +294,7 @@ public class PortalController {
             summaryCard("performance", "年度绩效额", totalAmount, "元"),
             summaryCard("participants", perspective.summaryLabel(), participantRefs.size(), "人"),
             summaryCard("products", "相关产品", productRefs.size(), "项"),
-            summaryCard("openWork", "待推进工作", countStatuses(workItems, "ACTIVE"), "项")
+            summaryCard("openWork", "待推进工作", countStatuses(workItems, "TODO") + countStatuses(workItems, "IN_PROGRESS"), "项")
         ));
         result.put("salesSummary", salesSummary);
         result.put("performanceItems", performanceItems);
@@ -318,9 +318,9 @@ public class PortalController {
         result.put("variant", "OBJECT_WORK");
         result.put("summaryCards", List.of(
             summaryCard("workTotal", "关联工作", workItems.size(), "项"),
-            summaryCard("active", "进行中", countStatuses(workItems, "ACTIVE"), "项"),
-            summaryCard("completed", "已完成", countStatuses(workItems, "COMPLETED"), "项"),
-            summaryCard("owners", "参与人员", ownerRefs.size(), "人")
+            summaryCard("todo", "待办", countStatuses(workItems, "TODO"), "项"),
+            summaryCard("active", "进行中", countStatuses(workItems, "IN_PROGRESS"), "项"),
+            summaryCard("completed", "已完成", countStatuses(workItems, "COMPLETED"), "项")
         ));
         result.put("workOwnerSummary", workOwnerSummary);
         result.put("workSummary", buildWorkSummary(workItems));
@@ -464,13 +464,14 @@ public class PortalController {
             result.put("summaryCards", List.of(
                 summaryCard("performance", "当前绩效", totalAmount, "元"),
                 summaryCard("customers", "关联客户", customerRefs.size(), "家"),
-                summaryCard("products", "关联产品", productRefs.size(), "项"),
-                summaryCard("openWork", "待推进工作", countStatuses(workItems, "ACTIVE"), "项")
+                summaryCard("products", "主推变频器", productRefs.size(), "款"),
+                summaryCard("openWork", "待推进工作", countStatuses(workItems, "TODO") + countStatuses(workItems, "IN_PROGRESS"), "项")
             ));
             result.put("customerPerformance", customerPerformance);
             result.put("performanceItems", performanceItems);
             result.put("relatedCustomers", customerPerformance);
             result.put("relatedProducts", relatedProducts);
+            result.put("salesRanking", buildSalesRanking(user, salesRefs, productRefs, seed));
             result.put("workSummary", buildWorkSummary(workItems));
             result.put("workItems", workItems);
             return result;
@@ -509,9 +510,9 @@ public class PortalController {
         result.put("variant", variant);
         result.put("summaryCards", List.of(
             summaryCard("workTotal", "关联工作", workItems.size(), "项"),
-            summaryCard("active", "进行中", countStatuses(workItems, "ACTIVE"), "项"),
-            summaryCard("completed", "已完成", countStatuses(workItems, "COMPLETED"), "项"),
-            summaryCard("objects", "关联对象", objectRefs.size(), "个")
+            summaryCard("todo", "待办", countStatuses(workItems, "TODO"), "项"),
+            summaryCard("active", "进行中", countStatuses(workItems, "IN_PROGRESS"), "项"),
+            summaryCard("completed", "已完成", countStatuses(workItems, "COMPLETED"), "项")
         ));
         result.put("workBuckets", workBuckets);
         result.put("workSummary", buildWorkSummary(workItems));
@@ -601,13 +602,13 @@ public class PortalController {
             return List.of();
         }
         List<Map<String, Object>> rows = new ArrayList<>();
-        List<String> topics = List.of("客户拜访", "报价推进", "合同对齐", "回款确认", "交付复盘");
-        for (int i = 0; i < 5; i++) {
+        List<String> topics = List.of("ASC580报价跟进", "样机测试安排", "商务条款确认", "交付排期同步", "回款与复盘");
+        for (int i = 0; i < 6; i++) {
             RefItem customer = customerRefs.get(i % customerRefs.size());
             RefItem productRef = productRefs.get((i + 1) % productRefs.size());
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", "sales-user-work-" + i);
-            row.put("title", customer.name() + topics.get(i % topics.size()));
+            row.put("title", customer.name() + " · " + topics.get(i % topics.size()));
             row.put("status", workStatus(seed, i));
             row.put("stage", topics.get(i % topics.size()));
             row.put("ownerId", user.getId());
@@ -617,6 +618,35 @@ public class PortalController {
             row.put("productId", productRef.id());
             row.put("productName", productRef.name());
             row.put("updatedAt", mockDate(seed, 6 + i * 12));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private List<Map<String, Object>> buildSalesRanking(SysUser currentUser,
+                                                        List<RefItem> salesRefs,
+                                                        List<RefItem> productRefs,
+                                                        int seed) {
+        if (salesRefs.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        List<RefItem> rankingSales = salesRefs.size() >= 4 ? salesRefs.subList(0, 4) : salesRefs;
+        for (int i = 0; i < rankingSales.size(); i++) {
+            RefItem sale = rankingSales.get(i);
+            RefItem focusProduct = productRefs.get(Math.floorMod(seed + i, productRefs.size()));
+            int rank = i + 1;
+            int completionRate = 72 + Math.floorMod(seed + i * 9, 23);
+            int salesAmount = 780000 + Math.floorMod(seed + i * 137000, 460000);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", sale.id());
+            row.put("rank", rank);
+            row.put("salespersonId", sale.id());
+            row.put("salespersonName", sale.name());
+            row.put("salesAmount", salesAmount);
+            row.put("completionRate", completionRate);
+            row.put("focusProduct", focusProduct.name());
+            row.put("currentUser", currentUser != null && Objects.equals(currentUser.getId(), sale.id()));
             rows.add(row);
         }
         return rows;
@@ -633,7 +663,7 @@ public class PortalController {
                     continue;
                 }
                 total++;
-                if ("ACTIVE".equals(workItem.get("status"))) {
+                if ("TODO".equals(workItem.get("status")) || "IN_PROGRESS".equals(workItem.get("status"))) {
                     active++;
                 }
                 if ("COMPLETED".equals(workItem.get("status"))) {
@@ -841,9 +871,9 @@ public class PortalController {
     private Map<String, Object> buildWorkSummary(List<Map<String, Object>> workItems) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("total", workItems.size());
-        summary.put("active", countStatuses(workItems, "ACTIVE"));
+        summary.put("todo", countStatuses(workItems, "TODO"));
+        summary.put("inProgress", countStatuses(workItems, "IN_PROGRESS"));
         summary.put("completed", countStatuses(workItems, "COMPLETED"));
-        summary.put("archived", countStatuses(workItems, "ARCHIVED"));
         summary.put("cancelled", countStatuses(workItems, "CANCELLED"));
         return summary;
     }
@@ -991,13 +1021,6 @@ public class PortalController {
     }
 
     private List<RefItem> loadProductRefs() {
-        List<RefItem> refs = jdbc.query(
-            "SELECT id, name, COALESCE(code, '') AS meta FROM product ORDER BY code, name, id LIMIT 16",
-            (rs, rowNum) -> new RefItem(rs.getString("id"), rs.getString("name"), rs.getString("meta"))
-        );
-        if (!refs.isEmpty()) {
-            return refs;
-        }
         return fallbackProducts();
     }
 
@@ -1051,13 +1074,16 @@ public class PortalController {
 
     private String workStatus(int seed, int index) {
         int value = Math.floorMod(seed + index * 7, 10);
-        if (value <= 4) {
-            return "ACTIVE";
+        if (value <= 2) {
+            return "TODO";
         }
-        if (value <= 7) {
+        if (value <= 5) {
+            return "IN_PROGRESS";
+        }
+        if (value <= 8) {
             return "COMPLETED";
         }
-        return value == 8 ? "ARCHIVED" : "CANCELLED";
+        return "CANCELLED";
     }
 
     private String cycle(List<String> values, int index) {
@@ -1156,10 +1182,12 @@ public class PortalController {
 
     private List<RefItem> fallbackProducts() {
         return List.of(
-            new RefItem("mock-product-1", "低压变频柜", "ABB-INV-1001"),
-            new RefItem("mock-product-2", "成套控制箱", "ABB-PNL-2012"),
-            new RefItem("mock-product-3", "智能传动单元", "INVEX-DRV-3008"),
-            new RefItem("mock-product-4", "远程监控模块", "INVEX-IOT-4106")
+            new RefItem("mock-product-1", "ASC580 变频器", "ASC580-01-017A-4"),
+            new RefItem("mock-product-2", "ACS880 工业传动变频器", "ACS880-01-065A-3"),
+            new RefItem("mock-product-3", "ACH580 暖通变频器", "ACH580-01-072A-4"),
+            new RefItem("mock-product-4", "ACQ580 水务变频器", "ACQ580-01-046A-4"),
+            new RefItem("mock-product-5", "ACS380 机械类变频器", "ACS380-040S-04A0-4"),
+            new RefItem("mock-product-6", "ACS180 微型变频器", "ACS180-04E-07A7-4")
         );
     }
 

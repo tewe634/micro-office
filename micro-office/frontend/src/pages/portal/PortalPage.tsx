@@ -30,10 +30,17 @@ const roleColorMap: Record<string, string> = {
 };
 
 const statusColorMap: Record<string, string> = {
-  ACTIVE: 'processing',
+  TODO: 'default',
+  IN_PROGRESS: 'processing',
   COMPLETED: 'success',
-  ARCHIVED: 'default',
   CANCELLED: 'error',
+};
+
+const statusLabelMap: Record<string, string> = {
+  TODO: '待办',
+  IN_PROGRESS: '进行中',
+  COMPLETED: '已完成',
+  CANCELLED: '取消',
 };
 
 const scopeLabelMap: Record<string, string> = {
@@ -578,7 +585,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (value: string) => <Tag color={statusColorMap[value] || 'default'}>{value || '-'}</Tag>,
+      render: (value: string) => <Tag color={statusColorMap[value] || 'default'}>{statusLabelMap[value] || value || '-'}</Tag>,
     },
     {
       title: '负责人',
@@ -626,9 +633,9 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       title="关联工作"
       extra={(
         <Space wrap>
-          <Tag color="processing">进行中 {workSummary.active || 0}</Tag>
+          <Tag>待办 {workSummary.todo || 0}</Tag>
+          <Tag color="processing">进行中 {workSummary.inProgress || 0}</Tag>
           <Tag color="success">已完成 {workSummary.completed || 0}</Tag>
-          <Tag>归档 {workSummary.archived || 0}</Tag>
           <Tag color="error">取消 {workSummary.cancelled || 0}</Tag>
         </Space>
       )}
@@ -834,7 +841,44 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const renderSalesUserPortal = () => (
     <>
       <Row gutter={[16, 16]}>
-        <Col xs={24} xl={16}>
+        <Col xs={24} xl={10}>
+          <Card title="销售排名" style={{ height: '100%' }}>
+            <Table
+              dataSource={data?.salesRanking || []}
+              rowKey={(record: any) => String(record.id || record.salespersonName)}
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: '排名',
+                  dataIndex: 'rank',
+                  width: 80,
+                  render: (value: unknown, record: any) => (
+                    <Space size={6}>
+                      <span style={{ fontWeight: 700 }}>{String(value ?? '-')}</span>
+                      {record.currentUser ? <Tag color="blue">我</Tag> : null}
+                    </Space>
+                  ),
+                },
+                { title: '销售人员', dataIndex: 'salespersonName', width: 120 },
+                {
+                  title: '销售额',
+                  dataIndex: 'salesAmount',
+                  width: 140,
+                  render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+                },
+                {
+                  title: '达成率',
+                  dataIndex: 'completionRate',
+                  width: 100,
+                  render: (value: any) => `${value || 0}%`,
+                },
+                { title: '主推产品', dataIndex: 'focusProduct' },
+              ]}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} xl={14}>
           <Card title={`${header.positionName || '当前岗位'}客户绩效分布`} style={{ height: '100%' }}>
             <Table
               dataSource={data?.customerPerformance || []}
@@ -860,8 +904,11 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             />
           </Card>
         </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
         <Col xs={24} xl={8}>
-          <Card title="关联产品" style={{ height: '100%' }}>
+          <Card title="主推变频器" style={{ height: '100%' }}>
             <List
               size="small"
               dataSource={data?.relatedProducts || []}
@@ -869,7 +916,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               renderItem={(item: any) => (
                 <List.Item>
                   <div style={{ width: '100%' }}>
-                    <div>{renderPortalLink('products', item.id, item.name)}</div>
+                    <div style={{ fontWeight: 600 }}>{renderPortalLink('products', item.id, item.name)}</div>
                     <div style={{ color: '#6b7280', fontSize: 12 }}>
                       {(item.code || '-')}{' · '}{formatAmount(item.amount)}
                     </div>
@@ -879,9 +926,31 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             />
           </Card>
         </Col>
+        <Col xs={24} xl={16}>
+          <Card title="关联工作状态" style={{ height: '100%' }}>
+            <Row gutter={[12, 12]}>
+              {[
+                { key: 'todo', label: '待办', color: '#6b7280' },
+                { key: 'inProgress', label: '进行中', color: '#1677ff' },
+                { key: 'completed', label: '已完成', color: '#16a34a' },
+                { key: 'cancelled', label: '取消', color: '#dc2626' },
+              ].map(item => (
+                <Col xs={12} md={6} key={item.key}>
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, background: '#fafafa' }}>
+                    <div style={{ color: item.color, fontWeight: 600, marginBottom: 8 }}>{item.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 700 }}>{data?.workSummary?.[item.key] || 0}</div>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+            <div style={{ color: '#64748b', marginTop: 12 }}>
+              关联工作按销售推进过程拆分为待办、进行中、已完成、取消四种状态，便于查看当前推进节奏。
+            </div>
+          </Card>
+        </Col>
       </Row>
 
-      <Card title={`${header.positionName || '当前岗位'}绩效明细`}>
+      <Card title={`${header.positionName || '当前岗位'}销售过程明细`}>
         <Table
           dataSource={data?.performanceItems || []}
           rowKey={(record: any) => String(record.id || `${record.customerName}-${record.productName}`)}
