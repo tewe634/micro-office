@@ -125,26 +125,6 @@ type OrgRuleDetail = {
   groups: GroupMeta[];
 };
 
-type PreviewPayload = {
-  group: { id: string; groupKey: string; groupName: string; domainKey: string };
-  owner?: { userId: string; name: string; orgId?: string; orgName?: string } | null;
-  collaborators: Array<{
-    userId: string;
-    name: string;
-    orgId?: string;
-    orgName?: string;
-    sourceType?: string;
-    sourceRefName?: string;
-    resolvedBy?: string;
-  }>;
-  unmatchedRules: Array<{
-    reason: string;
-    sourceType?: string;
-    sourceRefName?: string;
-    resolveScopeType?: string;
-  }>;
-};
-
 type TemplateModalMode = 'create' | 'edit';
 
 const TECH_GROUP_KEY = 'TECH_COLLAB';
@@ -528,10 +508,6 @@ export default function AdminSalesCollabPage() {
   const [orgRuleDetail, setOrgRuleDetail] = useState<OrgRuleDetail | null>(null);
   const [bindingSaving, setBindingSaving] = useState(false);
   const [orgRulesSaving, setOrgRulesSaving] = useState(false);
-  const [previewSceneKey, setPreviewSceneKey] = useState<string>();
-  const [previewSalesOwnerUserId, setPreviewSalesOwnerUserId] = useState<string>();
-  const [previewData, setPreviewData] = useState<PreviewPayload | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateModalMode, setTemplateModalMode] = useState<TemplateModalMode>('create');
   const [templateDuplicating, setTemplateDuplicating] = useState(false);
@@ -597,7 +573,6 @@ export default function AdminSalesCollabPage() {
   useEffect(() => {
     if (!selectedOrgId) {
       setOrgRuleDetail(null);
-      setPreviewData(null);
       return;
     }
     const load = async () => {
@@ -613,7 +588,6 @@ export default function AdminSalesCollabPage() {
           customRules: normalizeRules(group.customRules),
         })),
       });
-      setPreviewData(null);
     };
     void load();
   }, [selectedOrgId]);
@@ -622,13 +596,6 @@ export default function AdminSalesCollabPage() {
   const salesOrgIds = useMemo(() => (salesRoot ? collectDescendantIds(salesRoot.id, orgs) : new Set<string>()), [orgs, salesRoot]);
   const salesOrgTree = useMemo(() => buildTree(orgs, salesRoot ? salesOrgIds : undefined, salesRoot?.id, salesRoot?.id), [orgs, salesOrgIds, salesRoot]);
   const allOrgTree = useMemo(() => buildTree(orgs), [orgs]);
-  const sceneOptions = useMemo(() => {
-    const groups = meta?.groups || [];
-    return groups.flatMap(group => (group.scenes || []).map(scene => ({
-      value: scene.sceneKey,
-      label: `${scene.sceneName}（${group.groupName}）`,
-    })));
-  }, [meta]);
 
   const refreshTemplates = async (preferId?: string) => {
     const response: any = await salesCollabApi.listTemplates();
@@ -842,24 +809,6 @@ export default function AdminSalesCollabPage() {
     }
   };
 
-  const loadPreview = async () => {
-    if (!selectedOrgId || !previewSceneKey || !previewSalesOwnerUserId) {
-      message.warning('请选择销售部门、协同场景和业务销售负责人');
-      return;
-    }
-    setPreviewLoading(true);
-    try {
-      const response: any = await salesCollabApi.preview({
-        orgId: selectedOrgId,
-        sceneKey: previewSceneKey,
-        salesOwnerUserId: previewSalesOwnerUserId,
-      });
-      setPreviewData(response.data as PreviewPayload);
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
-
   return (
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Alert
@@ -1037,79 +986,6 @@ export default function AdminSalesCollabPage() {
                         </Space>
                       </Card>
 
-                      <Card title="责任人预览">
-                        <div style={{ display: 'grid', gridTemplateColumns: '280px 280px auto', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-                          <Select
-                            value={previewSceneKey}
-                            options={sceneOptions}
-                            placeholder="选择协同场景"
-                            onChange={value => setPreviewSceneKey(value)}
-                          />
-                          <Select
-                            showSearch
-                            optionFilterProp="label"
-                            value={previewSalesOwnerUserId}
-                            options={userOptions}
-                            placeholder="选择业务销售负责人"
-                            onChange={value => setPreviewSalesOwnerUserId(value)}
-                          />
-                          <Button loading={previewLoading} onClick={() => void loadPreview()}>预览解析结果</Button>
-                        </div>
-
-                        {!previewData ? (
-                          <Empty description="选择场景与业务销售负责人后可预览最终参与人" />
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                            <div>
-                              <Space size={[8, 8]} wrap>
-                                <Tag color="purple">{previewData.group.groupName}</Tag>
-                                <Tag>{previewData.owner?.name || '未指定销售负责人'}</Tag>
-                                {previewData.owner?.orgName ? <Tag>{previewData.owner.orgName}</Tag> : null}
-                              </Space>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontWeight: 600 }}>协同人</div>
-                              {previewData.collaborators.length ? previewData.collaborators.map(user => (
-                                <div
-                                  key={user.userId}
-                                  style={{
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: 12,
-                                    padding: '10px 12px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    gap: 12,
-                                    background: '#fafafa',
-                                  }}
-                                >
-                                  <Space size={[8, 8]} wrap>
-                                    <span>{user.name}</span>
-                                    {user.orgName ? <Tag>{user.orgName}</Tag> : null}
-                                    {user.sourceRefName ? <Tag color="blue">{user.sourceRefName}</Tag> : null}
-                                  </Space>
-                                  <span style={{ color: '#94a3b8' }}>{user.resolvedBy || user.sourceType}</span>
-                                </div>
-                              )) : <div style={{ color: '#94a3b8' }}>当前没有解析出协同人</div>}
-                            </div>
-
-                            {previewData.unmatchedRules.length ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div style={{ fontWeight: 600 }}>未命中规则</div>
-                                {previewData.unmatchedRules.map((item, index) => (
-                                  <Alert
-                                    key={`${item.reason}-${index}`}
-                                    type="warning"
-                                    showIcon
-                                    message={item.reason}
-                                    description={[item.sourceRefName, item.resolveScopeType].filter(Boolean).join(' / ') || '请检查规则配置'}
-                                  />
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </Card>
                     </>
                   )}
                 </div>

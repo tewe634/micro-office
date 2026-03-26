@@ -180,7 +180,6 @@ export const salesCollabApi = {
   getOrgRules: (orgId: string | number) => api.get(`/admin/sales-collab/org-rules/${orgId}`),
   saveOrgRules: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-rules/${orgId}`, data),
   copyOrgRules: (orgId: string | number, data: any) => api.post(`/admin/sales-collab/org-rules/${orgId}/copy`, data),
-  preview: (data: any) => api.post('/admin/sales-collab/preview', data),
 };
 
 export const portalApi = {

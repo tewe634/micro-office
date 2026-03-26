@@ -328,45 +328,6 @@ public class SalesCollabController {
         return ApiResponse.ok(result);
     }
 
-    @PostMapping("/preview")
-    public ApiResponse<Map<String, Object>> preview(@RequestBody Map<String, Object> body, Authentication auth) {
-        requireAdmin(auth);
-        String orgId = requireText(body.get("orgId"), "请选择销售部门");
-        String salesOwnerUserId = asNullableString(body.get("salesOwnerUserId"));
-        String groupId = asNullableString(body.get("groupId"));
-        String groupKey = asNullableString(body.get("groupKey"));
-        String sceneKey = asNullableString(body.get("sceneKey"));
-
-        Map<String, Object> group = resolveTargetGroup(groupId, groupKey, sceneKey);
-        if (group == null) {
-            throw new IllegalArgumentException("未找到对应的协同组");
-        }
-
-        String targetGroupId = asString(group.get("id"));
-        Map<String, Object> binding = loadOrgBinding(orgId);
-        String templateId = asNullableString(binding.get("templateId"));
-        Map<String, List<Map<String, Object>>> templateRulesByGroup = templateId == null
-            ? Map.of()
-            : loadTemplateRulesByGroup(templateId);
-        Map<String, List<Map<String, Object>>> orgRulesByGroup = loadOrgRulesByGroup(orgId);
-
-        List<Map<String, Object>> effectiveRules = new ArrayList<>(orgRulesByGroup.getOrDefault(
-            targetGroupId,
-            templateRulesByGroup.getOrDefault(targetGroupId, List.of())
-        ));
-
-        Map<String, Object> owner = salesOwnerUserId == null ? null : loadUserSummary(salesOwnerUserId);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("group", buildGroupSummary(group));
-        result.put("owner", owner);
-        Map<String, Object> resolved = resolveCollaborators(orgId, owner, effectiveRules);
-        result.put("collaborators", resolved.get("collaborators"));
-        result.put("unmatchedRules", resolved.get("unmatchedRules"));
-        result.put("binding", binding);
-        return ApiResponse.ok(result);
-    }
-
     private void requireAdmin(Authentication auth) {
         String currentUserId = (String) auth.getPrincipal();
         menuPermissionService.requireMenu(currentUserId, "/admin");
