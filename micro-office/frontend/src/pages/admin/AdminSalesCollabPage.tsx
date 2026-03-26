@@ -156,7 +156,7 @@ function localKey() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function createEmptyRule(sortOrder = 10): RuleItem {
+function createEmptyRule(sortOrder = 0): RuleItem {
   return {
     participantRole: 'COLLABORATOR',
     sourceType: 'USER',
@@ -409,9 +409,8 @@ function RuleEditor({
   };
 
   const addRule = () => {
-    const maxSort = rules.reduce((max, rule) => Math.max(max, rule.sortOrder || 0), 0);
     const defaultSourceType = sourceTypeOptions[0]?.value || 'USER';
-    const nextRule = createEmptyRule(maxSort + 10);
+    const nextRule = createEmptyRule(0);
     nextRule.sourceType = defaultSourceType;
     nextRule.sourceRefId = undefined;
     nextRule.sourceRefName = defaultSourceType === 'LEADER' ? '领导' : undefined;
