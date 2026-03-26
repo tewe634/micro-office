@@ -133,7 +133,6 @@ type PreviewPayload = {
     name: string;
     orgId?: string;
     orgName?: string;
-    dutyLabel?: string;
     sourceType?: string;
     sourceRefName?: string;
     resolvedBy?: string;
@@ -142,7 +141,6 @@ type PreviewPayload = {
     reason: string;
     sourceType?: string;
     sourceRefName?: string;
-    dutyLabel?: string;
     resolveScopeType?: string;
   }>;
 };
@@ -191,13 +189,11 @@ function isTechGroup(groupKey?: string) {
 
 function buildRuleSignature(rule: RuleItem) {
   return [
-    rule.participantRole || '',
     rule.sourceType || '',
     rule.sourceRefId || '',
     rule.sourceRefName || '',
     rule.resolveScopeType || '',
     rule.resolveScopeRefId || '',
-    rule.dutyLabel || '',
     String(rule.enabled ?? true),
     rule.remark || '',
   ].join('|');
@@ -319,6 +315,28 @@ function collectDescendantIds(rootId: string, items: OrgItem[]) {
   return result;
 }
 
+function serializeRule(rule: RuleItem) {
+  const { _localKey, dutyLabel: _dutyLabel, participantRole: _participantRole, ...payload } = rule;
+  return payload;
+}
+
+function ManagementLeaderHint() {
+  return (
+    <Alert
+      type="info"
+      showIcon
+      message="管理沟通协同 · 领导匹配逻辑"
+      description={(
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div>当前部门：业务销售负责人是销售员时，匹配当前部门直属领导；如果负责人本身就是部门经理，则自动上提到上一级组织领导。</div>
+          <div>当前销售大区：匹配业务销售负责人所在销售大区/业务部的直属领导；若本级无人，再继续向上一级管理组织查找。</div>
+          <div>固定组织：匹配所选组织的直属领导；若命中本人，则自动跳过本人并继续向上一级组织查找。</div>
+        </div>
+      )}
+    />
+  );
+}
+
 function RuleSummary({ rules, scopeLabelMap }: { rules: RuleItem[]; scopeLabelMap: Record<string, string> }) {
   if (!rules.length) {
     return <div style={{ color: '#94a3b8' }}>暂无协同规则</div>;
@@ -345,11 +363,10 @@ function RuleSummary({ rules, scopeLabelMap }: { rules: RuleItem[]; scopeLabelMa
           >
             <Space size={[8, 4]} wrap>
               <Tag color="blue">{sourceLabel}</Tag>
-              <span>{rule.sourceRefName || (isLeader ? '领导' : '-')}</span>
+              <span>{rule.sourceRefName || (isLeader ? '按业务销售负责人自动解析' : '-')}</span>
               {(isPosition || isLeader) && rule.resolveScopeType ? (
                 <Tag>{scopeLabelMap[rule.resolveScopeType] || rule.resolveScopeType}</Tag>
               ) : null}
-              {rule.dutyLabel ? <Tag color="gold">{rule.dutyLabel}</Tag> : null}
               {rule.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
             </Space>
             <span style={{ color: '#94a3b8' }}>排序 {rule.sortOrder}</span>
@@ -387,7 +404,14 @@ function RuleEditor({
 
   const addRule = () => {
     const maxSort = rules.reduce((max, rule) => Math.max(max, rule.sortOrder || 0), 0);
-    onChange([...rules, createEmptyRule(maxSort + 10)]);
+    const defaultSourceType = sourceTypeOptions.length === 1 ? sourceTypeOptions[0].value : 'USER';
+    const nextRule = createEmptyRule(maxSort + 10);
+    nextRule.sourceType = defaultSourceType;
+    nextRule.sourceRefId = undefined;
+    nextRule.sourceRefName = defaultSourceType === 'LEADER' ? '领导' : undefined;
+    nextRule.resolveScopeType = defaultSourceType === 'POSITION' || defaultSourceType === 'LEADER' ? 'CURRENT_SALES_DEPT' : undefined;
+    nextRule.resolveScopeRefId = undefined;
+    onChange([...rules, nextRule]);
   };
 
   return (
@@ -410,10 +434,11 @@ function RuleEditor({
               gap: 10,
             }}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 160px 1fr 140px 110px auto', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 170px 1fr 110px auto', gap: 10 }}>
               <Select
                 value={rule.sourceType}
                 options={sourceTypeOptions}
+                disabled={sourceTypeOptions.length === 1}
                 onChange={value => updateRule(ruleKey, {
                   sourceType: value,
                   sourceRefId: undefined,
@@ -427,7 +452,7 @@ function RuleEditor({
                 optionFilterProp="label"
                 value={isLeader ? undefined : rule.sourceRefId}
                 options={isPosition ? positionOptions : userOptions}
-                placeholder={isPosition ? '选择岗位' : isLeader ? '按领导自动解析' : '选择人员'}
+                placeholder={isPosition ? '选择岗位' : isLeader ? '按业务销售负责人自动匹配领导' : '选择人员'}
                 disabled={isLeader}
                 onChange={(value, option) => updateRule(ruleKey, {
                   sourceRefId: String(value),
@@ -453,11 +478,6 @@ function RuleEditor({
                 treeDefaultExpandAll
                 onChange={value => updateRule(ruleKey, { resolveScopeRefId: value ? String(value) : undefined })}
               />
-              <Input
-                value={rule.dutyLabel}
-                placeholder="职责标签，如财务"
-                onChange={event => updateRule(ruleKey, { dutyLabel: event.target.value })}
-              />
               <InputNumber
                 value={rule.sortOrder}
                 min={0}
@@ -469,6 +489,11 @@ function RuleEditor({
                 <Button danger icon={<DeleteOutlined />} onClick={() => removeRule(ruleKey)} />
               </Space>
             </div>
+            {isLeader ? (
+              <div style={{ color: '#64748b', fontSize: 12 }}>
+                会按业务销售负责人自动匹配领导：销售员优先匹配当前层级直属领导；若负责人本身就是该层级领导，则自动跳过本人并上提一级。
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -659,7 +684,7 @@ export default function AdminSalesCollabPage() {
       const payload = {
         groups: templateDetail.groups.map(group => ({
           groupId: group.id,
-          rules: (group.rules || []).map(({ _localKey, ...rule }) => rule),
+          rules: (group.rules || []).map(serializeRule),
         })),
       };
       const response: any = await salesCollabApi.saveTemplateRules(templateDetail.id, payload);
@@ -768,7 +793,7 @@ export default function AdminSalesCollabPage() {
         groups: orgRuleDetail.groups.map(group => ({
           groupId: group.id,
           overrideMode: group.overrideMode || 'INHERIT',
-          rules: (group.overrideMode === 'CUSTOM' ? (group.rules || []) : []).map(({ _localKey, ...rule }) => rule),
+          rules: (group.overrideMode === 'CUSTOM' ? (group.rules || []) : []).map(serializeRule),
         })),
       };
       const response: any = await salesCollabApi.saveOrgRules(selectedOrgId, payload);
@@ -895,10 +920,13 @@ export default function AdminSalesCollabPage() {
                           extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
                         >
                           {group.description ? <div style={{ color: '#64748b', marginBottom: 12 }}>{group.description}</div> : null}
+                          {group.groupKey === 'MANAGEMENT_SYNC' ? <ManagementLeaderHint /> : null}
                           <RuleEditor
                             rules={normalizeRules(group.rules)}
                             onChange={rules => updateTemplateGroupRules(group.id, rules)}
-                            sourceTypeOptions={meta?.sourceTypes || []}
+                            sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
+                              ? (meta?.sourceTypes || []).filter(option => option.value === 'LEADER')
+                              : (meta?.sourceTypes || [])}
                             scopeTypeOptions={meta?.scopeTypes || []}
                             userOptions={userOptions}
                             positionOptions={positionOptions}
@@ -963,13 +991,17 @@ export default function AdminSalesCollabPage() {
                               <Radio.Button value="CUSTOM">部门自定义</Radio.Button>
                             </Radio.Group>
 
+                            {group.groupKey === 'MANAGEMENT_SYNC' ? <ManagementLeaderHint /> : null}
+
                             {(group.overrideMode || 'INHERIT') === 'INHERIT' ? (
                               <RuleSummary rules={normalizeRules(group.templateRules)} scopeLabelMap={scopeLabelMap} />
                             ) : (
                               <RuleEditor
                                 rules={normalizeRules(group.rules)}
                                 onChange={rules => updateOrgGroupRules(group.id, rules)}
-                                sourceTypeOptions={meta?.sourceTypes || []}
+                                sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
+                                  ? (meta?.sourceTypes || []).filter(option => option.value === 'LEADER')
+                                  : (meta?.sourceTypes || [])}
                                 scopeTypeOptions={meta?.scopeTypes || []}
                                 userOptions={userOptions}
                                 positionOptions={positionOptions}
@@ -1043,7 +1075,6 @@ export default function AdminSalesCollabPage() {
                                   <Space size={[8, 8]} wrap>
                                     <span>{user.name}</span>
                                     {user.orgName ? <Tag>{user.orgName}</Tag> : null}
-                                    {user.dutyLabel ? <Tag color="gold">{user.dutyLabel}</Tag> : null}
                                     {user.sourceRefName ? <Tag color="blue">{user.sourceRefName}</Tag> : null}
                                   </Space>
                                   <span style={{ color: '#94a3b8' }}>{user.resolvedBy || user.sourceType}</span>
@@ -1060,7 +1091,7 @@ export default function AdminSalesCollabPage() {
                                     type="warning"
                                     showIcon
                                     message={item.reason}
-                                    description={[item.sourceRefName, item.dutyLabel, item.resolveScopeType].filter(Boolean).join(' / ') || '请检查规则配置'}
+                                    description={[item.sourceRefName, item.resolveScopeType].filter(Boolean).join(' / ') || '请检查规则配置'}
                                   />
                                 ))}
                               </div>
