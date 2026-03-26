@@ -320,17 +320,23 @@ function serializeRule(rule: RuleItem) {
   return payload;
 }
 
+function managementSourceTypeOptions(options: SourceTypeOption[]) {
+  const byValue = new Map(options.map(option => [option.value, option]));
+  return [byValue.get('LEADER'), byValue.get('USER')].filter(Boolean) as SourceTypeOption[];
+}
+
 function ManagementLeaderHint() {
   return (
     <Alert
       type="info"
       showIcon
-      message="管理沟通协同 · 领导匹配逻辑"
+      message="管理沟通协同 · 默认设计"
       description={(
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div>当前部门：业务销售负责人是销售员时，匹配当前部门直属领导；如果负责人本身就是部门经理，则自动上提到上一级组织领导。</div>
-          <div>当前销售大区：匹配业务销售负责人所在销售大区/业务部的直属领导；若本级无人，再继续向上一级管理组织查找。</div>
-          <div>固定组织：匹配所选组织的直属领导；若命中本人，则自动跳过本人并继续向上一级组织查找。</div>
+          <div>支持两种配置：<strong>按领导匹配</strong>、<strong>灵活指派人员</strong>。</div>
+          <div>默认会带出 3 条领导规则：当前部门领导、当前销售大区领导、固定组织领导（默认固定到“销售体系”）。</div>
+          <div>按领导匹配时：业务员默认会带出“部门经理 + 业务一部/大区 + 销售体系”；若业务销售负责人本身就是部门经理，则自动跳过本人，默认保留“业务一部/大区 + 销售体系”。</div>
+          <div>固定组织从“销售体系”开始向上查找合适领导；命中本人时会自动跳过本人继续向上。</div>
         </div>
       )}
     />
@@ -404,7 +410,7 @@ function RuleEditor({
 
   const addRule = () => {
     const maxSort = rules.reduce((max, rule) => Math.max(max, rule.sortOrder || 0), 0);
-    const defaultSourceType = sourceTypeOptions.length === 1 ? sourceTypeOptions[0].value : 'USER';
+    const defaultSourceType = sourceTypeOptions[0]?.value || 'USER';
     const nextRule = createEmptyRule(maxSort + 10);
     nextRule.sourceType = defaultSourceType;
     nextRule.sourceRefId = undefined;
@@ -925,7 +931,7 @@ export default function AdminSalesCollabPage() {
                             rules={normalizeRules(group.rules)}
                             onChange={rules => updateTemplateGroupRules(group.id, rules)}
                             sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
-                              ? (meta?.sourceTypes || []).filter(option => option.value === 'LEADER')
+                              ? managementSourceTypeOptions(meta?.sourceTypes || [])
                               : (meta?.sourceTypes || [])}
                             scopeTypeOptions={meta?.scopeTypes || []}
                             userOptions={userOptions}
@@ -1000,7 +1006,7 @@ export default function AdminSalesCollabPage() {
                                 rules={normalizeRules(group.rules)}
                                 onChange={rules => updateOrgGroupRules(group.id, rules)}
                                 sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
-                                  ? (meta?.sourceTypes || []).filter(option => option.value === 'LEADER')
+                                  ? managementSourceTypeOptions(meta?.sourceTypes || [])
                                   : (meta?.sourceTypes || [])}
                                 scopeTypeOptions={meta?.scopeTypes || []}
                                 userOptions={userOptions}

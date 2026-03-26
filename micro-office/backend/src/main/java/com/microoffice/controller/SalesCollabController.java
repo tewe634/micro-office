@@ -37,6 +37,9 @@ public class SalesCollabController {
     private static final String GROUP_KEY_PRE_SALES_TECH = "PRE_SALES_TECH";
     private static final String GROUP_KEY_AFTER_SALES_TECH = "AFTER_SALES_TECH";
     private static final String GROUP_KEY_MANAGEMENT_SYNC = "MANAGEMENT_SYNC";
+    private static final int MANAGEMENT_SYNC_CURRENT_DEPT_SORT = 10;
+    private static final int MANAGEMENT_SYNC_CURRENT_REGION_SORT = 20;
+    private static final int MANAGEMENT_SYNC_FIXED_SYSTEM_SORT = 30;
     private static final String GROUP_NAME_TECH_COLLAB = "技术协同";
     private static final String GROUP_DESC_TECH_COLLAB = "销售与技术共同参与售前、售后技术支持";
 
@@ -112,6 +115,7 @@ public class SalesCollabController {
             enabled,
             remark
         );
+        insertDefaultManagementSyncRules(id);
         return ApiResponse.ok(loadTemplateDetail(id));
     }
 
@@ -820,13 +824,9 @@ public class SalesCollabController {
         String currentOrgId = anchorOrgId;
         Set<String> visited = new LinkedHashSet<>();
         while (currentOrgId != null && visited.add(currentOrgId)) {
-            List<Map<String, Object>> preferred = loadLeaderUsersByOrg(currentOrgId, ownerUserId, true);
+            List<Map<String, Object>> preferred = loadLeaderUsersByOrg(currentOrgId, ownerUserId);
             if (!preferred.isEmpty()) {
                 return preferred;
-            }
-            List<Map<String, Object>> fallback = loadLeaderUsersByOrg(currentOrgId, ownerUserId, false);
-            if (!fallback.isEmpty()) {
-                return fallback;
             }
             currentOrgId = findParentOrgId(currentOrgId);
         }
@@ -867,8 +867,7 @@ public class SalesCollabController {
     }
 
     private List<Map<String, Object>> loadLeaderUsersByOrg(String orgId,
-                                                           String excludedUserId,
-                                                           boolean excludeStaffRole) {
+                                                           String excludedUserId) {
         if (orgId == null || orgId.isBlank()) {
             return List.of();
         }
@@ -892,9 +891,6 @@ public class SalesCollabController {
                 continue;
             }
             String role = asString(row.get("role"));
-            if (excludeStaffRole && "STAFF".equals(role)) {
-                continue;
-            }
             String positionName = asString(row.get("primary_position_name"));
             String extraPositionNames = asString(row.get("extra_position_names"));
             if (!isLeaderCandidate(positionName, extraPositionNames, role)) {
@@ -1024,13 +1020,42 @@ public class SalesCollabController {
         return item;
     }
 
+    private void insertDefaultManagementSyncRules(String templateId) {
+        String managementGroupId = queryForStringOrNull(
+            "SELECT id FROM sales_collab_group WHERE group_key = ? LIMIT 1",
+            GROUP_KEY_MANAGEMENT_SYNC
+        );
+        if (managementGroupId == null) {
+            return;
+        }
+        insertTemplateRule(templateId, managementGroupId, managementSyncLeaderRule(SCOPE_CURRENT_DEPT, null, MANAGEMENT_SYNC_CURRENT_DEPT_SORT));
+        insertTemplateRule(templateId, managementGroupId, managementSyncLeaderRule(SCOPE_CURRENT_REGION, null, MANAGEMENT_SYNC_CURRENT_REGION_SORT));
+        String salesSystemOrgId = queryForStringOrNull("SELECT id FROM organization WHERE name = ? LIMIT 1", SALES_SYSTEM_NAME);
+        if (salesSystemOrgId != null) {
+            insertTemplateRule(templateId, managementGroupId, managementSyncLeaderRule(SCOPE_FIXED_ORG, salesSystemOrgId, MANAGEMENT_SYNC_FIXED_SYSTEM_SORT));
+        }
+    }
+
+    private Map<String, Object> managementSyncLeaderRule(String scopeType, String scopeRefId, int sortOrder) {
+        Map<String, Object> rule = new LinkedHashMap<>();
+        rule.put("sourceType", SOURCE_TYPE_LEADER);
+        rule.put("sourceRefName", "领导");
+        rule.put("resolveScopeType", scopeType);
+        rule.put("resolveScopeRefId", scopeRefId);
+        rule.put("sortOrder", sortOrder);
+        rule.put("enabled", true);
+        return rule;
+    }
+
     private void insertTemplateRule(String templateId, String groupId, Map<String, Object> rule) {
         String sourceType = requireText(rule.get("sourceType"), "规则来源类型不能为空");
         String sourceRefId = asNullableString(rule.get("sourceRefId"));
         String targetGroupId = canonicalizeGroupId(groupId);
         String targetGroupKey = resolveGroupKeyById(targetGroupId);
-        if (GROUP_KEY_MANAGEMENT_SYNC.equals(targetGroupKey) && !SOURCE_TYPE_LEADER.equals(sourceType)) {
-            throw new IllegalArgumentException("管理沟通协同仅支持按领导配置");
+        if (GROUP_KEY_MANAGEMENT_SYNC.equals(targetGroupKey)
+            && !SOURCE_TYPE_LEADER.equals(sourceType)
+            && !SOURCE_TYPE_USER.equals(sourceType)) {
+            throw new IllegalArgumentException("管理沟通协同仅支持按领导或指定人员配置");
         }
         String sourceRefName = resolveSourceRefName(sourceType, sourceRefId, asNullableString(rule.get("sourceRefName")));
         jdbc.update(
@@ -1057,8 +1082,10 @@ public class SalesCollabController {
         String sourceRefId = asNullableString(rule.get("sourceRefId"));
         String targetGroupId = canonicalizeGroupId(groupId);
         String targetGroupKey = resolveGroupKeyById(targetGroupId);
-        if (GROUP_KEY_MANAGEMENT_SYNC.equals(targetGroupKey) && !SOURCE_TYPE_LEADER.equals(sourceType)) {
-            throw new IllegalArgumentException("管理沟通协同仅支持按领导配置");
+        if (GROUP_KEY_MANAGEMENT_SYNC.equals(targetGroupKey)
+            && !SOURCE_TYPE_LEADER.equals(sourceType)
+            && !SOURCE_TYPE_USER.equals(sourceType)) {
+            throw new IllegalArgumentException("管理沟通协同仅支持按领导或指定人员配置");
         }
         String sourceRefName = resolveSourceRefName(sourceType, sourceRefId, asNullableString(rule.get("sourceRefName")));
         jdbc.update(
@@ -1099,6 +1126,9 @@ public class SalesCollabController {
     }
 
     private boolean isLeaderCandidate(String positionName, String extraPositionNames, String role) {
+        if ("STAFF".equals(role)) {
+            return false;
+        }
         String combined = String.format("%s %s", positionName == null ? "" : positionName, extraPositionNames == null ? "" : extraPositionNames);
         String[] keywords = {"负责人", "总经理", "总监", "经理", "主管", "主任", "部长", "厂长", "组长", "科长"};
         for (String keyword : keywords) {
