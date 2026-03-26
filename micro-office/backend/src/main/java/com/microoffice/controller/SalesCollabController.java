@@ -792,7 +792,15 @@ public class SalesCollabController {
         }
         if (SCOPE_FIXED_ORG.equals(scopeType)) {
             String fixedOrgId = asNullableString(rule.get("resolveScopeRefId"));
-            return collectOrgPathIds(baseOrgId, fixedOrgId);
+            List<String> orgIds = collectOrgPathIds(baseOrgId, fixedOrgId);
+            if (fixedOrgId != null && orgIds.contains(fixedOrgId) && loadLeaderUsersByOrg(fixedOrgId, null).isEmpty()) {
+                String fallbackOrgId = findNearestLeaderAncestor(fixedOrgId);
+                if (fallbackOrgId != null && !orgIds.contains(fallbackOrgId)) {
+                    orgIds = new ArrayList<>(orgIds);
+                    orgIds.add(fallbackOrgId);
+                }
+            }
+            return orgIds;
         }
         return baseOrgId == null ? List.of() : List.of(baseOrgId);
     }
@@ -855,6 +863,18 @@ public class SalesCollabController {
             result.add(item);
         }
         return result;
+    }
+
+    private String findNearestLeaderAncestor(String orgId) {
+        String currentOrgId = findParentOrgId(orgId);
+        Set<String> visited = new LinkedHashSet<>();
+        while (currentOrgId != null && visited.add(currentOrgId)) {
+            if (!loadLeaderUsersByOrg(currentOrgId, null).isEmpty()) {
+                return currentOrgId;
+            }
+            currentOrgId = findParentOrgId(currentOrgId);
+        }
+        return null;
     }
 
     private String findParentOrgId(String orgId) {
