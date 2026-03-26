@@ -726,53 +726,95 @@ public class SalesCollabController {
                                                          Map<String, Object> owner,
                                                          Map<String, Object> rule) {
         String ownerUserId = owner == null ? null : asNullableString(owner.get("userId"));
-        String anchorOrgId = resolveLeaderAnchorOrgId(orgId, owner, rule);
-        if (anchorOrgId == null) {
+        String scopeType = asNullableString(rule.get("resolveScopeType"));
+        List<String> candidateOrgIds = resolveLeaderOrgIds(orgId, owner, rule);
+        if (candidateOrgIds.isEmpty()) {
             return List.of();
         }
-        String currentOrgId = anchorOrgId;
-        Set<String> visited = new LinkedHashSet<>();
-        while (currentOrgId != null && visited.add(currentOrgId)) {
-            List<Map<String, Object>> preferred = loadLeaderUsersByOrg(currentOrgId, ownerUserId);
-            if (!preferred.isEmpty()) {
-                return preferred;
+        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
+        for (String candidateOrgId : candidateOrgIds) {
+            for (Map<String, Object> leader : loadLeaderUsersByOrg(candidateOrgId, ownerUserId)) {
+                String userId = asString(leader.get("userId"));
+                if (userId != null) {
+                    result.putIfAbsent(userId, leader);
+                }
             }
-            currentOrgId = findParentOrgId(currentOrgId);
         }
-        return List.of();
+        if ((SCOPE_CURRENT_REGION.equals(scopeType) || SCOPE_FIXED_ORG.equals(scopeType)) && !candidateOrgIds.isEmpty()) {
+            String terminalOrgId = candidateOrgIds.get(candidateOrgIds.size() - 1);
+            if (loadLeaderUsersByOrg(terminalOrgId, ownerUserId).isEmpty()) {
+                String parentOrgId = findParentOrgId(terminalOrgId);
+                Set<String> visited = new LinkedHashSet<>(candidateOrgIds);
+                while (parentOrgId != null && visited.add(parentOrgId)) {
+                    List<Map<String, Object>> fallbackLeaders = loadLeaderUsersByOrg(parentOrgId, ownerUserId);
+                    if (!fallbackLeaders.isEmpty()) {
+                        for (Map<String, Object> leader : fallbackLeaders) {
+                            String userId = asString(leader.get("userId"));
+                            if (userId != null) {
+                                result.putIfAbsent(userId, leader);
+                            }
+                        }
+                        break;
+                    }
+                    parentOrgId = findParentOrgId(parentOrgId);
+                }
+            }
+        }
+        return new ArrayList<>(result.values());
     }
 
     private String resolveLeaderScopeLabel(Map<String, Object> rule) {
         String scopeType = asNullableString(rule.get("resolveScopeType"));
         if (scopeType == null || scopeType.isBlank() || SCOPE_CURRENT_DEPT.equals(scopeType)) {
-            return "当前部门领导";
+            return "当前销售部门领导";
         }
         if (SCOPE_CURRENT_REGION.equals(scopeType)) {
-            return "当前销售大区领导";
+            return "销售大区领导链";
         }
         if (SCOPE_FIXED_ORG.equals(scopeType)) {
-            return "固定组织领导";
+            return "固定组织领导链";
         }
         return "领导解析";
     }
 
-    private String resolveLeaderAnchorOrgId(String orgId,
-                                            Map<String, Object> owner,
-                                            Map<String, Object> rule) {
+    private List<String> resolveLeaderOrgIds(String orgId,
+                                             Map<String, Object> owner,
+                                             Map<String, Object> rule) {
         String ownerOrgId = owner == null ? null : asNullableString(owner.get("orgId"));
         String baseOrgId = ownerOrgId == null ? orgId : ownerOrgId;
         String scopeType = asNullableString(rule.get("resolveScopeType"));
         if (scopeType == null || scopeType.isBlank() || SCOPE_CURRENT_DEPT.equals(scopeType)) {
-            return baseOrgId;
+            return baseOrgId == null ? List.of() : List.of(baseOrgId);
         }
         if (SCOPE_CURRENT_REGION.equals(scopeType)) {
             String regionRootId = findSalesRegionRootOrgId(baseOrgId);
-            return regionRootId == null ? baseOrgId : regionRootId;
+            return collectOrgPathIds(baseOrgId, regionRootId == null ? baseOrgId : regionRootId);
         }
         if (SCOPE_FIXED_ORG.equals(scopeType)) {
-            return asNullableString(rule.get("resolveScopeRefId"));
+            String fixedOrgId = asNullableString(rule.get("resolveScopeRefId"));
+            return collectOrgPathIds(baseOrgId, fixedOrgId);
         }
-        return baseOrgId;
+        return baseOrgId == null ? List.of() : List.of(baseOrgId);
+    }
+
+    private List<String> collectOrgPathIds(String startOrgId, String targetOrgId) {
+        if (startOrgId == null || startOrgId.isBlank()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        String currentOrgId = startOrgId;
+        Set<String> visited = new LinkedHashSet<>();
+        while (currentOrgId != null && visited.add(currentOrgId)) {
+            result.add(currentOrgId);
+            if (Objects.equals(currentOrgId, targetOrgId)) {
+                return result;
+            }
+            currentOrgId = findParentOrgId(currentOrgId);
+        }
+        if (targetOrgId != null && !targetOrgId.isBlank()) {
+            return List.of(targetOrgId);
+        }
+        return result;
     }
 
     private List<Map<String, Object>> loadLeaderUsersByOrg(String orgId,
@@ -966,6 +1008,16 @@ public class SalesCollabController {
             && !SOURCE_TYPE_USER.equals(sourceType)) {
             throw new IllegalArgumentException("管理沟通协同仅支持按领导或指定人员配置");
         }
+        String resolveScopeType = asNullableString(rule.get("resolveScopeType"));
+        String resolveScopeRefId = asNullableString(rule.get("resolveScopeRefId"));
+        if (GROUP_KEY_MANAGEMENT_SYNC.equals(targetGroupKey) && SOURCE_TYPE_LEADER.equals(sourceType)) {
+            if (resolveScopeType == null || resolveScopeType.isBlank()) {
+                resolveScopeType = SCOPE_CURRENT_DEPT;
+            }
+            if (SCOPE_FIXED_ORG.equals(resolveScopeType) && (resolveScopeRefId == null || resolveScopeRefId.isBlank())) {
+                resolveScopeRefId = queryForStringOrNull("SELECT id FROM organization WHERE name = ? LIMIT 1", SALES_SYSTEM_NAME);
+            }
+        }
         String sourceRefName = resolveSourceRefName(sourceType, sourceRefId, asNullableString(rule.get("sourceRefName")));
         jdbc.update(
             "INSERT INTO sales_collab_template_rule (id, template_id, group_id, participant_role, source_type, source_ref_id, source_ref_name, resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark) " +
@@ -977,8 +1029,8 @@ public class SalesCollabController {
             sourceType,
             sourceRefId,
             sourceRefName,
-            asNullableString(rule.get("resolveScopeType")),
-            asNullableString(rule.get("resolveScopeRefId")),
+            resolveScopeType,
+            resolveScopeRefId,
             null,
             asInt(rule.get("sortOrder"), 0),
             asBoolean(rule.get("enabled"), true),
@@ -996,6 +1048,16 @@ public class SalesCollabController {
             && !SOURCE_TYPE_USER.equals(sourceType)) {
             throw new IllegalArgumentException("管理沟通协同仅支持按领导或指定人员配置");
         }
+        String resolveScopeType = asNullableString(rule.get("resolveScopeType"));
+        String resolveScopeRefId = asNullableString(rule.get("resolveScopeRefId"));
+        if (GROUP_KEY_MANAGEMENT_SYNC.equals(targetGroupKey) && SOURCE_TYPE_LEADER.equals(sourceType)) {
+            if (resolveScopeType == null || resolveScopeType.isBlank()) {
+                resolveScopeType = SCOPE_CURRENT_DEPT;
+            }
+            if (SCOPE_FIXED_ORG.equals(resolveScopeType) && (resolveScopeRefId == null || resolveScopeRefId.isBlank())) {
+                resolveScopeRefId = queryForStringOrNull("SELECT id FROM organization WHERE name = ? LIMIT 1", SALES_SYSTEM_NAME);
+            }
+        }
         String sourceRefName = resolveSourceRefName(sourceType, sourceRefId, asNullableString(rule.get("sourceRefName")));
         jdbc.update(
             "INSERT INTO sales_collab_org_rule (id, org_id, group_id, participant_role, source_type, source_ref_id, source_ref_name, resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark) " +
@@ -1007,8 +1069,8 @@ public class SalesCollabController {
             sourceType,
             sourceRefId,
             sourceRefName,
-            asNullableString(rule.get("resolveScopeType")),
-            asNullableString(rule.get("resolveScopeRefId")),
+            resolveScopeType,
+            resolveScopeRefId,
             null,
             asInt(rule.get("sortOrder"), 0),
             asBoolean(rule.get("enabled"), true),

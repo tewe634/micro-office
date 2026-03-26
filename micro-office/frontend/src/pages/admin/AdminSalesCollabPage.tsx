@@ -331,9 +331,9 @@ function ManagementLeaderHint() {
       description={(
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div>支持两种配置：<strong>按领导匹配</strong>、<strong>灵活指派人员</strong>。</div>
-          <div>默认会带出 3 条领导规则：当前部门领导、当前销售大区领导、固定组织领导（默认固定到“销售体系”）。</div>
-          <div>按领导匹配时：业务员默认会带出“部门经理 + 业务一部/大区 + 销售体系”；若业务销售负责人本身就是部门经理，则自动跳过本人，默认保留“业务一部/大区 + 销售体系”。</div>
-          <div>固定组织从“销售体系”开始向上查找合适领导；命中本人时会自动跳过本人继续向上。</div>
+          <div>当前销售部门：关联一级到部门经理。</div>
+          <div>销售大区：关联到业务部两级，默认包含<strong>部门经理 + 大区总</strong>。</div>
+          <div>固定组织：默认关联到“销售体系”，包含<strong>部门经理 + 大区总 + 体系负责人</strong>；命中本人时会自动跳过本人。</div>
         </div>
       )}
     />
