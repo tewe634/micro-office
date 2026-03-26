@@ -177,9 +177,6 @@ export const salesCollabApi = {
   saveTemplateRules: (id: string | number, data: any) => api.put(`/admin/sales-collab/templates/${id}/rules`, data),
   getOrgBinding: (orgId: string | number) => api.get(`/admin/sales-collab/org-binding/${orgId}`),
   saveOrgBinding: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-binding/${orgId}`, data),
-  getOrgRules: (orgId: string | number) => api.get(`/admin/sales-collab/org-rules/${orgId}`),
-  saveOrgRules: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-rules/${orgId}`, data),
-  copyOrgRules: (orgId: string | number, data: any) => api.post(`/admin/sales-collab/org-rules/${orgId}/copy`, data),
 };
 
 export const portalApi = {

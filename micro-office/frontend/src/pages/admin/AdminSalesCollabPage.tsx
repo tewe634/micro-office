@@ -8,7 +8,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Radio,
   Select,
   Space,
   Switch,
@@ -119,12 +118,6 @@ type OrgBinding = {
   remark?: string | null;
 };
 
-type OrgRuleDetail = {
-  orgId: string;
-  binding: OrgBinding;
-  groups: GroupMeta[];
-};
-
 type TemplateModalMode = 'create' | 'edit';
 
 const TECH_GROUP_KEY = 'TECH_COLLAB';
@@ -152,14 +145,6 @@ function normalizeRules(rules: RuleItem[] | undefined) {
     sortOrder: typeof rule.sortOrder === 'number' ? rule.sortOrder : (index + 1) * 10,
     enabled: rule.enabled ?? true,
     _localKey: rule._localKey || rule.id || localKey(),
-  }));
-}
-
-function cloneRules(rules: RuleItem[] | undefined) {
-  return normalizeRules(rules).map(rule => ({
-    ...rule,
-    id: undefined,
-    _localKey: localKey(),
   }));
 }
 
@@ -329,46 +314,6 @@ function ManagementLeaderHint() {
   );
 }
 
-function RuleSummary({ rules, scopeLabelMap }: { rules: RuleItem[]; scopeLabelMap: Record<string, string> }) {
-  if (!rules.length) {
-    return <div style={{ color: '#94a3b8' }}>暂无协同规则</div>;
-  }
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rules.map(rule => {
-        const isPosition = rule.sourceType === 'POSITION';
-        const isLeader = rule.sourceType === 'LEADER';
-        const sourceLabel = isPosition ? '岗位' : isLeader ? '领导' : '人员';
-        return (
-          <div
-            key={rule._localKey || rule.id}
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              padding: '10px 12px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 12,
-              alignItems: 'center',
-              background: '#fafafa',
-            }}
-          >
-            <Space size={[8, 4]} wrap>
-              <Tag color="blue">{sourceLabel}</Tag>
-              <span>{rule.sourceRefName || (isLeader ? '按业务销售负责人自动解析' : '-')}</span>
-              {(isPosition || isLeader) && rule.resolveScopeType ? (
-                <Tag>{scopeLabelMap[rule.resolveScopeType] || rule.resolveScopeType}</Tag>
-              ) : null}
-              {rule.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
-            </Space>
-            <span style={{ color: '#94a3b8' }}>排序 {rule.sortOrder}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function RuleEditor({
   rules,
   onChange,
@@ -505,15 +450,11 @@ export default function AdminSalesCollabPage() {
   const [positions, setPositions] = useState<PositionItem[]>([]);
   const [users, setUsers] = useState<LookupUser[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>();
-  const [orgRuleDetail, setOrgRuleDetail] = useState<OrgRuleDetail | null>(null);
+  const [orgBinding, setOrgBinding] = useState<OrgBinding | null>(null);
   const [bindingSaving, setBindingSaving] = useState(false);
-  const [orgRulesSaving, setOrgRulesSaving] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateModalMode, setTemplateModalMode] = useState<TemplateModalMode>('create');
   const [templateDuplicating, setTemplateDuplicating] = useState(false);
-  const [copyOrgModalOpen, setCopyOrgModalOpen] = useState(false);
-  const [copyOrgTargetIds, setCopyOrgTargetIds] = useState<string[]>([]);
-  const [copyOrgSubmitting, setCopyOrgSubmitting] = useState(false);
   const [templateForm] = Form.useForm<{ name: string; enabled: boolean; remark?: string }>();
 
   const orgNameMap = useMemo(() => Object.fromEntries(orgs.map(org => [org.id, org.name])), [orgs]);
@@ -525,7 +466,6 @@ export default function AdminSalesCollabPage() {
     value: position.id,
     label: position.code ? `${position.name}（${position.code}）` : position.name,
   })), [positions]);
-  const scopeLabelMap = useMemo(() => Object.fromEntries((meta?.scopeTypes || []).map(item => [item.value, item.label])), [meta]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -572,22 +512,13 @@ export default function AdminSalesCollabPage() {
 
   useEffect(() => {
     if (!selectedOrgId) {
-      setOrgRuleDetail(null);
+      setOrgBinding(null);
       return;
     }
+    setOrgBinding({ orgId: selectedOrgId, templateId: null, templateName: null, enabled: true, remark: null });
     const load = async () => {
-      const response: any = await salesCollabApi.getOrgRules(selectedOrgId);
-      const detail = response.data as OrgRuleDetail;
-      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
-      setOrgRuleDetail({
-        ...detail,
-        groups: normalizedGroups.map(group => ({
-          ...group,
-          rules: normalizeRules(group.rules),
-          templateRules: normalizeRules(group.templateRules),
-          customRules: normalizeRules(group.customRules),
-        })),
-      });
+      const response: any = await salesCollabApi.getOrgBinding(selectedOrgId);
+      setOrgBinding(response.data as OrgBinding);
     };
     void load();
   }, [selectedOrgId]);
@@ -693,119 +624,18 @@ export default function AdminSalesCollabPage() {
   };
 
   const updateOrgBinding = (patch: Partial<OrgBinding>) => {
-    setOrgRuleDetail(current => current ? { ...current, binding: { ...current.binding, ...patch } } : current);
+    setOrgBinding(current => current ? { ...current, ...patch } : current);
   };
 
   const saveOrgBinding = async () => {
-    if (!selectedOrgId || !orgRuleDetail) return;
+    if (!selectedOrgId || !orgBinding) return;
     setBindingSaving(true);
     try {
-      const response: any = await salesCollabApi.saveOrgBinding(selectedOrgId, orgRuleDetail.binding);
-      setOrgRuleDetail(current => current ? { ...current, binding: response.data as OrgBinding } : current);
+      const response: any = await salesCollabApi.saveOrgBinding(selectedOrgId, orgBinding);
+      setOrgBinding(response.data as OrgBinding);
       message.success('部门绑定模板已保存');
-      const detailResponse: any = await salesCollabApi.getOrgRules(selectedOrgId);
-      const detail = detailResponse.data as OrgRuleDetail;
-      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
-      setOrgRuleDetail({
-        ...detail,
-        groups: normalizedGroups.map(group => ({
-          ...group,
-          rules: normalizeRules(group.rules),
-          templateRules: normalizeRules(group.templateRules),
-          customRules: normalizeRules(group.customRules),
-        })),
-      });
     } finally {
       setBindingSaving(false);
-    }
-  };
-
-  const updateOrgGroup = (groupId: string, patch: Partial<GroupMeta>) => {
-    setOrgRuleDetail(current => {
-      if (!current) return current;
-      return {
-        ...current,
-        groups: current.groups.map(group => group.id === groupId ? { ...group, ...patch } : group),
-      };
-    });
-  };
-
-  const changeOverrideMode = (groupId: string, overrideMode: 'INHERIT' | 'CUSTOM') => {
-    setOrgRuleDetail(current => {
-      if (!current) return current;
-      return {
-        ...current,
-        groups: current.groups.map(group => {
-          if (group.id !== groupId) return group;
-          if (overrideMode === 'INHERIT') {
-            return {
-              ...group,
-              overrideMode,
-              rules: cloneRules(group.templateRules),
-              customRules: [],
-            };
-          }
-          const customRules = group.customRules && group.customRules.length
-            ? cloneRules(group.customRules)
-            : cloneRules(group.templateRules);
-          return {
-            ...group,
-            overrideMode,
-            rules: customRules,
-            customRules,
-          };
-        }),
-      };
-    });
-  };
-
-  const updateOrgGroupRules = (groupId: string, rules: RuleItem[]) => {
-    updateOrgGroup(groupId, { rules: normalizeRules(rules), customRules: normalizeRules(rules) });
-  };
-
-  const saveOrgRules = async () => {
-    if (!selectedOrgId || !orgRuleDetail) return;
-    setOrgRulesSaving(true);
-    try {
-      const payload = {
-        groups: orgRuleDetail.groups.map(group => ({
-          groupId: group.id,
-          overrideMode: group.overrideMode || 'INHERIT',
-          rules: (group.overrideMode === 'CUSTOM' ? (group.rules || []) : []).map(serializeRule),
-        })),
-      };
-      const response: any = await salesCollabApi.saveOrgRules(selectedOrgId, payload);
-      const detail = response.data as OrgRuleDetail;
-      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
-      setOrgRuleDetail({
-        ...detail,
-        groups: normalizedGroups.map(group => ({
-          ...group,
-          rules: normalizeRules(group.rules),
-          templateRules: normalizeRules(group.templateRules),
-          customRules: normalizeRules(group.customRules),
-        })),
-      });
-      message.success('部门协同规则已保存');
-    } finally {
-      setOrgRulesSaving(false);
-    }
-  };
-
-  const submitCopyOrgRules = async () => {
-    if (!selectedOrgId) return;
-    if (!copyOrgTargetIds.length) {
-      message.warning('请选择目标销售部门');
-      return;
-    }
-    setCopyOrgSubmitting(true);
-    try {
-      const response: any = await salesCollabApi.copyOrgRules(selectedOrgId, { targetOrgIds: copyOrgTargetIds });
-      message.success(`已复制到 ${response.data?.copiedCount || copyOrgTargetIds.length} 个销售部门`);
-      setCopyOrgModalOpen(false);
-      setCopyOrgTargetIds([]);
-    } finally {
-      setCopyOrgSubmitting(false);
     }
   };
 
@@ -815,7 +645,7 @@ export default function AdminSalesCollabPage() {
         type="info"
         showIcon
         message="销售协同配置"
-        description="主责人固定为业务销售负责人；本模块只配置不同协同组下的协同人规则，并支持模板复用与销售部门覆盖。"
+        description="主责人固定为业务销售负责人；本模块只配置不同协同组下的协同人规则，并支持模板复用与销售部门绑定。"
       />
 
       <Tabs
@@ -917,76 +747,37 @@ export default function AdminSalesCollabPage() {
                         onChange={value => setSelectedOrgId(value ? String(value) : undefined)}
                       />
                       <Select
-                        value={orgRuleDetail?.binding.templateId || undefined}
+                        value={orgBinding?.templateId || undefined}
                         placeholder="绑定模板"
                         disabled={!selectedOrgId}
                         options={templates.map(template => ({ value: template.id, label: template.name }))}
-                        onChange={value => updateOrgBinding({ templateId: value ? String(value) : null })}
+                        onChange={(value, option) => updateOrgBinding({
+                          templateId: value ? String(value) : null,
+                          templateName: Array.isArray(option) ? undefined : String(option?.label || ''),
+                        })}
                       />
                       <Button type="primary" loading={bindingSaving} disabled={!selectedOrgId} onClick={() => void saveOrgBinding()}>保存部门模板绑定</Button>
                     </div>
                   </Card>
 
-                  {!selectedOrgId || !orgRuleDetail ? (
-                    <Card><Empty description="请选择销售部门后配置协同规则" /></Card>
+                  {!selectedOrgId || !orgBinding ? (
+                    <Card><Empty description="请选择销售部门后绑定协同模板" /></Card>
                   ) : (
-                    <>
-                      {orgRuleDetail.groups.map(group => (
-                        <Card
-                          key={group.id}
-                          title={group.groupName}
-                          extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <Space size={[8, 8]} wrap>
-                              <Tag color="blue">主责人：业务销售负责人（自动带出）</Tag>
-                              {group.description ? <Tag>{group.description}</Tag> : null}
-                            </Space>
-
-                            <Radio.Group
-                              value={group.overrideMode || 'INHERIT'}
-                              onChange={event => changeOverrideMode(group.id, event.target.value as 'INHERIT' | 'CUSTOM')}
-                            >
-                              <Radio.Button value="INHERIT">继承模板</Radio.Button>
-                              <Radio.Button value="CUSTOM">部门自定义</Radio.Button>
-                            </Radio.Group>
-
-                            {group.groupKey === 'MANAGEMENT_SYNC' ? <ManagementLeaderHint /> : null}
-
-                            {(group.overrideMode || 'INHERIT') === 'INHERIT' ? (
-                              <RuleSummary rules={normalizeRules(group.templateRules)} scopeLabelMap={scopeLabelMap} />
-                            ) : (
-                              <RuleEditor
-                                rules={normalizeRules(group.rules)}
-                                onChange={rules => updateOrgGroupRules(group.id, rules)}
-                                sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
-                                  ? managementSourceTypeOptions(meta?.sourceTypes || [])
-                                  : (meta?.sourceTypes || [])}
-                                scopeTypeOptions={meta?.scopeTypes || []}
-                                userOptions={userOptions}
-                                positionOptions={positionOptions}
-                                orgTreeData={allOrgTree}
-                              />
-                            )}
-                          </div>
-                        </Card>
-                      ))}
-
-                      <Card>
-                        <Space wrap>
-                          <Button type="primary" icon={<SaveOutlined />} loading={orgRulesSaving} onClick={() => void saveOrgRules()}>
-                            保存部门协同规则
-                          </Button>
-                          <Button disabled={!selectedOrgId} onClick={() => {
-                            setCopyOrgTargetIds([]);
-                            setCopyOrgModalOpen(true);
-                          }}>
-                            复制到其他部门
-                          </Button>
+                    <Card>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <Alert
+                          type="info"
+                          showIcon
+                          message="部门应用仅保留模板绑定"
+                          description="部门协同规则统一在“模板管理”中维护；部门应用只负责选择并绑定模板。业务销售负责人为负责人，模板命中的其他人员默认为协作者。"
+                        />
+                        <Space size={[8, 8]} wrap>
+                          <Tag color="blue">负责人：业务销售负责人</Tag>
+                          {orgBinding.templateName ? <Tag color="green">当前模板：{orgBinding.templateName}</Tag> : <Tag>当前未绑定模板</Tag>}
+                          {orgBinding.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
                         </Space>
-                      </Card>
-
-                    </>
+                      </div>
+                    </Card>
                   )}
                 </div>
               </div>
@@ -1022,31 +813,6 @@ export default function AdminSalesCollabPage() {
         </Form>
       </Modal>
 
-      <Modal
-        open={copyOrgModalOpen}
-        title="复制部门协同配置"
-        okText="开始复制"
-        cancelText="取消"
-        confirmLoading={copyOrgSubmitting}
-        onCancel={() => setCopyOrgModalOpen(false)}
-        onOk={() => void submitCopyOrgRules()}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ color: '#64748b' }}>会复制当前部门的模板绑定和自定义协同规则到目标销售部门。</div>
-          <TreeSelect
-            value={copyOrgTargetIds}
-            treeData={salesOrgTree}
-            treeCheckable
-            multiple
-            allowClear
-            showSearch
-            treeDefaultExpandAll
-            placeholder="选择目标销售部门"
-            onChange={value => setCopyOrgTargetIds((value || []) as string[])}
-            style={{ width: '100%' }}
-          />
-        </div>
-      </Modal>
     </div>
   );
 }
