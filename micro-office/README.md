@@ -74,7 +74,7 @@ npm run smoke:api
 - org / positions / users
 - objects / products / portal
 - threads / nodes / comments / taskpool
-- admin permissions / user object types / position object types / field visibility
+- admin permissions / user object types / position object types
 
 如需覆盖其他地址或管理员账号，可设置环境变量：
 

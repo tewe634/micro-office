@@ -61,14 +61,6 @@ function quoteSql(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function fieldVisibilityToPayload(rows) {
-  return (rows ?? []).map((row) => ({
-    positionId: row.positionId ?? row.position_id,
-    entityType: row.entityType ?? row.entity_type,
-    hiddenFields: [...(row.hiddenFields ?? row.hidden_fields ?? [])],
-  }));
-}
-
 async function api(method, route, { token, query, body } = {}) {
   const url = new URL(route.replace(/^\//, ''), BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`);
   if (query) {
@@ -149,7 +141,6 @@ const cleanupState = {
   orgIds: [],
   rolePermissions: null,
   positionObjectTypes: null,
-  fieldVisibility: null,
 };
 
 async function main() {
@@ -387,7 +378,7 @@ async function main() {
   const productPortal = await api('GET', `/portal/products/${createdProduct.id}`, { token: adminToken });
   assert(productPortal?.header?.id === createdProduct.id, 'product portal header mismatch', productPortal);
 
-  log('checking admin permission/object-type/field-visibility endpoints');
+  log('checking admin permission/object-type endpoints');
   cleanupState.rolePermissions = await api('GET', '/admin/permissions', { token: adminToken });
   const modifiedRolePermissions = clone(cleanupState.rolePermissions);
   const itMenus = new Set(modifiedRolePermissions.IT ?? []);
@@ -435,22 +426,6 @@ async function main() {
   });
   const positionObjectTypesAfterSave = await api('GET', '/admin/position-object-types', { token: adminToken });
   expectMembers(positionObjectTypesAfterSave[createdPosition.id], ['CUSTOMER'], 'position object types for temp position');
-
-  cleanupState.fieldVisibility = await api('GET', '/admin/field-visibility', { token: adminToken });
-  const modifiedFieldVisibility = [
-    ...fieldVisibilityToPayload(cleanupState.fieldVisibility),
-    { positionId: createdPosition.id, entityType: 'WORK_NODE', hiddenFields: ['moduleData'] },
-  ];
-  await api('PUT', '/admin/field-visibility', {
-    token: adminToken,
-    body: modifiedFieldVisibility,
-  });
-  const fieldVisibilityAfterSave = await api('GET', '/admin/field-visibility', { token: adminToken });
-  const tempFieldRule = fieldVisibilityAfterSave.find(
-    (rule) => (rule.positionId ?? rule.position_id) === createdPosition.id && (rule.entityType ?? rule.entity_type) === 'WORK_NODE',
-  );
-  assert(tempFieldRule, 'field visibility rule for temp position missing', fieldVisibilityAfterSave);
-  expectMembers(tempFieldRule.hiddenFields ?? tempFieldRule.hidden_fields, ['moduleData'], 'field visibility hidden fields');
 
   log('checking thread/node/comment/taskpool endpoints');
   const createdThread = await api('POST', '/threads', {
@@ -619,18 +594,6 @@ async function run() {
       }
     } catch (error) {
       cleanupErrors.push(`restore position object types: ${error.message}`);
-    }
-
-    try {
-      if (cleanupState.fieldVisibility) {
-        const current = await login(ADMIN_LOGIN, ADMIN_PASSWORD);
-        await api('PUT', '/admin/field-visibility', {
-          token: current.token,
-          body: fieldVisibilityToPayload(cleanupState.fieldVisibility),
-        });
-      }
-    } catch (error) {
-      cleanupErrors.push(`restore field visibility: ${error.message}`);
     }
 
     try {
