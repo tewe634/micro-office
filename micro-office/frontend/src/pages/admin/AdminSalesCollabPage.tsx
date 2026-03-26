@@ -756,7 +756,7 @@ export default function AdminSalesCollabPage() {
       <Alert
         type="info"
         showIcon
-        message="协同配置模块"
+        message="协同配置"
         description="负责人固定为业务销售负责人；模板管理负责维护协同规则，部门应用负责按列表绑定模板，模板命中的其他人员默认为协作者。"
       />
 
