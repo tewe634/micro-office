@@ -264,9 +264,11 @@ function normalizeLegacyTechGroups(groups: GroupMeta[] | undefined) {
   return result;
 }
 
-function buildTree(items: OrgItem[], allowedIds?: Set<string>, disableRootId?: string): TreeNode[] {
+function buildTree(items: OrgItem[], allowedIds?: Set<string>, disableRootId?: string, rootId?: string): TreeNode[] {
   const childrenByParent = new Map<string | null, OrgItem[]>();
+  const itemById = new Map<string, OrgItem>();
   items.forEach(item => {
+    itemById.set(item.id, item);
     const parentId = item.parentId || null;
     const list = childrenByParent.get(parentId) || [];
     list.push(item);
@@ -291,7 +293,11 @@ function buildTree(items: OrgItem[], allowedIds?: Set<string>, disableRootId?: s
     };
   };
 
-  return sortByName(childrenByParent.get(null) || [])
+  const roots = rootId
+    ? [itemById.get(rootId)].filter((item): item is OrgItem => !!item)
+    : sortByName(childrenByParent.get(null) || []);
+
+  return roots
     .map(item => buildNode(item))
     .filter((node): node is TreeNode => !!node);
 }
@@ -614,7 +620,7 @@ export default function AdminSalesCollabPage() {
 
   const salesRoot = useMemo(() => orgs.find(org => org.name === '销售体系'), [orgs]);
   const salesOrgIds = useMemo(() => (salesRoot ? collectDescendantIds(salesRoot.id, orgs) : new Set<string>()), [orgs, salesRoot]);
-  const salesOrgTree = useMemo(() => buildTree(orgs, salesRoot ? salesOrgIds : undefined, salesRoot?.id), [orgs, salesOrgIds, salesRoot]);
+  const salesOrgTree = useMemo(() => buildTree(orgs, salesRoot ? salesOrgIds : undefined, salesRoot?.id, salesRoot?.id), [orgs, salesOrgIds, salesRoot]);
   const allOrgTree = useMemo(() => buildTree(orgs), [orgs]);
   const sceneOptions = useMemo(() => {
     const groups = meta?.groups || [];
