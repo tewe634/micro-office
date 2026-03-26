@@ -471,7 +471,6 @@ public class PortalController {
             result.put("performanceItems", performanceItems);
             result.put("relatedCustomers", customerPerformance);
             result.put("relatedProducts", relatedProducts);
-            result.put("salesRanking", buildSalesRanking(user, salesRefs, productRefs, seed));
             result.put("workSummary", buildWorkSummary(workItems));
             result.put("workItems", workItems);
             return result;
