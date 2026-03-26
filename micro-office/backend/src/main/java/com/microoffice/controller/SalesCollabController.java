@@ -201,6 +201,12 @@ public class SalesCollabController {
         return ApiResponse.ok(loadTemplateDetail(id));
     }
 
+    @GetMapping("/org-bindings")
+    public ApiResponse<List<Map<String, Object>>> listOrgBindings(Authentication auth) {
+        requireAdmin(auth);
+        return ApiResponse.ok(loadOrgBindings());
+    }
+
     @GetMapping("/org-binding/{orgId}")
     public ApiResponse<Map<String, Object>> getOrgBinding(@PathVariable String orgId, Authentication auth) {
         requireAdmin(auth);
@@ -529,10 +535,31 @@ public class SalesCollabController {
         return item;
     }
 
+    private List<Map<String, Object>> loadOrgBindings() {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT b.org_id, b.template_id, t.name AS template_name, b.enabled, b.remark, b.updated_at " +
+                "FROM sales_collab_org_binding b " +
+                "LEFT JOIN sales_collab_template t ON t.id = b.template_id " +
+                "ORDER BY b.updated_at DESC, b.org_id"
+        );
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("orgId", asString(row.get("org_id")));
+            item.put("templateId", asString(row.get("template_id")));
+            item.put("templateName", asString(row.get("template_name")));
+            item.put("enabled", asBoolean(row.get("enabled"), true));
+            item.put("remark", asString(row.get("remark")));
+            item.put("updatedAt", row.get("updated_at") == null ? null : String.valueOf(row.get("updated_at")));
+            result.add(item);
+        }
+        return result;
+    }
+
     private Map<String, Object> loadOrgBinding(String orgId) {
         Map<String, Object> binding = queryForMapOrNull(
-            "SELECT b.id, b.org_id, b.template_id, b.enabled, b.remark, t.name AS template_name " +
-                "FROM sales_collab_org_binding b JOIN sales_collab_template t ON t.id = b.template_id WHERE b.org_id = ?",
+            "SELECT b.id, b.org_id, b.template_id, b.enabled, b.remark, b.updated_at, t.name AS template_name " +
+                "FROM sales_collab_org_binding b LEFT JOIN sales_collab_template t ON t.id = b.template_id WHERE b.org_id = ?",
             orgId
         );
         Map<String, Object> result = new LinkedHashMap<>();
@@ -541,6 +568,7 @@ public class SalesCollabController {
         result.put("templateName", binding == null ? null : asString(binding.get("template_name")));
         result.put("enabled", binding == null ? true : asBoolean(binding.get("enabled"), true));
         result.put("remark", binding == null ? null : asString(binding.get("remark")));
+        result.put("updatedAt", binding == null || binding.get("updated_at") == null ? null : String.valueOf(binding.get("updated_at")));
         return result;
     }
 

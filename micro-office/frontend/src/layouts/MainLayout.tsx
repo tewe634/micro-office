@@ -31,14 +31,14 @@ const pageTitles: Record<string, string> = {
   '/objects': '外部对象管理',
   '/products': '产品与服务',
   '/admin/permissions': '权限配置',
-  '/admin/sales-collab': '销售协同配置',
+  '/admin/sales-collab': '协同配置模块',
 };
 
 const menuOrder = ['/org', '/users', '/objects', '/products'];
 
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
-  { key: '/admin/sales-collab', label: '销售协同配置' },
+  { key: '/admin/sales-collab', label: '协同配置模块' },
 ];
 
 function resolveSelectedKey(pathname: string) {

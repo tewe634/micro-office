@@ -175,6 +175,7 @@ export const salesCollabApi = {
   deleteTemplate: (id: string | number) => api.delete(`/admin/sales-collab/templates/${id}`),
   duplicateTemplate: (id: string | number, data?: any) => api.post(`/admin/sales-collab/templates/${id}/copy`, data),
   saveTemplateRules: (id: string | number, data: any) => api.put(`/admin/sales-collab/templates/${id}/rules`, data),
+  listOrgBindings: () => api.get('/admin/sales-collab/org-bindings'),
   getOrgBinding: (orgId: string | number) => api.get(`/admin/sales-collab/org-binding/${orgId}`),
   saveOrgBinding: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-binding/${orgId}`, data),
 };

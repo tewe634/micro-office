@@ -11,12 +11,13 @@ import {
   Select,
   Space,
   Switch,
+  Table,
   Tabs,
   Tag,
   TreeSelect,
   message,
 } from 'antd';
-import { DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { orgApi, positionApi, salesCollabApi, userApi } from '../../api';
 
 type SourceTypeOption = { value: string; label: string };
@@ -116,9 +117,21 @@ type OrgBinding = {
   templateName?: string | null;
   enabled: boolean;
   remark?: string | null;
+  updatedAt?: string | null;
 };
 
 type TemplateModalMode = 'create' | 'edit';
+
+type BindingRow = {
+  key: string;
+  orgId: string;
+  orgName: string;
+  parentName?: string;
+  templateId?: string | null;
+  templateName?: string | null;
+  enabled: boolean;
+  updatedAt?: string | null;
+};
 
 const TECH_GROUP_KEY = 'TECH_COLLAB';
 const LEGACY_TECH_GROUP_KEYS = new Set(['PRE_SALES_TECH', 'AFTER_SALES_TECH']);
@@ -296,6 +309,19 @@ function managementSourceTypeOptions(options: SourceTypeOption[]) {
   return [byValue.get('LEADER'), byValue.get('USER')].filter(Boolean) as SourceTypeOption[];
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
 function ManagementLeaderHint() {
   return (
     <Alert
@@ -446,16 +472,22 @@ export default function AdminSalesCollabPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
   const [templateDetail, setTemplateDetail] = useState<TemplateDetail | null>(null);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateConfigOpen, setTemplateConfigOpen] = useState(false);
+  const [templateKeyword, setTemplateKeyword] = useState('');
+  const [orgKeyword, setOrgKeyword] = useState('');
   const [orgs, setOrgs] = useState<OrgItem[]>([]);
   const [positions, setPositions] = useState<PositionItem[]>([]);
   const [users, setUsers] = useState<LookupUser[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string>();
-  const [orgBinding, setOrgBinding] = useState<OrgBinding | null>(null);
+  const [orgBindings, setOrgBindings] = useState<OrgBinding[]>([]);
   const [bindingSaving, setBindingSaving] = useState(false);
+  const [bindingModalOpen, setBindingModalOpen] = useState(false);
+  const [bindingModalOrgId, setBindingModalOrgId] = useState<string>();
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateModalMode, setTemplateModalMode] = useState<TemplateModalMode>('create');
+  const [templateModalTargetId, setTemplateModalTargetId] = useState<string>();
   const [templateDuplicating, setTemplateDuplicating] = useState(false);
   const [templateForm] = Form.useForm<{ name: string; enabled: boolean; remark?: string }>();
+  const [bindingForm] = Form.useForm<{ templateId?: string; enabled: boolean }>();
 
   const orgNameMap = useMemo(() => Object.fromEntries(orgs.map(org => [org.id, org.name])), [orgs]);
   const userOptions = useMemo(() => users.map(user => ({
@@ -466,15 +498,19 @@ export default function AdminSalesCollabPage() {
     value: position.id,
     label: position.code ? `${position.name}（${position.code}）` : position.name,
   })), [positions]);
+  const salesRoot = useMemo(() => orgs.find(org => org.name === '销售体系'), [orgs]);
+  const salesOrgIds = useMemo(() => (salesRoot ? collectDescendantIds(salesRoot.id, orgs) : new Set<string>()), [orgs, salesRoot]);
+  const allOrgTree = useMemo(() => buildTree(orgs), [orgs]);
 
   useEffect(() => {
     const bootstrap = async () => {
-      const [metaRes, templateRes, orgRes, positionRes, lookupRes]: any[] = await Promise.all([
+      const [metaRes, templateRes, orgRes, positionRes, lookupRes, bindingRes]: any[] = await Promise.all([
         salesCollabApi.meta(),
         salesCollabApi.listTemplates(),
         orgApi.list(),
         positionApi.list(),
         userApi.lookups(),
+        salesCollabApi.listOrgBindings(),
       ]);
       setMeta(metaRes.data ? {
         ...metaRes.data,
@@ -482,10 +518,11 @@ export default function AdminSalesCollabPage() {
       } : null);
       const templateList = (templateRes.data || []) as TemplateSummary[];
       setTemplates(templateList);
-      setSelectedTemplateId(current => current || templateList[0]?.id);
+      setSelectedTemplateId(templateList[0]?.id);
       setOrgs((orgRes.data || []) as OrgItem[]);
       setPositions((positionRes.data || []) as PositionItem[]);
       setUsers((lookupRes.data?.users || []) as LookupUser[]);
+      setOrgBindings((bindingRes.data || []) as OrgBinding[]);
     };
     void bootstrap();
   }, []);
@@ -510,46 +547,86 @@ export default function AdminSalesCollabPage() {
     void load();
   }, [selectedTemplateId]);
 
-  useEffect(() => {
-    if (!selectedOrgId) {
-      setOrgBinding(null);
-      return;
-    }
-    setOrgBinding({ orgId: selectedOrgId, templateId: null, templateName: null, enabled: true, remark: null });
-    const load = async () => {
-      const response: any = await salesCollabApi.getOrgBinding(selectedOrgId);
-      setOrgBinding(response.data as OrgBinding);
-    };
-    void load();
-  }, [selectedOrgId]);
-
-  const salesRoot = useMemo(() => orgs.find(org => org.name === '销售体系'), [orgs]);
-  const salesOrgIds = useMemo(() => (salesRoot ? collectDescendantIds(salesRoot.id, orgs) : new Set<string>()), [orgs, salesRoot]);
-  const salesOrgTree = useMemo(() => buildTree(orgs, salesRoot ? salesOrgIds : undefined, salesRoot?.id, salesRoot?.id), [orgs, salesOrgIds, salesRoot]);
-  const allOrgTree = useMemo(() => buildTree(orgs), [orgs]);
-
   const refreshTemplates = async (preferId?: string) => {
     const response: any = await salesCollabApi.listTemplates();
     const list = (response.data || []) as TemplateSummary[];
     setTemplates(list);
-    setSelectedTemplateId(preferId || list[0]?.id);
+    const nextId = preferId || selectedTemplateId || list[0]?.id;
+    setSelectedTemplateId(nextId && list.some(item => item.id === nextId) ? nextId : list[0]?.id);
   };
 
+  const refreshOrgBindings = async () => {
+    const response: any = await salesCollabApi.listOrgBindings();
+    setOrgBindings((response.data || []) as OrgBinding[]);
+  };
+
+  const templateRows = useMemo(() => {
+    const keyword = templateKeyword.trim().toLowerCase();
+    return templates.filter(template => {
+      if (!keyword) return true;
+      return [template.name, template.remark || '']
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [templateKeyword, templates]);
+
+  const bindingMap = useMemo(() => new Map(orgBindings.map(binding => [binding.orgId, binding])), [orgBindings]);
+
+  const bindingRows = useMemo<BindingRow[]>(() => {
+    const keyword = orgKeyword.trim().toLowerCase();
+    return orgs
+      .filter(org => salesRoot && salesOrgIds.has(org.id) && org.id !== salesRoot.id)
+      .map(org => {
+        const binding = bindingMap.get(org.id);
+        return {
+          key: org.id,
+          orgId: org.id,
+          orgName: org.name,
+          parentName: org.parentId ? orgNameMap[org.parentId] : undefined,
+          templateId: binding?.templateId || null,
+          templateName: binding?.templateName || null,
+          enabled: binding?.enabled ?? true,
+          updatedAt: binding?.updatedAt || null,
+        };
+      })
+      .filter(row => {
+        if (!keyword) return true;
+        return [row.orgName, row.parentName || '', row.templateName || '']
+          .join(' ')
+          .toLowerCase()
+          .includes(keyword);
+      })
+      .sort((a, b) => a.orgName.localeCompare(b.orgName, 'zh-CN'));
+  }, [bindingMap, orgKeyword, orgNameMap, orgs, salesOrgIds, salesRoot]);
+
+  const bindingModalOrg = useMemo(
+    () => (bindingModalOrgId ? orgs.find(org => org.id === bindingModalOrgId) || null : null),
+    [bindingModalOrgId, orgs],
+  );
+
   const openCreateTemplate = () => {
+    setTemplateModalTargetId(undefined);
     setTemplateModalMode('create');
     templateForm.setFieldsValue({ name: '', enabled: true, remark: '' });
     setTemplateModalOpen(true);
   };
 
-  const openEditTemplate = () => {
-    if (!templateDetail) return;
+  const openEditTemplate = (template: TemplateSummary) => {
+    setSelectedTemplateId(template.id);
+    setTemplateModalTargetId(template.id);
     setTemplateModalMode('edit');
     templateForm.setFieldsValue({
-      name: templateDetail.name,
-      enabled: templateDetail.enabled,
-      remark: templateDetail.remark,
+      name: template.name,
+      enabled: template.enabled,
+      remark: template.remark,
     });
     setTemplateModalOpen(true);
+  };
+
+  const openConfigTemplate = (template: TemplateSummary) => {
+    setSelectedTemplateId(template.id);
+    setTemplateConfigOpen(true);
   };
 
   const submitTemplateModal = async (values: { name: string; enabled: boolean; remark?: string }) => {
@@ -560,25 +637,28 @@ export default function AdminSalesCollabPage() {
       await refreshTemplates(response.data?.id as string | undefined);
       return;
     }
-    if (!templateDetail) return;
-    await salesCollabApi.updateTemplate(templateDetail.id, values);
+    const targetId = templateModalTargetId || selectedTemplateId;
+    if (!targetId) return;
+    await salesCollabApi.updateTemplate(targetId, values);
     message.success('模板信息已更新');
     setTemplateModalOpen(false);
-    await refreshTemplates(templateDetail.id);
+    await refreshTemplates(targetId);
   };
 
-  const removeTemplate = async () => {
-    if (!templateDetail) return;
-    await salesCollabApi.deleteTemplate(templateDetail.id);
+  const removeTemplate = async (template: TemplateSummary) => {
+    await salesCollabApi.deleteTemplate(template.id);
     message.success('模板已删除');
+    if (selectedTemplateId === template.id) {
+      setTemplateConfigOpen(false);
+    }
     await refreshTemplates();
+    await refreshOrgBindings();
   };
 
-  const duplicateTemplate = async () => {
-    if (!templateDetail) return;
+  const duplicateTemplate = async (template: TemplateSummary) => {
     setTemplateDuplicating(true);
     try {
-      const response: any = await salesCollabApi.duplicateTemplate(templateDetail.id);
+      const response: any = await salesCollabApi.duplicateTemplate(template.id);
       message.success('模板已复制');
       await refreshTemplates(response.data?.id as string | undefined);
     } finally {
@@ -608,6 +688,7 @@ export default function AdminSalesCollabPage() {
       });
       message.success('模板规则已保存');
       await refreshTemplates(templateDetail.id);
+      await refreshOrgBindings();
     } finally {
       setTemplateSaving(false);
     }
@@ -623,17 +704,48 @@ export default function AdminSalesCollabPage() {
     });
   };
 
-  const updateOrgBinding = (patch: Partial<OrgBinding>) => {
-    setOrgBinding(current => current ? { ...current, ...patch } : current);
+  const openBindingModal = (row: BindingRow) => {
+    setBindingModalOrgId(row.orgId);
+    bindingForm.setFieldsValue({
+      templateId: row.templateId || undefined,
+      enabled: row.templateId ? row.enabled : true,
+    });
+    setBindingModalOpen(true);
   };
 
-  const saveOrgBinding = async () => {
-    if (!selectedOrgId || !orgBinding) return;
+  const saveBinding = async () => {
+    if (!bindingModalOrgId) return;
+    const values = await bindingForm.validateFields();
     setBindingSaving(true);
     try {
-      const response: any = await salesCollabApi.saveOrgBinding(selectedOrgId, orgBinding);
-      setOrgBinding(response.data as OrgBinding);
-      message.success('部门绑定模板已保存');
+      await salesCollabApi.saveOrgBinding(bindingModalOrgId, {
+        orgId: bindingModalOrgId,
+        templateId: values.templateId ? String(values.templateId) : null,
+        enabled: values.enabled ?? true,
+        remark: null,
+      });
+      message.success(values.templateId ? '部门模板绑定已保存' : '部门模板绑定已清除');
+      setBindingModalOpen(false);
+      setBindingModalOrgId(undefined);
+      await refreshOrgBindings();
+      await refreshTemplates();
+    } finally {
+      setBindingSaving(false);
+    }
+  };
+
+  const clearBinding = async (row: BindingRow) => {
+    setBindingSaving(true);
+    try {
+      await salesCollabApi.saveOrgBinding(row.orgId, {
+        orgId: row.orgId,
+        templateId: null,
+        enabled: true,
+        remark: null,
+      });
+      message.success('部门模板绑定已清除');
+      await refreshOrgBindings();
+      await refreshTemplates();
     } finally {
       setBindingSaving(false);
     }
@@ -644,8 +756,8 @@ export default function AdminSalesCollabPage() {
       <Alert
         type="info"
         showIcon
-        message="销售协同配置"
-        description="主责人固定为业务销售负责人；本模块只配置不同协同组下的协同人规则，并支持模板复用与销售部门绑定。"
+        message="协同配置模块"
+        description="负责人固定为业务销售负责人；模板管理负责维护协同规则，部门应用负责按列表绑定模板，模板命中的其他人员默认为协作者。"
       />
 
       <Tabs
@@ -658,74 +770,91 @@ export default function AdminSalesCollabPage() {
               <div style={{ height: '100%', overflow: 'auto', paddingRight: 4 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 4 }}>
                   <Card>
-                    <Space wrap>
-                      <Select
-                        value={selectedTemplateId}
-                        style={{ width: 320 }}
-                        placeholder="选择模板"
-                        options={templates.map(template => ({ value: template.id, label: template.name }))}
-                        onChange={value => setSelectedTemplateId(value)}
-                      />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <Space wrap>
+                        <Input.Search
+                          allowClear
+                          placeholder="搜索模板名称或备注"
+                          style={{ width: 320 }}
+                          value={templateKeyword}
+                          onChange={event => setTemplateKeyword(event.target.value)}
+                        />
+                      </Space>
                       <Button type="primary" onClick={openCreateTemplate}>新增模板</Button>
-                      <Button onClick={openEditTemplate} disabled={!templateDetail}>编辑模板</Button>
-                      <Button loading={templateDuplicating} disabled={!templateDetail} onClick={() => void duplicateTemplate()}>复制模板</Button>
-                      <Button danger disabled={!templateDetail} onClick={() => {
-                        void Modal.confirm({
-                          title: '确认删除模板？',
-                          content: '删除后不可恢复，且不能删除已被部门绑定的模板。',
-                          okText: '删除',
-                          cancelText: '取消',
-                          onOk: async () => {
-                            await removeTemplate();
-                          },
-                        });
-                      }}>删除模板</Button>
-                      <Button
-                        type="primary"
-                        icon={<SaveOutlined />}
-                        loading={templateSaving}
-                        disabled={!templateDetail}
-                        onClick={() => void saveTemplateRules()}
-                      >
-                        保存模板规则
-                      </Button>
-                    </Space>
+                    </div>
                   </Card>
 
-                  {!templateDetail ? (
-                    <Card><Empty description="请选择或创建一个协同模板" /></Card>
-                  ) : (
-                    <>
-                      <Card title={templateDetail.name} extra={templateDetail.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}>
-                        <Space size={[8, 8]} wrap>
-                          <Tag color="blue">主责人固定：业务销售负责人</Tag>
-                          {templateDetail.remark ? <Tag>{templateDetail.remark}</Tag> : null}
-                        </Space>
-                      </Card>
-
-                      {templateDetail.groups.map(group => (
-                        <Card
-                          key={group.id}
-                          title={group.groupName}
-                          extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
-                        >
-                          {group.description ? <div style={{ color: '#64748b', marginBottom: 12 }}>{group.description}</div> : null}
-                          {group.groupKey === 'MANAGEMENT_SYNC' ? <ManagementLeaderHint /> : null}
-                          <RuleEditor
-                            rules={normalizeRules(group.rules)}
-                            onChange={rules => updateTemplateGroupRules(group.id, rules)}
-                            sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
-                              ? managementSourceTypeOptions(meta?.sourceTypes || [])
-                              : (meta?.sourceTypes || [])}
-                            scopeTypeOptions={meta?.scopeTypes || []}
-                            userOptions={userOptions}
-                            positionOptions={positionOptions}
-                            orgTreeData={allOrgTree}
-                          />
-                        </Card>
-                      ))}
-                    </>
-                  )}
+                  <Card>
+                    <Table
+                      rowKey="id"
+                      pagination={false}
+                      dataSource={templateRows}
+                      locale={{ emptyText: <Empty description="暂无协同模板" /> }}
+                      columns={[
+                        {
+                          title: '模板名称',
+                          dataIndex: 'name',
+                          key: 'name',
+                          render: (_, record: TemplateSummary) => (
+                            <Space size={[8, 8]} wrap>
+                              <span style={{ fontWeight: 600 }}>{record.name}</span>
+                              {record.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
+                            </Space>
+                          ),
+                        },
+                        {
+                          title: '规则数',
+                          dataIndex: 'ruleCount',
+                          key: 'ruleCount',
+                          width: 100,
+                          render: (value: number | undefined) => value ?? 0,
+                        },
+                        {
+                          title: '绑定部门数',
+                          dataIndex: 'bindingCount',
+                          key: 'bindingCount',
+                          width: 120,
+                          render: (value: number | undefined) => value ?? 0,
+                        },
+                        {
+                          title: '备注',
+                          dataIndex: 'remark',
+                          key: 'remark',
+                          ellipsis: true,
+                          render: (value: string | undefined) => value || '-',
+                        },
+                        {
+                          title: '操作',
+                          key: 'actions',
+                          width: 280,
+                          render: (_, record: TemplateSummary) => (
+                            <Space size={4} wrap>
+                              <Button type="link" onClick={() => openConfigTemplate(record)}>配置协同</Button>
+                              <Button type="link" onClick={() => openEditTemplate(record)}>编辑</Button>
+                              <Button type="link" loading={templateDuplicating && selectedTemplateId === record.id} onClick={() => void duplicateTemplate(record)}>复制</Button>
+                              <Button
+                                danger
+                                type="link"
+                                onClick={() => {
+                                  void Modal.confirm({
+                                    title: '确认删除模板？',
+                                    content: '删除后不可恢复，且不能删除已被部门绑定的模板。',
+                                    okText: '删除',
+                                    cancelText: '取消',
+                                    onOk: async () => {
+                                      await removeTemplate(record);
+                                    },
+                                  });
+                                }}
+                              >
+                                删除
+                              </Button>
+                            </Space>
+                          ),
+                        },
+                      ]}
+                    />
+                  </Card>
                 </div>
               </div>
             ),
@@ -737,48 +866,93 @@ export default function AdminSalesCollabPage() {
               <div style={{ height: '100%', overflow: 'auto', paddingRight: 4 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 4 }}>
                   <Card>
-                    <div style={{ display: 'grid', gridTemplateColumns: '320px 320px auto', gap: 12, alignItems: 'center' }}>
-                      <TreeSelect
-                        value={selectedOrgId}
-                        treeData={salesOrgTree}
-                        placeholder="选择销售部门"
-                        treeDefaultExpandAll
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <Input.Search
                         allowClear
-                        onChange={value => setSelectedOrgId(value ? String(value) : undefined)}
+                        placeholder="搜索销售部门或已绑定模板"
+                        style={{ width: 360 }}
+                        value={orgKeyword}
+                        onChange={event => setOrgKeyword(event.target.value)}
                       />
-                      <Select
-                        value={orgBinding?.templateId || undefined}
-                        placeholder="绑定模板"
-                        disabled={!selectedOrgId}
-                        options={templates.map(template => ({ value: template.id, label: template.name }))}
-                        onChange={(value, option) => updateOrgBinding({
-                          templateId: value ? String(value) : null,
-                          templateName: Array.isArray(option) ? undefined : String(option?.label || ''),
-                        })}
-                      />
-                      <Button type="primary" loading={bindingSaving} disabled={!selectedOrgId} onClick={() => void saveOrgBinding()}>保存部门模板绑定</Button>
+                      <Space size={[8, 8]} wrap>
+                        <Tag color="blue">负责人：业务销售负责人</Tag>
+                        <Tag>协作者：模板命中的其他人员</Tag>
+                      </Space>
                     </div>
                   </Card>
 
-                  {!selectedOrgId || !orgBinding ? (
-                    <Card><Empty description="请选择销售部门后绑定协同模板" /></Card>
-                  ) : (
-                    <Card>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <Alert
-                          type="info"
-                          showIcon
-                          message="部门应用仅保留模板绑定"
-                          description="部门协同规则统一在“模板管理”中维护；部门应用只负责选择并绑定模板。业务销售负责人为负责人，模板命中的其他人员默认为协作者。"
-                        />
-                        <Space size={[8, 8]} wrap>
-                          <Tag color="blue">负责人：业务销售负责人</Tag>
-                          {orgBinding.templateName ? <Tag color="green">当前模板：{orgBinding.templateName}</Tag> : <Tag>当前未绑定模板</Tag>}
-                          {orgBinding.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
-                        </Space>
-                      </div>
-                    </Card>
-                  )}
+                  <Card>
+                    <Table
+                      rowKey="orgId"
+                      pagination={false}
+                      dataSource={bindingRows}
+                      locale={{ emptyText: <Empty description="暂无销售部门数据" /> }}
+                      columns={[
+                        {
+                          title: '销售部门',
+                          dataIndex: 'orgName',
+                          key: 'orgName',
+                          render: (value: string, record: BindingRow) => (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <span style={{ fontWeight: 600 }}>{value}</span>
+                              <span style={{ color: '#94a3b8', fontSize: 12 }}>上级部门：{record.parentName || '-'}</span>
+                            </div>
+                          ),
+                        },
+                        {
+                          title: '当前模板',
+                          dataIndex: 'templateName',
+                          key: 'templateName',
+                          render: (value: string | null | undefined) => value ? <Tag color="green">{value}</Tag> : <Tag>未绑定</Tag>,
+                        },
+                        {
+                          title: '状态',
+                          key: 'enabled',
+                          width: 100,
+                          render: (_, record: BindingRow) => record.templateId
+                            ? (record.enabled ? <Tag color="green">启用</Tag> : <Tag color="orange">停用</Tag>)
+                            : <Tag>未绑定</Tag>,
+                        },
+                        {
+                          title: '更新时间',
+                          dataIndex: 'updatedAt',
+                          key: 'updatedAt',
+                          width: 140,
+                          render: (value: string | null | undefined) => formatDateTime(value),
+                        },
+                        {
+                          title: '操作',
+                          key: 'actions',
+                          width: 220,
+                          render: (_, record: BindingRow) => (
+                            <Space size={4} wrap>
+                              <Button type="link" onClick={() => openBindingModal(record)}>
+                                {record.templateId ? '修改绑定' : '绑定模板'}
+                              </Button>
+                              <Button
+                                danger
+                                type="link"
+                                disabled={!record.templateId || bindingSaving}
+                                onClick={() => {
+                                  void Modal.confirm({
+                                    title: '确认解绑当前模板？',
+                                    content: `解绑后，${record.orgName} 将不再应用当前模板。`,
+                                    okText: '解绑',
+                                    cancelText: '取消',
+                                    onOk: async () => {
+                                      await clearBinding(record);
+                                    },
+                                  });
+                                }}
+                              >
+                                解绑
+                              </Button>
+                            </Space>
+                          ),
+                        },
+                      ]}
+                    />
+                  </Card>
                 </div>
               </div>
             ),
@@ -813,6 +987,92 @@ export default function AdminSalesCollabPage() {
         </Form>
       </Modal>
 
+      <Modal
+        open={templateConfigOpen}
+        title={templateDetail ? `配置协同 · ${templateDetail.name}` : '配置协同'}
+        okText="保存协同配置"
+        cancelText="关闭"
+        width={1200}
+        confirmLoading={templateSaving}
+        onCancel={() => setTemplateConfigOpen(false)}
+        onOk={() => void saveTemplateRules()}
+      >
+        {!templateDetail || templateDetail.id !== selectedTemplateId ? (
+          <Empty description="正在加载模板配置..." />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflow: 'auto', paddingRight: 4 }}>
+            <Alert
+              type="info"
+              showIcon
+              message="模板协同配置"
+              description="负责人固定为业务销售负责人；在模板中配置的其他人员、岗位或领导解析结果，默认都作为协作者。"
+            />
+            <Card>
+              <Space size={[8, 8]} wrap>
+                {templateDetail.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
+                <Tag color="blue">负责人：业务销售负责人</Tag>
+                {templateDetail.remark ? <Tag>{templateDetail.remark}</Tag> : null}
+              </Space>
+            </Card>
+            {templateDetail.groups.map(group => (
+              <Card
+                key={group.id}
+                title={group.groupName}
+                extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
+              >
+                {group.description ? <div style={{ color: '#64748b', marginBottom: 12 }}>{group.description}</div> : null}
+                {group.groupKey === 'MANAGEMENT_SYNC' ? <ManagementLeaderHint /> : null}
+                <RuleEditor
+                  rules={normalizeRules(group.rules)}
+                  onChange={rules => updateTemplateGroupRules(group.id, rules)}
+                  sourceTypeOptions={group.groupKey === 'MANAGEMENT_SYNC'
+                    ? managementSourceTypeOptions(meta?.sourceTypes || [])
+                    : (meta?.sourceTypes || [])}
+                  scopeTypeOptions={meta?.scopeTypes || []}
+                  userOptions={userOptions}
+                  positionOptions={positionOptions}
+                  orgTreeData={allOrgTree}
+                />
+              </Card>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={bindingModalOpen}
+        title={bindingModalOrg ? `模板绑定 · ${bindingModalOrg.name}` : '模板绑定'}
+        okText="保存绑定"
+        cancelText="取消"
+        confirmLoading={bindingSaving}
+        onCancel={() => {
+          setBindingModalOpen(false);
+          setBindingModalOrgId(undefined);
+        }}
+        onOk={() => void saveBinding()}
+      >
+        <Form form={bindingForm} layout="vertical">
+          <Form.Item label="销售部门">
+            <Input value={bindingModalOrg?.name} disabled />
+          </Form.Item>
+          <Form.Item label="绑定模板" name="templateId">
+            <Select
+              allowClear
+              placeholder="选择要应用的协同模板；清空表示解绑"
+              options={templates.map(template => ({ value: template.id, label: template.name }))}
+            />
+          </Form.Item>
+          <Form.Item label="启用" name="enabled" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Alert
+            type="info"
+            showIcon
+            message="部门应用说明"
+            description="这里仅负责绑定模板，不再维护部门级协同规则。绑定完成后，该部门按模板规则执行，业务销售负责人为负责人，模板命中的其他人员默认为协作者。"
+          />
+        </Form>
+      </Modal>
     </div>
   );
 }
