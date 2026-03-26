@@ -729,7 +729,7 @@ export default function AdminSalesCollabPage() {
   };
 
   return (
-    <div className="page-fill" style={{ gap: 16 }}>
+    <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Alert
         type="info"
         showIcon
@@ -738,78 +738,81 @@ export default function AdminSalesCollabPage() {
       />
 
       <Tabs
+        className="page-tabs"
         items={[
           {
             key: 'templates',
             label: '模板管理',
             children: (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <Card>
-                  <Space wrap>
-                    <Select
-                      value={selectedTemplateId}
-                      style={{ width: 320 }}
-                      placeholder="选择模板"
-                      options={templates.map(template => ({ value: template.id, label: template.name }))}
-                      onChange={value => setSelectedTemplateId(value)}
-                    />
-                    <Button type="primary" onClick={openCreateTemplate}>新增模板</Button>
-                    <Button onClick={openEditTemplate} disabled={!templateDetail}>编辑模板</Button>
-                    <Button loading={templateDuplicating} disabled={!templateDetail} onClick={() => void duplicateTemplate()}>复制模板</Button>
-                    <Button danger disabled={!templateDetail} onClick={() => {
-                      void Modal.confirm({
-                        title: '确认删除模板？',
-                        content: '删除后不可恢复，且不能删除已被部门绑定的模板。',
-                        okText: '删除',
-                        cancelText: '取消',
-                        onOk: async () => {
-                          await removeTemplate();
-                        },
-                      });
-                    }}>删除模板</Button>
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      loading={templateSaving}
-                      disabled={!templateDetail}
-                      onClick={() => void saveTemplateRules()}
-                    >
-                      保存模板规则
-                    </Button>
-                  </Space>
-                </Card>
-
-                {!templateDetail ? (
-                  <Card><Empty description="请选择或创建一个协同模板" /></Card>
-                ) : (
-                  <>
-                    <Card title={templateDetail.name} extra={templateDetail.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}>
-                      <Space size={[8, 8]} wrap>
-                        <Tag color="blue">主责人固定：业务销售负责人</Tag>
-                        {templateDetail.remark ? <Tag>{templateDetail.remark}</Tag> : null}
-                      </Space>
-                    </Card>
-
-                    {templateDetail.groups.map(group => (
-                      <Card
-                        key={group.id}
-                        title={group.groupName}
-                        extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
+              <div style={{ height: '100%', overflow: 'auto', paddingRight: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 4 }}>
+                  <Card>
+                    <Space wrap>
+                      <Select
+                        value={selectedTemplateId}
+                        style={{ width: 320 }}
+                        placeholder="选择模板"
+                        options={templates.map(template => ({ value: template.id, label: template.name }))}
+                        onChange={value => setSelectedTemplateId(value)}
+                      />
+                      <Button type="primary" onClick={openCreateTemplate}>新增模板</Button>
+                      <Button onClick={openEditTemplate} disabled={!templateDetail}>编辑模板</Button>
+                      <Button loading={templateDuplicating} disabled={!templateDetail} onClick={() => void duplicateTemplate()}>复制模板</Button>
+                      <Button danger disabled={!templateDetail} onClick={() => {
+                        void Modal.confirm({
+                          title: '确认删除模板？',
+                          content: '删除后不可恢复，且不能删除已被部门绑定的模板。',
+                          okText: '删除',
+                          cancelText: '取消',
+                          onOk: async () => {
+                            await removeTemplate();
+                          },
+                        });
+                      }}>删除模板</Button>
+                      <Button
+                        type="primary"
+                        icon={<SaveOutlined />}
+                        loading={templateSaving}
+                        disabled={!templateDetail}
+                        onClick={() => void saveTemplateRules()}
                       >
-                        {group.description ? <div style={{ color: '#64748b', marginBottom: 12 }}>{group.description}</div> : null}
-                        <RuleEditor
-                          rules={normalizeRules(group.rules)}
-                          onChange={rules => updateTemplateGroupRules(group.id, rules)}
-                          sourceTypeOptions={meta?.sourceTypes || []}
-                          scopeTypeOptions={meta?.scopeTypes || []}
-                          userOptions={userOptions}
-                          positionOptions={positionOptions}
-                          orgTreeData={allOrgTree}
-                        />
+                        保存模板规则
+                      </Button>
+                    </Space>
+                  </Card>
+
+                  {!templateDetail ? (
+                    <Card><Empty description="请选择或创建一个协同模板" /></Card>
+                  ) : (
+                    <>
+                      <Card title={templateDetail.name} extra={templateDetail.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}>
+                        <Space size={[8, 8]} wrap>
+                          <Tag color="blue">主责人固定：业务销售负责人</Tag>
+                          {templateDetail.remark ? <Tag>{templateDetail.remark}</Tag> : null}
+                        </Space>
                       </Card>
-                    ))}
-                  </>
-                )}
+
+                      {templateDetail.groups.map(group => (
+                        <Card
+                          key={group.id}
+                          title={group.groupName}
+                          extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
+                        >
+                          {group.description ? <div style={{ color: '#64748b', marginBottom: 12 }}>{group.description}</div> : null}
+                          <RuleEditor
+                            rules={normalizeRules(group.rules)}
+                            onChange={rules => updateTemplateGroupRules(group.id, rules)}
+                            sourceTypeOptions={meta?.sourceTypes || []}
+                            scopeTypeOptions={meta?.scopeTypes || []}
+                            userOptions={userOptions}
+                            positionOptions={positionOptions}
+                            orgTreeData={allOrgTree}
+                          />
+                        </Card>
+                      ))}
+                    </>
+                  )}
+                </div>
               </div>
             ),
           },
@@ -817,159 +820,161 @@ export default function AdminSalesCollabPage() {
             key: 'orgs',
             label: '部门应用',
             children: (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <Card>
-                  <div style={{ display: 'grid', gridTemplateColumns: '320px 320px auto', gap: 12, alignItems: 'center' }}>
-                    <TreeSelect
-                      value={selectedOrgId}
-                      treeData={salesOrgTree}
-                      placeholder="选择销售部门"
-                      treeDefaultExpandAll
-                      allowClear
-                      onChange={value => setSelectedOrgId(value ? String(value) : undefined)}
-                    />
-                    <Select
-                      value={orgRuleDetail?.binding.templateId || undefined}
-                      placeholder="绑定模板"
-                      disabled={!selectedOrgId}
-                      options={templates.map(template => ({ value: template.id, label: template.name }))}
-                      onChange={value => updateOrgBinding({ templateId: value ? String(value) : null })}
-                    />
-                    <Button type="primary" loading={bindingSaving} disabled={!selectedOrgId} onClick={() => void saveOrgBinding()}>保存部门模板绑定</Button>
-                  </div>
-                </Card>
+              <div style={{ height: '100%', overflow: 'auto', paddingRight: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 4 }}>
+                  <Card>
+                    <div style={{ display: 'grid', gridTemplateColumns: '320px 320px auto', gap: 12, alignItems: 'center' }}>
+                      <TreeSelect
+                        value={selectedOrgId}
+                        treeData={salesOrgTree}
+                        placeholder="选择销售部门"
+                        treeDefaultExpandAll
+                        allowClear
+                        onChange={value => setSelectedOrgId(value ? String(value) : undefined)}
+                      />
+                      <Select
+                        value={orgRuleDetail?.binding.templateId || undefined}
+                        placeholder="绑定模板"
+                        disabled={!selectedOrgId}
+                        options={templates.map(template => ({ value: template.id, label: template.name }))}
+                        onChange={value => updateOrgBinding({ templateId: value ? String(value) : null })}
+                      />
+                      <Button type="primary" loading={bindingSaving} disabled={!selectedOrgId} onClick={() => void saveOrgBinding()}>保存部门模板绑定</Button>
+                    </div>
+                  </Card>
 
-                {!selectedOrgId || !orgRuleDetail ? (
-                  <Card><Empty description="请选择销售部门后配置协同规则" /></Card>
-                ) : (
-                  <>
-                    {orgRuleDetail.groups.map(group => (
-                      <Card
-                        key={group.id}
-                        title={group.groupName}
-                        extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          <Space size={[8, 8]} wrap>
-                            <Tag color="blue">主责人：业务销售负责人（自动带出）</Tag>
-                            {group.description ? <Tag>{group.description}</Tag> : null}
-                          </Space>
-
-                          <Radio.Group
-                            value={group.overrideMode || 'INHERIT'}
-                            onChange={event => changeOverrideMode(group.id, event.target.value as 'INHERIT' | 'CUSTOM')}
-                          >
-                            <Radio.Button value="INHERIT">继承模板</Radio.Button>
-                            <Radio.Button value="CUSTOM">部门自定义</Radio.Button>
-                          </Radio.Group>
-
-                          {(group.overrideMode || 'INHERIT') === 'INHERIT' ? (
-                            <RuleSummary rules={normalizeRules(group.templateRules)} scopeLabelMap={scopeLabelMap} />
-                          ) : (
-                            <RuleEditor
-                              rules={normalizeRules(group.rules)}
-                              onChange={rules => updateOrgGroupRules(group.id, rules)}
-                              sourceTypeOptions={meta?.sourceTypes || []}
-                              scopeTypeOptions={meta?.scopeTypes || []}
-                              userOptions={userOptions}
-                              positionOptions={positionOptions}
-                              orgTreeData={allOrgTree}
-                            />
-                          )}
-                        </div>
-                      </Card>
-                    ))}
-
-                    <Card>
-                      <Space wrap>
-                        <Button type="primary" icon={<SaveOutlined />} loading={orgRulesSaving} onClick={() => void saveOrgRules()}>
-                          保存部门协同规则
-                        </Button>
-                        <Button disabled={!selectedOrgId} onClick={() => {
-                          setCopyOrgTargetIds([]);
-                          setCopyOrgModalOpen(true);
-                        }}>
-                          复制到其他部门
-                        </Button>
-                      </Space>
-                    </Card>
-
-                    <Card title="责任人预览">
-                      <div style={{ display: 'grid', gridTemplateColumns: '280px 280px auto', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-                        <Select
-                          value={previewSceneKey}
-                          options={sceneOptions}
-                          placeholder="选择协同场景"
-                          onChange={value => setPreviewSceneKey(value)}
-                        />
-                        <Select
-                          showSearch
-                          optionFilterProp="label"
-                          value={previewSalesOwnerUserId}
-                          options={userOptions}
-                          placeholder="选择业务销售负责人"
-                          onChange={value => setPreviewSalesOwnerUserId(value)}
-                        />
-                        <Button loading={previewLoading} onClick={() => void loadPreview()}>预览解析结果</Button>
-                      </div>
-
-                      {!previewData ? (
-                        <Empty description="选择场景与业务销售负责人后可预览最终参与人" />
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                          <div>
+                  {!selectedOrgId || !orgRuleDetail ? (
+                    <Card><Empty description="请选择销售部门后配置协同规则" /></Card>
+                  ) : (
+                    <>
+                      {orgRuleDetail.groups.map(group => (
+                        <Card
+                          key={group.id}
+                          title={group.groupName}
+                          extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             <Space size={[8, 8]} wrap>
-                              <Tag color="purple">{previewData.group.groupName}</Tag>
-                              <Tag>{previewData.owner?.name || '未指定销售负责人'}</Tag>
-                              {previewData.owner?.orgName ? <Tag>{previewData.owner.orgName}</Tag> : null}
+                              <Tag color="blue">主责人：业务销售负责人（自动带出）</Tag>
+                              {group.description ? <Tag>{group.description}</Tag> : null}
                             </Space>
-                          </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <div style={{ fontWeight: 600 }}>协同人</div>
-                            {previewData.collaborators.length ? previewData.collaborators.map(user => (
-                              <div
-                                key={user.userId}
-                                style={{
-                                  border: '1px solid #e5e7eb',
-                                  borderRadius: 12,
-                                  padding: '10px 12px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  gap: 12,
-                                  background: '#fafafa',
-                                }}
-                              >
-                                <Space size={[8, 8]} wrap>
-                                  <span>{user.name}</span>
-                                  {user.orgName ? <Tag>{user.orgName}</Tag> : null}
-                                  {user.dutyLabel ? <Tag color="gold">{user.dutyLabel}</Tag> : null}
-                                  {user.sourceRefName ? <Tag color="blue">{user.sourceRefName}</Tag> : null}
-                                </Space>
-                                <span style={{ color: '#94a3b8' }}>{user.resolvedBy || user.sourceType}</span>
-                              </div>
-                            )) : <div style={{ color: '#94a3b8' }}>当前没有解析出协同人</div>}
-                          </div>
+                            <Radio.Group
+                              value={group.overrideMode || 'INHERIT'}
+                              onChange={event => changeOverrideMode(group.id, event.target.value as 'INHERIT' | 'CUSTOM')}
+                            >
+                              <Radio.Button value="INHERIT">继承模板</Radio.Button>
+                              <Radio.Button value="CUSTOM">部门自定义</Radio.Button>
+                            </Radio.Group>
 
-                          {previewData.unmatchedRules.length ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              <div style={{ fontWeight: 600 }}>未命中规则</div>
-                              {previewData.unmatchedRules.map((item, index) => (
-                                <Alert
-                                  key={`${item.reason}-${index}`}
-                                  type="warning"
-                                  showIcon
-                                  message={item.reason}
-                                  description={[item.sourceRefName, item.dutyLabel, item.resolveScopeType].filter(Boolean).join(' / ') || '请检查规则配置'}
-                                />
-                              ))}
-                            </div>
-                          ) : null}
+                            {(group.overrideMode || 'INHERIT') === 'INHERIT' ? (
+                              <RuleSummary rules={normalizeRules(group.templateRules)} scopeLabelMap={scopeLabelMap} />
+                            ) : (
+                              <RuleEditor
+                                rules={normalizeRules(group.rules)}
+                                onChange={rules => updateOrgGroupRules(group.id, rules)}
+                                sourceTypeOptions={meta?.sourceTypes || []}
+                                scopeTypeOptions={meta?.scopeTypes || []}
+                                userOptions={userOptions}
+                                positionOptions={positionOptions}
+                                orgTreeData={allOrgTree}
+                              />
+                            )}
+                          </div>
+                        </Card>
+                      ))}
+
+                      <Card>
+                        <Space wrap>
+                          <Button type="primary" icon={<SaveOutlined />} loading={orgRulesSaving} onClick={() => void saveOrgRules()}>
+                            保存部门协同规则
+                          </Button>
+                          <Button disabled={!selectedOrgId} onClick={() => {
+                            setCopyOrgTargetIds([]);
+                            setCopyOrgModalOpen(true);
+                          }}>
+                            复制到其他部门
+                          </Button>
+                        </Space>
+                      </Card>
+
+                      <Card title="责任人预览">
+                        <div style={{ display: 'grid', gridTemplateColumns: '280px 280px auto', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+                          <Select
+                            value={previewSceneKey}
+                            options={sceneOptions}
+                            placeholder="选择协同场景"
+                            onChange={value => setPreviewSceneKey(value)}
+                          />
+                          <Select
+                            showSearch
+                            optionFilterProp="label"
+                            value={previewSalesOwnerUserId}
+                            options={userOptions}
+                            placeholder="选择业务销售负责人"
+                            onChange={value => setPreviewSalesOwnerUserId(value)}
+                          />
+                          <Button loading={previewLoading} onClick={() => void loadPreview()}>预览解析结果</Button>
                         </div>
-                      )}
-                    </Card>
-                  </>
-                )}
+
+                        {!previewData ? (
+                          <Empty description="选择场景与业务销售负责人后可预览最终参与人" />
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div>
+                              <Space size={[8, 8]} wrap>
+                                <Tag color="purple">{previewData.group.groupName}</Tag>
+                                <Tag>{previewData.owner?.name || '未指定销售负责人'}</Tag>
+                                {previewData.owner?.orgName ? <Tag>{previewData.owner.orgName}</Tag> : null}
+                              </Space>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div style={{ fontWeight: 600 }}>协同人</div>
+                              {previewData.collaborators.length ? previewData.collaborators.map(user => (
+                                <div
+                                  key={user.userId}
+                                  style={{
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: 12,
+                                    padding: '10px 12px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    gap: 12,
+                                    background: '#fafafa',
+                                  }}
+                                >
+                                  <Space size={[8, 8]} wrap>
+                                    <span>{user.name}</span>
+                                    {user.orgName ? <Tag>{user.orgName}</Tag> : null}
+                                    {user.dutyLabel ? <Tag color="gold">{user.dutyLabel}</Tag> : null}
+                                    {user.sourceRefName ? <Tag color="blue">{user.sourceRefName}</Tag> : null}
+                                  </Space>
+                                  <span style={{ color: '#94a3b8' }}>{user.resolvedBy || user.sourceType}</span>
+                                </div>
+                              )) : <div style={{ color: '#94a3b8' }}>当前没有解析出协同人</div>}
+                            </div>
+
+                            {previewData.unmatchedRules.length ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontWeight: 600 }}>未命中规则</div>
+                                {previewData.unmatchedRules.map((item, index) => (
+                                  <Alert
+                                    key={`${item.reason}-${index}`}
+                                    type="warning"
+                                    showIcon
+                                    message={item.reason}
+                                    description={[item.sourceRefName, item.dutyLabel, item.resolveScopeType].filter(Boolean).join(' / ') || '请检查规则配置'}
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </Card>
+                    </>
+                  )}
+                </div>
               </div>
             ),
           },
