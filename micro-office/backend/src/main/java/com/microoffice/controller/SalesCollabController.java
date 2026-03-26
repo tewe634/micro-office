@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,6 +33,11 @@ public class SalesCollabController {
     private static final String SCOPE_CURRENT_DEPT = "CURRENT_SALES_DEPT";
     private static final String SCOPE_CURRENT_REGION = "CURRENT_SALES_REGION";
     private static final String SCOPE_FIXED_ORG = "FIXED_ORG";
+    private static final String GROUP_KEY_TECH_COLLAB = "TECH_COLLAB";
+    private static final String GROUP_KEY_PRE_SALES_TECH = "PRE_SALES_TECH";
+    private static final String GROUP_KEY_AFTER_SALES_TECH = "AFTER_SALES_TECH";
+    private static final String GROUP_NAME_TECH_COLLAB = "技术协同";
+    private static final String GROUP_DESC_TECH_COLLAB = "销售与技术共同参与售前、售后技术支持";
 
     private final JdbcTemplate jdbc;
     private final MenuPermissionService menuPermissionService;
@@ -371,40 +377,67 @@ public class SalesCollabController {
             "SELECT id, group_key, group_name, domain_key, description, sort_order, enabled " +
                 "FROM sales_collab_group ORDER BY sort_order, group_name"
         );
-        Map<String, List<Map<String, Object>>> scenesByGroup = new LinkedHashMap<>();
+        String canonicalTechGroupId = resolveCanonicalTechGroupId(groupRows);
+
+        Map<String, List<Map<String, Object>>> scenesByGroupKey = new LinkedHashMap<>();
+        Map<String, Set<String>> sceneKeysByGroupKey = new LinkedHashMap<>();
         List<Map<String, Object>> sceneRows = jdbc.queryForList(
-            "SELECT gs.group_id, s.id AS scene_id, s.scene_key, s.scene_name, s.domain_key, gs.sort_order " +
+            "SELECT gs.group_id, g.group_key, s.id AS scene_id, s.scene_key, s.scene_name, s.domain_key, gs.sort_order " +
                 "FROM sales_collab_group_scene gs " +
+                "JOIN sales_collab_group g ON g.id = gs.group_id " +
                 "JOIN sales_collab_scene s ON s.id = gs.scene_id " +
                 "ORDER BY gs.sort_order, s.sort_order, s.scene_name"
         );
         for (Map<String, Object> row : sceneRows) {
-            String groupId = asString(row.get("group_id"));
-            if (groupId == null) {
+            String normalizedGroupKey = normalizeGroupKey(asString(row.get("group_key")));
+            if (normalizedGroupKey == null) {
+                continue;
+            }
+            String sceneKey = asString(row.get("scene_key"));
+            String dedupKey = sceneKey == null ? asString(row.get("scene_id")) : sceneKey;
+            Set<String> seen = sceneKeysByGroupKey.computeIfAbsent(normalizedGroupKey, key -> new LinkedHashSet<>());
+            if (dedupKey != null && !seen.add(dedupKey)) {
                 continue;
             }
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", asString(row.get("scene_id")));
-            item.put("sceneKey", asString(row.get("scene_key")));
+            item.put("sceneKey", sceneKey);
             item.put("sceneName", asString(row.get("scene_name")));
             item.put("domainKey", asString(row.get("domain_key")));
             item.put("sortOrder", asInt(row.get("sort_order"), 0));
-            scenesByGroup.computeIfAbsent(groupId, key -> new ArrayList<>()).add(item);
+            scenesByGroupKey.computeIfAbsent(normalizedGroupKey, key -> new ArrayList<>()).add(item);
+        }
+
+        Map<String, Map<String, Object>> groupsByKey = new LinkedHashMap<>();
+        for (Map<String, Object> row : groupRows) {
+            String rawGroupKey = asString(row.get("group_key"));
+            String normalizedGroupKey = normalizeGroupKey(rawGroupKey);
+            if (normalizedGroupKey == null) {
+                continue;
+            }
+            boolean techGroup = isTechGroupKey(rawGroupKey);
+            Map<String, Object> existing = groupsByKey.get(normalizedGroupKey);
+            if (existing == null) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("id", techGroup ? (canonicalTechGroupId == null ? asString(row.get("id")) : canonicalTechGroupId) : asString(row.get("id")));
+                item.put("groupKey", normalizedGroupKey);
+                item.put("groupName", techGroup ? GROUP_NAME_TECH_COLLAB : asString(row.get("group_name")));
+                item.put("domainKey", techGroup ? "TECH" : asString(row.get("domain_key")));
+                item.put("description", techGroup ? GROUP_DESC_TECH_COLLAB : asString(row.get("description")));
+                item.put("sortOrder", asInt(row.get("sort_order"), 0));
+                item.put("enabled", asBoolean(row.get("enabled"), true));
+                groupsByKey.put(normalizedGroupKey, item);
+                continue;
+            }
+            existing.put("sortOrder", Math.min(asInt(existing.get("sortOrder"), 0), asInt(row.get("sort_order"), 0)));
+            existing.put("enabled", asBoolean(existing.get("enabled"), true) || asBoolean(row.get("enabled"), true));
         }
 
         List<Map<String, Object>> groups = new ArrayList<>();
-        for (Map<String, Object> row : groupRows) {
-            String groupId = asString(row.get("id"));
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", groupId);
-            item.put("groupKey", asString(row.get("group_key")));
-            item.put("groupName", asString(row.get("group_name")));
-            item.put("domainKey", asString(row.get("domain_key")));
-            item.put("description", asString(row.get("description")));
-            item.put("sortOrder", asInt(row.get("sort_order"), 0));
-            item.put("enabled", asBoolean(row.get("enabled"), true));
-            item.put("scenes", new ArrayList<>(scenesByGroup.getOrDefault(groupId, List.of())));
-            groups.add(item);
+        for (Map<String, Object> group : groupsByKey.values()) {
+            String groupKey = asString(group.get("groupKey"));
+            group.put("scenes", new ArrayList<>(scenesByGroupKey.getOrDefault(groupKey, List.of())));
+            groups.add(group);
         }
         return groups;
     }
@@ -437,9 +470,11 @@ public class SalesCollabController {
 
     private Map<String, List<Map<String, Object>>> loadTemplateRulesByGroup(String templateId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, group_id, participant_role, source_type, source_ref_id, source_ref_name, " +
-                "resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark " +
-                "FROM sales_collab_template_rule WHERE template_id = ? ORDER BY group_id, sort_order, created_at",
+            "SELECT r.id, r.group_id, g.group_key, r.participant_role, r.source_type, r.source_ref_id, r.source_ref_name, " +
+                "r.resolve_scope_type, r.resolve_scope_ref_id, r.duty_label, r.sort_order, r.enabled, r.remark " +
+                "FROM sales_collab_template_rule r " +
+                "JOIN sales_collab_group g ON g.id = r.group_id " +
+                "WHERE r.template_id = ? ORDER BY r.group_id, r.sort_order, r.created_at",
             templateId
         );
         return groupRules(rows);
@@ -447,9 +482,11 @@ public class SalesCollabController {
 
     private Map<String, List<Map<String, Object>>> loadOrgRulesByGroup(String orgId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, group_id, participant_role, source_type, source_ref_id, source_ref_name, " +
-                "resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark " +
-                "FROM sales_collab_org_rule WHERE org_id = ? ORDER BY group_id, sort_order, created_at",
+            "SELECT r.id, r.group_id, g.group_key, r.participant_role, r.source_type, r.source_ref_id, r.source_ref_name, " +
+                "r.resolve_scope_type, r.resolve_scope_ref_id, r.duty_label, r.sort_order, r.enabled, r.remark " +
+                "FROM sales_collab_org_rule r " +
+                "JOIN sales_collab_group g ON g.id = r.group_id " +
+                "WHERE r.org_id = ? ORDER BY r.group_id, r.sort_order, r.created_at",
             orgId
         );
         return groupRules(rows);
@@ -457,14 +494,134 @@ public class SalesCollabController {
 
     private Map<String, List<Map<String, Object>>> groupRules(List<Map<String, Object>> rows) {
         Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
+        Map<String, Map<String, Map<String, Object>>> dedupIndex = new LinkedHashMap<>();
+        String canonicalTechGroupId = resolveCanonicalTechGroupId();
         for (Map<String, Object> row : rows) {
-            String groupId = asString(row.get("group_id"));
-            if (groupId == null) {
+            String rawGroupId = asString(row.get("group_id"));
+            String rawGroupKey = asString(row.get("group_key"));
+            if (rawGroupId == null) {
                 continue;
             }
-            result.computeIfAbsent(groupId, key -> new ArrayList<>()).add(toRulePayload(row));
+            String targetGroupId = isTechGroupKey(rawGroupKey) && canonicalTechGroupId != null ? canonicalTechGroupId : rawGroupId;
+            Map<String, Object> payload = toRulePayload(row);
+            String signature = buildRuleSignature(payload);
+            Map<String, Map<String, Object>> bySignature = dedupIndex.computeIfAbsent(targetGroupId, key -> new LinkedHashMap<>());
+            Map<String, Object> existing = bySignature.get(signature);
+            if (existing == null) {
+                bySignature.put(signature, payload);
+                result.computeIfAbsent(targetGroupId, key -> new ArrayList<>()).add(payload);
+                continue;
+            }
+            existing.put("sortOrder", Math.min(asInt(existing.get("sortOrder"), 0), asInt(payload.get("sortOrder"), 0)));
+            existing.put("enabled", asBoolean(existing.get("enabled"), true) || asBoolean(payload.get("enabled"), true));
         }
+        result.values().forEach(rules -> rules.sort(Comparator.comparingInt(rule -> asInt(rule.get("sortOrder"), 0))));
         return result;
+    }
+
+    private boolean isTechGroupKey(String groupKey) {
+        return GROUP_KEY_TECH_COLLAB.equals(groupKey)
+            || GROUP_KEY_PRE_SALES_TECH.equals(groupKey)
+            || GROUP_KEY_AFTER_SALES_TECH.equals(groupKey);
+    }
+
+    private String normalizeGroupKey(String groupKey) {
+        return isTechGroupKey(groupKey) ? GROUP_KEY_TECH_COLLAB : groupKey;
+    }
+
+    private String resolveCanonicalTechGroupId() {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT id, group_key FROM sales_collab_group WHERE group_key IN (?, ?, ?) " +
+                "ORDER BY CASE WHEN group_key = ? THEN 0 WHEN group_key = ? THEN 1 ELSE 2 END",
+            GROUP_KEY_TECH_COLLAB,
+            GROUP_KEY_PRE_SALES_TECH,
+            GROUP_KEY_AFTER_SALES_TECH,
+            GROUP_KEY_TECH_COLLAB,
+            GROUP_KEY_PRE_SALES_TECH
+        );
+        return resolveCanonicalTechGroupId(rows);
+    }
+
+    private String resolveCanonicalTechGroupId(List<Map<String, Object>> rows) {
+        for (Map<String, Object> row : rows) {
+            if (GROUP_KEY_TECH_COLLAB.equals(asString(row.get("group_key")))) {
+                return asString(row.get("id"));
+            }
+        }
+        for (Map<String, Object> row : rows) {
+            if (GROUP_KEY_PRE_SALES_TECH.equals(asString(row.get("group_key")))) {
+                return asString(row.get("id"));
+            }
+        }
+        for (Map<String, Object> row : rows) {
+            if (GROUP_KEY_AFTER_SALES_TECH.equals(asString(row.get("group_key")))) {
+                return asString(row.get("id"));
+            }
+        }
+        return null;
+    }
+
+    private String canonicalizeGroupId(String groupId) {
+        if (groupId == null || groupId.isBlank()) {
+            return groupId;
+        }
+        Map<String, Object> row = queryForMapOrNull("SELECT id, group_key FROM sales_collab_group WHERE id = ?", groupId);
+        if (row == null) {
+            return groupId;
+        }
+        String groupKey = asString(row.get("group_key"));
+        if (!isTechGroupKey(groupKey)) {
+            return groupId;
+        }
+        String canonicalTechGroupId = resolveCanonicalTechGroupId();
+        return canonicalTechGroupId == null ? groupId : canonicalTechGroupId;
+    }
+
+    private Map<String, Object> queryCanonicalTechGroupRow() {
+        return queryForMapOrNull(
+            "SELECT id, group_key, group_name, domain_key FROM sales_collab_group " +
+                "WHERE group_key IN (?, ?, ?) " +
+                "ORDER BY CASE WHEN group_key = ? THEN 0 WHEN group_key = ? THEN 1 ELSE 2 END LIMIT 1",
+            GROUP_KEY_TECH_COLLAB,
+            GROUP_KEY_PRE_SALES_TECH,
+            GROUP_KEY_AFTER_SALES_TECH,
+            GROUP_KEY_TECH_COLLAB,
+            GROUP_KEY_PRE_SALES_TECH
+        );
+    }
+
+    private Map<String, Object> normalizeResolvedGroup(Map<String, Object> row) {
+        if (row == null) {
+            return null;
+        }
+        String groupKey = asString(row.get("group_key"));
+        if (!isTechGroupKey(groupKey)) {
+            return row;
+        }
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", canonicalizeGroupId(asString(row.get("id"))));
+        item.put("group_key", GROUP_KEY_TECH_COLLAB);
+        item.put("group_name", GROUP_NAME_TECH_COLLAB);
+        item.put("domain_key", "TECH");
+        return item;
+    }
+
+    private String buildRuleSignature(Map<String, Object> rule) {
+        return String.join("|",
+            safeSignatureValue(rule.get("participantRole")),
+            safeSignatureValue(rule.get("sourceType")),
+            safeSignatureValue(rule.get("sourceRefId")),
+            safeSignatureValue(rule.get("sourceRefName")),
+            safeSignatureValue(rule.get("resolveScopeType")),
+            safeSignatureValue(rule.get("resolveScopeRefId")),
+            safeSignatureValue(rule.get("dutyLabel")),
+            safeSignatureValue(rule.get("enabled")),
+            safeSignatureValue(rule.get("remark"))
+        );
+    }
+
+    private String safeSignatureValue(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 
     private Map<String, Object> toRulePayload(Map<String, Object> row) {
@@ -764,26 +921,34 @@ public class SalesCollabController {
 
     private Map<String, Object> resolveTargetGroup(String groupId, String groupKey, String sceneKey) {
         if (groupId != null && !groupId.isBlank()) {
-            return queryForMapOrNull(
+            return normalizeResolvedGroup(queryForMapOrNull(
                 "SELECT id, group_key, group_name, domain_key FROM sales_collab_group WHERE id = ?",
-                groupId
-            );
+                canonicalizeGroupId(groupId)
+            ));
         }
         if (groupKey != null && !groupKey.isBlank()) {
-            return queryForMapOrNull(
+            if (isTechGroupKey(groupKey)) {
+                return normalizeResolvedGroup(queryCanonicalTechGroupRow());
+            }
+            return normalizeResolvedGroup(queryForMapOrNull(
                 "SELECT id, group_key, group_name, domain_key FROM sales_collab_group WHERE group_key = ?",
                 groupKey
-            );
+            ));
         }
         if (sceneKey != null && !sceneKey.isBlank()) {
-            return queryForMapOrNull(
+            return normalizeResolvedGroup(queryForMapOrNull(
                 "SELECT g.id, g.group_key, g.group_name, g.domain_key " +
                     "FROM sales_collab_group g " +
                     "JOIN sales_collab_group_scene gs ON gs.group_id = g.id " +
                     "JOIN sales_collab_scene s ON s.id = gs.scene_id " +
-                    "WHERE s.scene_key = ? LIMIT 1",
-                sceneKey
-            );
+                    "WHERE s.scene_key = ? " +
+                    "ORDER BY CASE WHEN g.group_key = ? THEN 0 WHEN g.group_key = ? THEN 1 WHEN g.group_key = ? THEN 2 ELSE 3 END " +
+                    "LIMIT 1",
+                sceneKey,
+                GROUP_KEY_TECH_COLLAB,
+                GROUP_KEY_PRE_SALES_TECH,
+                GROUP_KEY_AFTER_SALES_TECH
+            ));
         }
         return null;
     }
@@ -801,12 +966,13 @@ public class SalesCollabController {
         String sourceType = requireText(rule.get("sourceType"), "规则来源类型不能为空");
         String sourceRefId = asNullableString(rule.get("sourceRefId"));
         String sourceRefName = resolveSourceRefName(sourceType, sourceRefId, asNullableString(rule.get("sourceRefName")));
+        String targetGroupId = canonicalizeGroupId(groupId);
         jdbc.update(
             "INSERT INTO sales_collab_template_rule (id, template_id, group_id, participant_role, source_type, source_ref_id, source_ref_name, resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             UUID.randomUUID().toString(),
             templateId,
-            groupId,
+            targetGroupId,
             asNullableString(rule.get("participantRole")) == null ? COLLABORATOR_ROLE : asString(rule.get("participantRole")),
             sourceType,
             sourceRefId,
@@ -824,12 +990,13 @@ public class SalesCollabController {
         String sourceType = requireText(rule.get("sourceType"), "规则来源类型不能为空");
         String sourceRefId = asNullableString(rule.get("sourceRefId"));
         String sourceRefName = resolveSourceRefName(sourceType, sourceRefId, asNullableString(rule.get("sourceRefName")));
+        String targetGroupId = canonicalizeGroupId(groupId);
         jdbc.update(
             "INSERT INTO sales_collab_org_rule (id, org_id, group_id, participant_role, source_type, source_ref_id, source_ref_name, resolve_scope_type, resolve_scope_ref_id, duty_label, sort_order, enabled, remark) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             UUID.randomUUID().toString(),
             orgId,
-            groupId,
+            targetGroupId,
             asNullableString(rule.get("participantRole")) == null ? COLLABORATOR_ROLE : asString(rule.get("participantRole")),
             sourceType,
             sourceRefId,

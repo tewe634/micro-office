@@ -149,6 +149,11 @@ type PreviewPayload = {
 
 type TemplateModalMode = 'create' | 'edit';
 
+const TECH_GROUP_KEY = 'TECH_COLLAB';
+const LEGACY_TECH_GROUP_KEYS = new Set(['PRE_SALES_TECH', 'AFTER_SALES_TECH']);
+const TECH_GROUP_NAME = '技术协同';
+const TECH_GROUP_DESCRIPTION = '销售与技术共同参与售前、售后技术支持';
+
 function localKey() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -178,6 +183,89 @@ function cloneRules(rules: RuleItem[] | undefined) {
     id: undefined,
     _localKey: localKey(),
   }));
+}
+
+function isTechGroup(groupKey?: string) {
+  return groupKey === TECH_GROUP_KEY || (!!groupKey && LEGACY_TECH_GROUP_KEYS.has(groupKey));
+}
+
+function buildRuleSignature(rule: RuleItem) {
+  return [
+    rule.participantRole || '',
+    rule.sourceType || '',
+    rule.sourceRefId || '',
+    rule.sourceRefName || '',
+    rule.resolveScopeType || '',
+    rule.resolveScopeRefId || '',
+    rule.dutyLabel || '',
+    String(rule.enabled ?? true),
+    rule.remark || '',
+  ].join('|');
+}
+
+function mergeRules(...ruleGroups: Array<RuleItem[] | undefined>) {
+  const merged = normalizeRules(ruleGroups.flatMap(group => group || []));
+  const seen = new Set<string>();
+  return merged.filter(rule => {
+    const signature = buildRuleSignature(rule);
+    if (seen.has(signature)) {
+      return false;
+    }
+    seen.add(signature);
+    return true;
+  });
+}
+
+function mergeScenes(...sceneGroups: Array<SceneMeta[] | undefined>) {
+  const items = sceneGroups.flatMap(group => group || []);
+  const seen = new Set<string>();
+  return items
+    .filter(scene => {
+      const signature = scene.sceneKey || scene.id;
+      if (seen.has(signature)) {
+        return false;
+      }
+      seen.add(signature);
+      return true;
+    })
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+}
+
+function normalizeLegacyTechGroups(groups: GroupMeta[] | undefined) {
+  const list = groups || [];
+  const techGroups = list.filter(group => isTechGroup(group.groupKey));
+  if (!techGroups.length) {
+    return list;
+  }
+  const mergedTechGroup = techGroups.find(group => group.groupKey === TECH_GROUP_KEY) || techGroups[0];
+  const mergedTechSortOrder = Math.min(...techGroups.map(group => group.sortOrder || 0));
+
+  const result: GroupMeta[] = [];
+  let techInserted = false;
+  list.forEach(group => {
+    if (!isTechGroup(group.groupKey)) {
+      result.push(group);
+      return;
+    }
+    if (techInserted) {
+      return;
+    }
+    result.push({
+      ...mergedTechGroup,
+      groupKey: TECH_GROUP_KEY,
+      groupName: TECH_GROUP_NAME,
+      domainKey: 'TECH',
+      description: TECH_GROUP_DESCRIPTION,
+      sortOrder: mergedTechSortOrder,
+      scenes: mergeScenes(...techGroups.map(item => item.scenes)),
+      rules: mergeRules(...techGroups.map(item => item.rules)),
+      templateRules: mergeRules(...techGroups.map(item => item.templateRules)),
+      customRules: mergeRules(...techGroups.map(item => item.customRules)),
+      overrideMode: techGroups.some(item => item.overrideMode === 'CUSTOM') ? 'CUSTOM' : mergedTechGroup.overrideMode,
+    });
+    techInserted = true;
+  });
+  return result;
 }
 
 function buildTree(items: OrgItem[], allowedIds?: Set<string>, disableRootId?: string): TreeNode[] {
@@ -436,7 +524,10 @@ export default function AdminSalesCollabPage() {
         positionApi.list(),
         userApi.lookups(),
       ]);
-      setMeta(metaRes.data || null);
+      setMeta(metaRes.data ? {
+        ...metaRes.data,
+        groups: normalizeLegacyTechGroups(metaRes.data.groups),
+      } : null);
       const templateList = (templateRes.data || []) as TemplateSummary[];
       setTemplates(templateList);
       setSelectedTemplateId(current => current || templateList[0]?.id);
@@ -455,9 +546,10 @@ export default function AdminSalesCollabPage() {
     const load = async () => {
       const response: any = await salesCollabApi.getTemplate(selectedTemplateId);
       const detail = response.data as TemplateDetail;
+      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
       setTemplateDetail({
         ...detail,
-        groups: (detail.groups || []).map(group => ({
+        groups: normalizedGroups.map(group => ({
           ...group,
           rules: normalizeRules(group.rules),
         })),
@@ -475,9 +567,10 @@ export default function AdminSalesCollabPage() {
     const load = async () => {
       const response: any = await salesCollabApi.getOrgRules(selectedOrgId);
       const detail = response.data as OrgRuleDetail;
+      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
       setOrgRuleDetail({
         ...detail,
-        groups: (detail.groups || []).map(group => ({
+        groups: normalizedGroups.map(group => ({
           ...group,
           rules: normalizeRules(group.rules),
           templateRules: normalizeRules(group.templateRules),
@@ -571,9 +664,10 @@ export default function AdminSalesCollabPage() {
       };
       const response: any = await salesCollabApi.saveTemplateRules(templateDetail.id, payload);
       const detail = response.data as TemplateDetail;
+      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
       setTemplateDetail({
         ...detail,
-        groups: (detail.groups || []).map(group => ({
+        groups: normalizedGroups.map(group => ({
           ...group,
           rules: normalizeRules(group.rules),
         })),
@@ -608,9 +702,10 @@ export default function AdminSalesCollabPage() {
       message.success('部门绑定模板已保存');
       const detailResponse: any = await salesCollabApi.getOrgRules(selectedOrgId);
       const detail = detailResponse.data as OrgRuleDetail;
+      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
       setOrgRuleDetail({
         ...detail,
-        groups: (detail.groups || []).map(group => ({
+        groups: normalizedGroups.map(group => ({
           ...group,
           rules: normalizeRules(group.rules),
           templateRules: normalizeRules(group.templateRules),
@@ -678,9 +773,10 @@ export default function AdminSalesCollabPage() {
       };
       const response: any = await salesCollabApi.saveOrgRules(selectedOrgId, payload);
       const detail = response.data as OrgRuleDetail;
+      const normalizedGroups = normalizeLegacyTechGroups(detail.groups);
       setOrgRuleDetail({
         ...detail,
-        groups: (detail.groups || []).map(group => ({
+        groups: normalizedGroups.map(group => ({
           ...group,
           rules: normalizeRules(group.rules),
           templateRules: normalizeRules(group.templateRules),
