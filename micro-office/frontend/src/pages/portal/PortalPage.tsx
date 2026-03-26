@@ -838,153 +838,206 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     </>
   );
 
-  const renderSalesUserPortal = () => (
-    <>
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={10}>
-          <Card title="销售排名" style={{ height: '100%' }}>
-            <Table
-              dataSource={data?.salesRanking || []}
-              rowKey={(record: any) => String(record.id || record.salespersonName)}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: '排名',
-                  dataIndex: 'rank',
-                  width: 80,
-                  render: (value: unknown, record: any) => (
-                    <Space size={6}>
-                      <span style={{ fontWeight: 700 }}>{String(value ?? '-')}</span>
-                      {record.currentUser ? <Tag color="blue">我</Tag> : null}
-                    </Space>
-                  ),
-                },
-                { title: '销售人员', dataIndex: 'salespersonName', width: 120 },
-                {
-                  title: '销售额',
-                  dataIndex: 'salesAmount',
-                  width: 140,
-                  render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
-                },
-                {
-                  title: '达成率',
-                  dataIndex: 'completionRate',
-                  width: 100,
-                  render: (value: any) => `${value || 0}%`,
-                },
-                { title: '主推产品', dataIndex: 'focusProduct' },
-              ]}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} xl={14}>
-          <Card title={`${header.positionName || '当前岗位'}客户绩效分布`} style={{ height: '100%' }}>
-            <Table
-              dataSource={data?.customerPerformance || []}
-              rowKey={(record: any) => String(record.id || record.name)}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: '客户',
-                  dataIndex: 'name',
-                  render: (_: unknown, record: any) => renderPortalLink('objects', record.id, record.name),
-                },
-                {
-                  title: '绩效金额',
-                  dataIndex: 'amount',
-                  width: 150,
-                  render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
-                },
-                { title: '涉及产品', dataIndex: 'productCount', width: 100 },
-                { title: '相关工作', dataIndex: 'workItemCount', width: 100 },
-                { title: '最近跟进', dataIndex: 'lastActiveAt', width: 120 },
-              ]}
-            />
-          </Card>
-        </Col>
-      </Row>
+  const renderSalesUserPortal = () => {
+    const productMocks = [
+      { id: 'mock-product-1', name: 'ASC580 变频器', code: 'ASC580-01-017A-4', amount: 138000 },
+      { id: 'mock-product-2', name: 'ACS880 工业传动变频器', code: 'ACS880-01-065A-3', amount: 186000 },
+      { id: 'mock-product-3', name: 'ACH580 暖通变频器', code: 'ACH580-01-072A-4', amount: 112000 },
+      { id: 'mock-product-4', name: 'ACQ580 水务变频器', code: 'ACQ580-01-046A-4', amount: 128000 },
+    ];
+    const customerRows = (data?.customerPerformance || []).map((item: any, index: number) => ({
+      ...item,
+      productCount: item.productCount || ((index % 3) + 1),
+      workItemCount: item.workItemCount || ((index % 4) + 1),
+    }));
+    const salesRanking = [
+      { id: 'rank-1', rank: 1, salespersonName: header.userName || header.displayName || '当前销售', salesAmount: 1380000, completionRate: 96, focusProduct: productMocks[0].name, currentUser: true },
+      { id: 'rank-2', rank: 2, salespersonName: '伊志杰', salesAmount: 1210000, completionRate: 91, focusProduct: productMocks[1].name, currentUser: false },
+      { id: 'rank-3', rank: 3, salespersonName: '彭和春', salesAmount: 1180000, completionRate: 88, focusProduct: productMocks[2].name, currentUser: false },
+      { id: 'rank-4', rank: 4, salespersonName: '王忠', salesAmount: 1060000, completionRate: 83, focusProduct: productMocks[3].name, currentUser: (header.userName || header.displayName) === '王忠' },
+    ];
+    const performanceItems = ((data?.performanceItems || []) as any[]).slice(0, 6).map((item, index) => ({
+      ...item,
+      productId: productMocks[index % productMocks.length].id,
+      productName: productMocks[index % productMocks.length].name,
+      note: item.note || `${productMocks[index % productMocks.length].name} 项目推进中`,
+    }));
+    const fallbackCustomers = customerRows.length
+      ? customerRows
+      : [
+          { id: 'mock-customer-1', name: '杭州恒盈设备', amount: 520000, lastActiveAt: '03-25', productCount: 2, workItemCount: 2 },
+          { id: 'mock-customer-2', name: '宁波远望机电', amount: 410000, lastActiveAt: '03-24', productCount: 1, workItemCount: 1 },
+          { id: 'mock-customer-3', name: '嘉兴智控科技', amount: 360000, lastActiveAt: '03-22', productCount: 2, workItemCount: 2 },
+        ];
+    const workItems = [
+      { id: 'sales-work-1', title: '杭州恒盈设备 · ASC580 报价跟进', status: 'TODO', stage: '待报价', ownerName: header.userName || header.displayName || '当前销售', objectId: fallbackCustomers[0]?.id, objectName: fallbackCustomers[0]?.name, productId: productMocks[0].id, productName: productMocks[0].name, updatedAt: '03-26 09:10' },
+      { id: 'sales-work-2', title: '宁波远望机电 · ACS880 样机测试安排', status: 'IN_PROGRESS', stage: '测试推进', ownerName: header.userName || header.displayName || '当前销售', objectId: fallbackCustomers[1]?.id, objectName: fallbackCustomers[1]?.name, productId: productMocks[1].id, productName: productMocks[1].name, updatedAt: '03-26 10:20' },
+      { id: 'sales-work-3', title: '嘉兴智控科技 · ACH580 商务条款确认', status: 'COMPLETED', stage: '商务确认', ownerName: header.userName || header.displayName || '当前销售', objectId: fallbackCustomers[2]?.id, objectName: fallbackCustomers[2]?.name, productId: productMocks[2].id, productName: productMocks[2].name, updatedAt: '03-25 16:40' },
+      { id: 'sales-work-4', title: '杭州恒盈设备 · ACQ580 交付排期同步', status: 'CANCELLED', stage: '排期取消', ownerName: header.userName || header.displayName || '当前销售', objectId: fallbackCustomers[0]?.id, objectName: fallbackCustomers[0]?.name, productId: productMocks[3].id, productName: productMocks[3].name, updatedAt: '03-24 11:30' },
+    ];
+    const workSummary = {
+      todo: workItems.filter(item => item.status === 'TODO').length,
+      inProgress: workItems.filter(item => item.status === 'IN_PROGRESS').length,
+      completed: workItems.filter(item => item.status === 'COMPLETED').length,
+      cancelled: workItems.filter(item => item.status === 'CANCELLED').length,
+    };
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={8}>
-          <Card title="主推变频器" style={{ height: '100%' }}>
-            <List
-              size="small"
-              dataSource={data?.relatedProducts || []}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
-              renderItem={(item: any) => (
-                <List.Item>
-                  <div style={{ width: '100%' }}>
-                    <div style={{ fontWeight: 600 }}>{renderPortalLink('products', item.id, item.name)}</div>
-                    <div style={{ color: '#6b7280', fontSize: 12 }}>
-                      {(item.code || '-')}{' · '}{formatAmount(item.amount)}
+    return (
+      <>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={10}>
+            <Card title="销售排名" style={{ height: '100%' }}>
+              <Table
+                dataSource={salesRanking}
+                rowKey={(record: any) => String(record.id || record.salespersonName)}
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: '排名',
+                    dataIndex: 'rank',
+                    width: 80,
+                    render: (value: unknown, record: any) => (
+                      <Space size={6}>
+                        <span style={{ fontWeight: 700 }}>{String(value ?? '-')}</span>
+                        {record.currentUser ? <Tag color="blue">我</Tag> : null}
+                      </Space>
+                    ),
+                  },
+                  { title: '销售人员', dataIndex: 'salespersonName', width: 120 },
+                  {
+                    title: '销售额',
+                    dataIndex: 'salesAmount',
+                    width: 140,
+                    render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+                  },
+                  {
+                    title: '达成率',
+                    dataIndex: 'completionRate',
+                    width: 100,
+                    render: (value: any) => `${value || 0}%`,
+                  },
+                  { title: '主推产品', dataIndex: 'focusProduct' },
+                ]}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} xl={14}>
+            <Card title={`${header.positionName || '当前岗位'}客户绩效分布`} style={{ height: '100%' }}>
+              <Table
+                dataSource={fallbackCustomers}
+                rowKey={(record: any) => String(record.id || record.name)}
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: '客户',
+                    dataIndex: 'name',
+                    render: (_: unknown, record: any) => renderPortalLink('objects', record.id, record.name),
+                  },
+                  {
+                    title: '绩效金额',
+                    dataIndex: 'amount',
+                    width: 150,
+                    render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+                  },
+                  { title: '涉及产品', dataIndex: 'productCount', width: 100 },
+                  { title: '相关工作', dataIndex: 'workItemCount', width: 100 },
+                  { title: '最近跟进', dataIndex: 'lastActiveAt', width: 120 },
+                ]}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={8}>
+            <Card title="主推变频器" style={{ height: '100%' }}>
+              <List
+                size="small"
+                dataSource={productMocks}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
+                renderItem={(item: any) => (
+                  <List.Item>
+                    <div style={{ width: '100%' }}>
+                      <div style={{ fontWeight: 600 }}>{renderPortalLink('products', item.id, item.name)}</div>
+                      <div style={{ color: '#6b7280', fontSize: 12 }}>
+                        {(item.code || '-')}{' · '}{formatAmount(item.amount)}
+                      </div>
                     </div>
-                  </div>
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} xl={16}>
-          <Card title="关联工作状态" style={{ height: '100%' }}>
-            <Row gutter={[12, 12]}>
-              {[
-                { key: 'todo', label: '待办', color: '#6b7280' },
-                { key: 'inProgress', label: '进行中', color: '#1677ff' },
-                { key: 'completed', label: '已完成', color: '#16a34a' },
-                { key: 'cancelled', label: '取消', color: '#dc2626' },
-              ].map(item => (
-                <Col xs={12} md={6} key={item.key}>
-                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, background: '#fafafa' }}>
-                    <div style={{ color: item.color, fontWeight: 600, marginBottom: 8 }}>{item.label}</div>
-                    <div style={{ fontSize: 28, fontWeight: 700 }}>{data?.workSummary?.[item.key] || 0}</div>
-                  </div>
-                </Col>
-              ))}
-            </Row>
-            <div style={{ color: '#64748b', marginTop: 12 }}>
-              关联工作按销售推进过程拆分为待办、进行中、已完成、取消四种状态，便于查看当前推进节奏。
-            </div>
-          </Card>
-        </Col>
-      </Row>
+                  </List.Item>
+                )}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} xl={16}>
+            <Card title="关联工作状态" style={{ height: '100%' }}>
+              <Row gutter={[12, 12]}>
+                {[
+                  { key: 'todo', label: '待办', color: '#6b7280' },
+                  { key: 'inProgress', label: '进行中', color: '#1677ff' },
+                  { key: 'completed', label: '已完成', color: '#16a34a' },
+                  { key: 'cancelled', label: '取消', color: '#dc2626' },
+                ].map(item => (
+                  <Col xs={12} md={6} key={item.key}>
+                    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, background: '#fafafa' }}>
+                      <div style={{ color: item.color, fontWeight: 600, marginBottom: 8 }}>{item.label}</div>
+                      <div style={{ fontSize: 28, fontWeight: 700 }}>{workSummary[item.key as keyof typeof workSummary] || 0}</div>
+                    </div>
+                  </Col>
+                ))}
+              </Row>
+              <div style={{ color: '#64748b', marginTop: 12 }}>
+                关联工作按销售推进过程拆分为待办、进行中、已完成、取消四种状态，便于查看当前推进节奏。
+              </div>
+            </Card>
+          </Col>
+        </Row>
 
-      <Card title={`${header.positionName || '当前岗位'}销售过程明细`}>
-        <Table
-          dataSource={data?.performanceItems || []}
-          rowKey={(record: any) => String(record.id || `${record.customerName}-${record.productName}`)}
-          pagination={false}
-          size="small"
-          columns={[
-            { title: '日期', dataIndex: 'achievedAt', width: 120 },
-            {
-              title: '客户',
-              dataIndex: 'customerName',
-              width: 180,
-              render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
-            },
-            {
-              title: '产品',
-              dataIndex: 'productName',
-              width: 180,
-              render: (_: unknown, record: any) => renderPortalLink('products', record.productId, record.productName),
-            },
-            { title: '阶段', dataIndex: 'stage', width: 120 },
-            {
-              title: '金额',
-              dataIndex: 'amount',
-              width: 150,
-              render: (value: unknown) => formatAmount(value),
-            },
-            { title: '说明', dataIndex: 'note' },
-          ]}
-        />
-      </Card>
+        <Card title={`${header.positionName || '当前岗位'}销售过程明细`}>
+          <Table
+            dataSource={performanceItems}
+            rowKey={(record: any) => String(record.id || `${record.customerName}-${record.productName}`)}
+            pagination={false}
+            size="small"
+            columns={[
+              { title: '日期', dataIndex: 'achievedAt', width: 120 },
+              {
+                title: '客户',
+                dataIndex: 'customerName',
+                width: 180,
+                render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
+              },
+              {
+                title: '产品',
+                dataIndex: 'productName',
+                width: 180,
+                render: (_: unknown, record: any) => renderPortalLink('products', record.productId, record.productName),
+              },
+              { title: '阶段', dataIndex: 'stage', width: 120 },
+              {
+                title: '金额',
+                dataIndex: 'amount',
+                width: 150,
+                render: (value: unknown) => formatAmount(value),
+              },
+              { title: '说明', dataIndex: 'note' },
+            ]}
+          />
+        </Card>
 
-      {renderWorkSection()}
-    </>
-  );
+        <Card title="关联工作清单">
+          <Table
+            dataSource={workItems}
+            rowKey={(record: any) => String(record.id || record.title)}
+            pagination={false}
+            size="small"
+            columns={workColumns}
+          />
+        </Card>
+      </>
+    );
+  };
 
   const renderWorkUserPortal = () => (
     <>
