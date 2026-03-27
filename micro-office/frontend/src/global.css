@@ -239,6 +239,66 @@ body {
   gap: 16px;
 }
 
+.portal-placeholder-card.ant-card,
+.portal-button-section-card.ant-card,
+.portal-detail-intro-card.ant-card {
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.portal-placeholder-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.portal-placeholder-card__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.portal-placeholder-card__description {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.portal-placeholder-card__input.ant-input {
+  resize: none;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.portal-detail-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portal-detail-intro__eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+.portal-detail-intro__title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.portal-detail-intro__description {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .portal-hero-card.ant-card {
   border-color: rgba(191, 219, 254, 0.92);
   background:
