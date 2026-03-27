@@ -77,6 +77,8 @@ const workflowFilterLabelMap: Record<WorkflowFilterKey, string> = {
   CANCELLED: '取消',
 };
 
+const workflowHomeStatusOrder: WorkflowFilterKey[] = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+
 const portalTypeLabelMap: Record<string, string> = {
   USER_SALES: '销售视图',
   PRODUCT: '销售视图',
@@ -1179,52 +1181,28 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     );
   };
 
-  const renderUserWorkflowStatusOverview = () => (
-    renderUserShortcutSection(
-      '工作流',
-      [
-        {
-          key: 'workflow-all',
-          label: '全部工作',
-          value: formatMetricDisplay(userWorkItems.length, '项'),
-          onClick: () => navigateToUserPortalDetail('workflow'),
-        },
-        ...workflowStatusCards.map((card: any) => {
-          const cardFilter = normalizeWorkflowFilterKey(card.filterKey ?? card.key);
-          return {
-            key: String(card.key || card.label),
-            label: card.label,
-            value: formatMetricDisplay(card.count, '项'),
-            onClick: () => navigateToUserPortalDetail('workflow', { status: cardFilter }),
-          };
-        }),
-      ],
-    )
-  );
+  const renderUserWorkflowStatusOverview = () => {
+    const cardMap = new Map<WorkflowFilterKey, any>();
+    workflowStatusCards.forEach((card: any) => {
+      const key = normalizeWorkflowFilterKey(card.filterKey ?? card.key);
+      if (workflowHomeStatusOrder.includes(key)) {
+        cardMap.set(key, card);
+      }
+    });
 
-  const renderUserWorkflowBucketOverview = () => (
-    (userWorkBuckets.length
-      ? renderUserShortcutSection(
-        '维度',
-        userWorkBuckets.map((bucket: any) => {
-          const filterValue = normalizeText(bucket.filterValue) || normalizeText(bucket.label) || 'ALL';
-          return {
-            key: String(bucket.id || bucket.label),
-            label: bucket.label,
-            value: formatMetricDisplay(bucket.count, '项'),
-            onClick: () => navigateToUserPortalDetail('workflow', { stage: filterValue }),
-          };
-        }),
-      )
-      : (
-        <section className="portal-shortcut-group">
-          <div className="portal-shortcut-group__header">
-            <div className="portal-shortcut-group__title">维度</div>
-          </div>
-          <div className="portal-shortcut-group__empty">暂无可用入口</div>
-        </section>
-      ))
-  );
+    return renderUserShortcutSection(
+      '工作流',
+      workflowHomeStatusOrder.map(statusKey => {
+        const card = cardMap.get(statusKey);
+        return {
+          key: `workflow-${statusKey}`,
+          label: workflowFilterLabelMap[statusKey],
+          value: formatMetricDisplay(card?.count ?? 0, '项'),
+          onClick: () => navigateToUserPortalDetail('workflow', { status: statusKey }),
+        };
+      }),
+    );
+  };
 
   const renderUserPromptPanel = () => (
     <section className="portal-home__prompt">
@@ -1489,7 +1467,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       <div className="portal-shortcut-stack">
         {renderSalesActionRow()}
         {renderUserWorkflowStatusOverview()}
-        {renderUserWorkflowBucketOverview()}
       </div>
     </div>
   );
