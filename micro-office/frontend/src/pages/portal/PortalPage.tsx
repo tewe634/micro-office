@@ -1039,24 +1039,37 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   );
 
   const renderUserHeaderStrip = () => {
-    const compactMeta = [
-      activePortalOption?.label || header.positionName,
-      header.orgName,
-      header.empNo ? `工号 ${header.empNo}` : undefined,
-      header.email,
-      header.phone,
-    ].filter(Boolean);
+    const compactMeta = (isUserDetailRoute
+      ? [
+        activePortalOption?.label || header.positionName,
+        header.orgName,
+        header.empNo ? `工号 ${header.empNo}` : undefined,
+        header.email,
+        header.phone,
+      ]
+      : [
+        activePortalOption?.label || header.positionName,
+        header.orgName,
+        header.empNo ? `工号 ${header.empNo}` : undefined,
+      ]).filter(Boolean);
 
     return (
-      <div className="portal-user-strip">
+      <div className={`portal-user-strip${isUserDetailRoute ? '' : ' portal-user-strip--home'}`}>
         <div className="portal-user-strip__identity">
-          <div className="portal-user-strip__eyebrow">Personal Portal</div>
+          <div className="portal-user-strip__eyebrow">{isUserDetailRoute ? '个人门户' : '门户首页'}</div>
           <div className="portal-user-strip__heading">
             <div className="portal-user-strip__name">{header.name || '-'}</div>
-            <Space wrap size={[8, 8]} className="portal-user-strip__tags">
-              <Tag color={roleColorMap[header.role] || 'default'}>{formatRoleLabel(header.role)}</Tag>
-              {selectedPortalLabel ? <Tag color={selectedPortalTone}>{selectedPortalLabel}</Tag> : null}
-            </Space>
+            {isUserDetailRoute ? (
+              <Space wrap size={[8, 8]} className="portal-user-strip__tags">
+                <Tag color={roleColorMap[header.role] || 'default'}>{formatRoleLabel(header.role)}</Tag>
+                {selectedPortalLabel ? <Tag color={selectedPortalTone}>{selectedPortalLabel}</Tag> : null}
+              </Space>
+            ) : (
+              <div className="portal-user-strip__tags portal-user-strip__tags--home">
+                <span className="portal-user-strip__tag portal-user-strip__tag--role">{formatRoleLabel(header.role)}</span>
+                {selectedPortalLabel ? <span className="portal-user-strip__tag portal-user-strip__tag--portal">{selectedPortalLabel}</span> : null}
+              </div>
+            )}
           </div>
           {compactMeta.length ? (
             <div className="portal-user-strip__meta">
@@ -1133,7 +1146,10 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
               className={`portal-shortcut-card${item.tone === 'sales' ? ' portal-shortcut-card--sales' : ''}`}
               onClick={item.onClick}
             >
-              <div className="portal-shortcut-card__label">{item.label}</div>
+              <div className="portal-shortcut-card__topline">
+                <div className="portal-shortcut-card__label">{item.label}</div>
+                <div className="portal-shortcut-card__jump">跳转入口</div>
+              </div>
               <div className="portal-shortcut-card__value">{item.value}</div>
               <div className="portal-shortcut-card__description">{item.description}</div>
             </button>
@@ -1150,12 +1166,12 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
     return renderUserShortcutSection(
       '销售模块',
-      '保留销售相关跳转入口，作为第一行快捷操作。',
+      '保留销售相关跳转入口，继续作为第一行快捷操作。',
       salesActionCards.map((card: any) => ({
         key: String(card.key || card.label),
         label: card.label,
         value: formatMetricDisplay(card.value, card.suffix),
-        description: card.description || '点击查看详情',
+        description: card.description || '点击进入对应销售详情',
         onClick: () => handleSalesActionCard(card),
         tone: 'sales',
       })),
@@ -1165,13 +1181,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const renderUserWorkflowStatusOverview = () => (
     renderUserShortcutSection(
       '工作流',
-      '只保留进入明细页的快捷入口，不在首页堆叠更多内容。',
+      '只保留明细跳转入口，不在首页展开更多内容。',
       [
         {
           key: 'workflow-all',
           label: '全部工作',
           value: formatMetricDisplay(userWorkItems.length, '项'),
-          description: '查看当前岗位全部工作流事项',
+          description: '进入当前岗位全部工作流明细',
           onClick: () => navigateToUserPortalDetail('workflow'),
         },
         ...workflowStatusCards.map((card: any) => {
@@ -1180,7 +1196,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             key: String(card.key || card.label),
             label: card.label,
             value: formatMetricDisplay(card.count, '项'),
-            description: card.description || '点击查看该状态明细',
+            description: card.description || '进入该状态对应的工作流明细',
             onClick: () => navigateToUserPortalDetail('workflow', { status: cardFilter }),
           };
         }),
@@ -1199,7 +1215,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             key: String(bucket.id || bucket.label),
             label: bucket.label,
             value: formatMetricDisplay(bucket.count, '项'),
-            description: bucket.description || '点击查看该维度明细',
+            description: bucket.description || '进入该维度对应的工作流明细',
             onClick: () => navigateToUserPortalDetail('workflow', { stage: filterValue }),
           };
         }),
@@ -1219,12 +1235,15 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const renderUserPromptPanel = () => (
     <section className="portal-home__prompt">
-      <div className="portal-home__prompt-eyebrow">Input Placeholder</div>
-      <div className="portal-home__prompt-box">
-        <div className="portal-home__prompt-field">
-          <div className="portal-home__prompt-placeholder">你想处理什么？</div>
+      <div className="portal-home__prompt-panel">
+        <div className="portal-home__prompt-eyebrow">输入占位</div>
+        <div className="portal-home__prompt-title">请输入想查看或处理的内容</div>
+        <div className="portal-home__prompt-box">
+          <div className="portal-home__prompt-field">
+            <div className="portal-home__prompt-placeholder">输入问题、任务或想前往的内容</div>
+            <div className="portal-home__prompt-field-note">占位</div>
+          </div>
         </div>
-        <div className="portal-home__prompt-note">此处预留输入能力，暂不开放实际操作。</div>
       </div>
     </section>
   );
@@ -1664,7 +1683,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           entityType === 'users' ? (
             <div className="portal-dashboard portal-dashboard--user">
               {isRefreshing ? <Alert type="info" showIcon message={refreshingMessage} /> : null}
-              <div className={`portal-user-shell${isUserDetailRoute ? ' portal-user-shell--detail' : ''}`}>
+              <div className={`portal-user-shell${isUserDetailRoute ? ' portal-user-shell--detail' : ' portal-user-shell--home'}`}>
                 <div className="page-toolbar portal-user-toolbar" style={{ justifyContent: 'flex-start' }}>
                   <Space wrap>
                     <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
