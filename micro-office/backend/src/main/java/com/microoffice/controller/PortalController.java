@@ -459,18 +459,26 @@ public class PortalController {
             BigDecimal totalAmount = performanceItems.stream()
                 .map(item -> (BigDecimal) item.get("amount"))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<Map<String, Object>> salesActionCards = buildSalesActionCards(totalAmount, customerPerformance, relatedProducts, workItems);
+            List<Map<String, Object>> workflowStatusCards = buildWorkflowStatusCards(workItems);
+            List<Map<String, Object>> salesRanking = buildSalesRanking(user, buildSalesRankingRefs(user), productRefs, seed);
 
             result.put("variant", variant);
-            result.put("summaryCards", List.of(
-                summaryCard("performance", "当前绩效", totalAmount, "元"),
-                summaryCard("customers", "关联客户", customerRefs.size(), "家"),
-                summaryCard("products", "主推变频器", productRefs.size(), "款"),
-                summaryCard("openWork", "待推进工作", countStatuses(workItems, "TODO") + countStatuses(workItems, "IN_PROGRESS"), "项")
-            ));
+            result.put("summaryCards", salesActionCards);
+            result.put("salesActionCards", salesActionCards);
+            result.put("workflowStatusCards", workflowStatusCards);
+            result.put("salesRanking", salesRanking);
             result.put("customerPerformance", customerPerformance);
             result.put("performanceItems", performanceItems);
             result.put("relatedCustomers", customerPerformance);
             result.put("relatedProducts", relatedProducts);
+            result.put("workBuckets", buildWorkBuckets(List.of(
+                "ASC580报价跟进",
+                "样机测试安排",
+                "商务条款确认",
+                "交付排期同步",
+                "回款与复盘"
+            ), workItems));
             result.put("workSummary", buildWorkSummary(workItems));
             result.put("workItems", workItems);
             return result;
@@ -497,15 +505,6 @@ public class PortalController {
             workItems.add(row);
         }
 
-        List<Map<String, Object>> workBuckets = new ArrayList<>();
-        for (int i = 0; i < topics.size(); i++) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", "bucket-" + i);
-            row.put("label", topics.get(i));
-            row.put("count", 1 + Math.floorMod(seed + i * 3, 4));
-            workBuckets.add(row);
-        }
-
         result.put("variant", variant);
         result.put("summaryCards", List.of(
             summaryCard("workTotal", "关联工作", workItems.size(), "项"),
@@ -513,7 +512,8 @@ public class PortalController {
             summaryCard("active", "进行中", countStatuses(workItems, "IN_PROGRESS"), "项"),
             summaryCard("completed", "已完成", countStatuses(workItems, "COMPLETED"), "项")
         ));
-        result.put("workBuckets", workBuckets);
+        result.put("workflowStatusCards", buildWorkflowStatusCards(workItems));
+        result.put("workBuckets", buildWorkBuckets(topics, workItems));
         result.put("workSummary", buildWorkSummary(workItems));
         result.put("workItems", workItems);
         return result;
@@ -626,7 +626,7 @@ public class PortalController {
                                                         List<RefItem> salesRefs,
                                                         List<RefItem> productRefs,
                                                         int seed) {
-        if (salesRefs.isEmpty()) {
+        if (salesRefs.isEmpty() || productRefs.isEmpty()) {
             return List.of();
         }
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -646,6 +646,95 @@ public class PortalController {
             row.put("completionRate", completionRate);
             row.put("focusProduct", focusProduct.name());
             row.put("currentUser", currentUser != null && Objects.equals(currentUser.getId(), sale.id()));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private List<RefItem> buildSalesRankingRefs(SysUser user) {
+        LinkedHashMap<String, RefItem> refs = new LinkedHashMap<>();
+        RefItem currentUser = new RefItem(user.getId(), user.getName(), "SALES");
+        refs.put(refKey(currentUser), currentUser);
+
+        for (RefItem ref : loadUserRefs()) {
+            if (refs.size() >= 4) {
+                break;
+            }
+            if (!Objects.equals(ref.id(), user.getId()) && "SALES".equalsIgnoreCase(Objects.toString(ref.meta(), ""))) {
+                refs.putIfAbsent(refKey(ref), ref);
+            }
+        }
+
+        for (RefItem fallback : fallbackSalesRefs()) {
+            if (refs.size() >= 4) {
+                break;
+            }
+            refs.putIfAbsent(refKey(fallback), fallback);
+        }
+
+        return new ArrayList<>(refs.values());
+    }
+
+    private List<Map<String, Object>> buildSalesActionCards(BigDecimal totalAmount,
+                                                            List<Map<String, Object>> customerPerformance,
+                                                            List<Map<String, Object>> relatedProducts,
+                                                            List<Map<String, Object>> workItems) {
+        String leadCustomer = customerPerformance.isEmpty() ? null : Objects.toString(customerPerformance.get(0).get("name"), null);
+        String leadProduct = relatedProducts.isEmpty() ? null : Objects.toString(relatedProducts.get(0).get("name"), null);
+        int openWorkCount = countStatuses(workItems, "TODO") + countStatuses(workItems, "IN_PROGRESS");
+
+        return List.of(
+            actionCard("performance", "当前绩效", totalAmount, "元", "查看销售排名与绩效过程明细", "performance", null),
+            actionCard(
+                "customers",
+                "关联客户",
+                customerPerformance.size(),
+                "家",
+                leadCustomer == null ? "查看客户推进详情" : "重点客户：" + leadCustomer,
+                "customers",
+                null
+            ),
+            actionCard(
+                "products",
+                "主推产品",
+                relatedProducts.size(),
+                "款",
+                leadProduct == null ? "查看重点产品与金额分布" : "当前聚焦：" + leadProduct,
+                "products",
+                null
+            ),
+            actionCard("openWork", "待推进工作", openWorkCount, "项", "切换到待办与进行中的工作流明细", "workflow", "OPEN")
+        );
+    }
+
+    private List<Map<String, Object>> buildWorkflowStatusCards(List<Map<String, Object>> workItems) {
+        return List.of(
+            workflowStatusCard("TODO", "待办", countStatuses(workItems, "TODO"), "待当前岗位处理"),
+            workflowStatusCard("IN_PROGRESS", "进行中", countStatuses(workItems, "IN_PROGRESS"), "正在推进中的事项"),
+            workflowStatusCard("COMPLETED", "已完成", countStatuses(workItems, "COMPLETED"), "已闭环归档"),
+            workflowStatusCard("CANCELLED", "取消", countStatuses(workItems, "CANCELLED"), "已终止或撤回")
+        );
+    }
+
+    private List<Map<String, Object>> buildWorkBuckets(List<String> orderedLabels, List<Map<String, Object>> workItems) {
+        LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
+        for (String label : orderedLabels) {
+            counts.put(label, 0);
+        }
+        for (Map<String, Object> workItem : workItems) {
+            String stage = Objects.toString(workItem.get("stage"), "其他");
+            counts.put(stage, counts.getOrDefault(stage, 0) + 1);
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int index = 0;
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", "bucket-" + index++);
+            row.put("label", entry.getKey());
+            row.put("count", entry.getValue());
+            row.put("filterValue", entry.getKey());
+            row.put("description", entry.getValue() > 0 ? "点击查看该维度明细" : "当前没有该维度事项");
             rows.add(row);
         }
         return rows;
@@ -762,16 +851,23 @@ public class PortalController {
 
     private Map<String, Object> buildPortalOption(SysUser user, PortalPosition position) {
         String effectiveRole = effectiveRole(position, user.getRole());
+        String variant = variantForUserRole(effectiveRole);
+        String positionName = position == null || !hasText(position.name())
+            ? ("SALES".equals(effectiveRole) ? "销售岗位" : "工作岗位")
+            : position.name();
         Map<String, Object> option = new LinkedHashMap<>();
         option.put("positionId", position == null ? null : position.id());
-        option.put("positionName", position == null ? null : position.name());
+        option.put("positionName", positionName);
         option.put("positionCode", position == null ? null : position.code());
+        option.put("code", position == null ? null : position.code());
         option.put("primary", position != null && position.primary());
         option.put("defaultRole", position == null ? null : position.defaultRole());
         option.put("role", effectiveRole);
         option.put("level", position == null ? null : position.level());
-        option.put("variant", variantForUserRole(effectiveRole));
-        option.put("label", buildPortalLabel(position, effectiveRole));
+        option.put("variant", variant);
+        option.put("portalType", variant);
+        option.put("label", positionName);
+        option.put("title", buildPortalLabel(position, effectiveRole));
         return option;
     }
 
@@ -893,6 +989,31 @@ public class PortalController {
         card.put("label", label);
         card.put("value", value);
         card.put("suffix", suffix);
+        return card;
+    }
+
+    private Map<String, Object> actionCard(String key,
+                                           String label,
+                                           Object value,
+                                           String suffix,
+                                           String description,
+                                           String targetSection,
+                                           String filterKey) {
+        Map<String, Object> card = summaryCard(key, label, value, suffix);
+        card.put("description", description);
+        card.put("targetSection", targetSection);
+        card.put("filterKey", filterKey);
+        return card;
+    }
+
+    private Map<String, Object> workflowStatusCard(String key, String label, int count, String description) {
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("key", key);
+        card.put("label", label);
+        card.put("count", count);
+        card.put("description", description);
+        card.put("targetSection", "workflow");
+        card.put("filterKey", key);
         return card;
     }
 
