@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Descriptions, Empty, Input, List, Radio, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Empty, List, Radio, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { portalApi } from '../../api';
 import type { PortalOptionItem, PortalPayload, PortalRequestParams, PortalSelection } from '../../api';
@@ -1038,80 +1038,108 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     </>
   );
 
-  const renderUserHero = () => {
-    const metaItems = [
-      { label: '所属组织', value: header.orgName },
-      { label: '当前岗位', value: activePortalOption?.label || header.positionName },
-      { label: '联系邮箱', value: header.email },
-      { label: '联系电话', value: header.phone },
-      { label: '工号', value: header.empNo },
-      { label: '入职日期', value: header.hiredAt },
-    ].filter(item => normalizeText(item.value));
+  const renderUserHeaderStrip = () => {
+    const compactMeta = [
+      activePortalOption?.label || header.positionName,
+      header.orgName,
+      header.empNo ? `工号 ${header.empNo}` : undefined,
+      header.email,
+      header.phone,
+    ].filter(Boolean);
 
     return (
-      <Card className="portal-hero-card" styles={{ body: { padding: 24 } }}>
-        <div className="portal-hero">
-          <div className="portal-hero__main">
-            <div className="portal-hero__eyebrow">Personal Portal</div>
-            <div className="portal-hero__title-row">
-              <div>
-                <div className="portal-hero__title">{header.name || '-'}</div>
-                <div className="portal-hero__subtitle">
-                  {[activePortalOption?.label || header.positionName, header.orgName].filter(Boolean).join(' · ') || '人员门户'}
-                </div>
-              </div>
-            </div>
-            <Space wrap size={[8, 8]} className="portal-hero__tags">
+      <div className="portal-user-strip">
+        <div className="portal-user-strip__identity">
+          <div className="portal-user-strip__eyebrow">Personal Portal</div>
+          <div className="portal-user-strip__heading">
+            <div className="portal-user-strip__name">{header.name || '-'}</div>
+            <Space wrap size={[8, 8]} className="portal-user-strip__tags">
               <Tag color={roleColorMap[header.role] || 'default'}>{formatRoleLabel(header.role)}</Tag>
-              {header.positionCode ? <Tag>{header.positionCode}</Tag> : null}
-              {header.empNo ? <Tag color="blue">工号 {header.empNo}</Tag> : null}
-              <Tag color="processing">{header.year} 门户</Tag>
+              {selectedPortalLabel ? <Tag color={selectedPortalTone}>{selectedPortalLabel}</Tag> : null}
             </Space>
-            <div className="portal-hero__meta-grid">
-              {metaItems.map(item => (
-                <div key={item.label} className="portal-hero__meta-card">
-                  <div className="portal-hero__meta-label">{item.label}</div>
-                  <div className="portal-hero__meta-value">{item.value || '-'}</div>
-                </div>
-              ))}
-            </div>
           </div>
-
-          {showPortalSwitch ? (
-            <div className="portal-hero__switch">
-              <div className="portal-switch">
-                <span className="portal-switch__label">岗位切换</span>
-                <Radio.Group
-                  className="portal-position-radio-group"
-                  value={portalSwitchValue}
-                  disabled={loading}
-                  onChange={event => handlePortalSwitchValue(event.target.value)}
-                >
-                  {portalOptions.map(option => {
-                    const value = option.requestValue || option.key;
-                    return (
-                      <Radio.Button
-                        key={option.key}
-                        value={value}
-                        className="portal-position-radio"
-                      >
-                        <span className="portal-position-radio__title">{option.label}</span>
-                        {option.badge ? <span className="portal-position-radio__badge">{option.badge}</span> : null}
-                      </Radio.Button>
-                    );
-                  })}
-                </Radio.Group>
-                {isPortalSwitchPending && pendingPortalOption ? (
-                  <div className="portal-switch__status">
-                    正在切换到 {pendingPortalOption.label}
-                    {pendingPortalOption.portalLabel ? ` · ${pendingPortalOption.portalLabel}` : ''}
-                  </div>
-                ) : null}
-              </div>
+          {compactMeta.length ? (
+            <div className="portal-user-strip__meta">
+              {compactMeta.map(item => (
+                <span key={item} className="portal-user-strip__meta-item">{item}</span>
+              ))}
             </div>
           ) : null}
         </div>
-      </Card>
+
+        {showPortalSwitch ? (
+          <div className="portal-user-strip__controls">
+            <div className="portal-user-strip__switch-label">岗位切换</div>
+            <Radio.Group
+              className="portal-position-pill-group"
+              value={portalSwitchValue}
+              disabled={loading}
+              onChange={event => handlePortalSwitchValue(event.target.value)}
+            >
+              {portalOptions.map(option => {
+                const value = option.requestValue || option.key;
+                const hint = buildHint([option.badge, option.portalLabel]);
+                return (
+                  <Radio.Button
+                    key={option.key}
+                    value={value}
+                    className="portal-position-pill"
+                  >
+                    <span className="portal-position-pill__title">{option.label}</span>
+                    {hint ? <span className="portal-position-pill__hint">{hint}</span> : null}
+                  </Radio.Button>
+                );
+              })}
+            </Radio.Group>
+            {isPortalSwitchPending && pendingPortalOption ? (
+              <div className="portal-user-strip__status">
+                正在切换到 {pendingPortalOption.label}
+                {pendingPortalOption.portalLabel ? ` · ${pendingPortalOption.portalLabel}` : ''}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderUserShortcutSection = (
+    title: string,
+    description: string,
+    items: Array<{
+      key: string;
+      label: string;
+      value: string;
+      description: string;
+      onClick: () => void;
+      tone?: 'sales';
+    }>,
+  ) => {
+    if (!items.length) {
+      return null;
+    }
+
+    return (
+      <section className="portal-shortcut-group">
+        <div className="portal-shortcut-group__header">
+          <div className="portal-shortcut-group__title">{title}</div>
+          <div className="portal-shortcut-group__description">{description}</div>
+        </div>
+        <div className="portal-shortcut-grid">
+          {items.map(item => (
+            <button
+              key={item.key}
+              type="button"
+              className={`portal-shortcut-card${item.tone === 'sales' ? ' portal-shortcut-card--sales' : ''}`}
+              onClick={item.onClick}
+            >
+              <div className="portal-shortcut-card__label">{item.label}</div>
+              <div className="portal-shortcut-card__value">{item.value}</div>
+              <div className="portal-shortcut-card__description">{item.description}</div>
+            </button>
+          ))}
+        </div>
+      </section>
     );
   };
 
@@ -1120,98 +1148,85 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       return null;
     }
 
-    return (
-      <Card className="portal-button-section-card" title="销售快捷入口" styles={{ body: { padding: 20 } }}>
-        <Row gutter={[16, 16]}>
-          {salesActionCards.map((card: any) => (
-            <Col xs={24} sm={12} xl={6} key={String(card.key || card.label)}>
-              <button
-                type="button"
-                className="portal-action-card"
-                onClick={() => handleSalesActionCard(card)}
-              >
-                <div className="portal-action-card__label">{card.label}</div>
-                <div className="portal-action-card__value">{formatMetricDisplay(card.value, card.suffix)}</div>
-                <div className="portal-action-card__description">{card.description || '点击查看详情'}</div>
-              </button>
-            </Col>
-          ))}
-        </Row>
-      </Card>
+    return renderUserShortcutSection(
+      '销售模块',
+      '保留销售相关跳转入口，作为第一行快捷操作。',
+      salesActionCards.map((card: any) => ({
+        key: String(card.key || card.label),
+        label: card.label,
+        value: formatMetricDisplay(card.value, card.suffix),
+        description: card.description || '点击查看详情',
+        onClick: () => handleSalesActionCard(card),
+        tone: 'sales',
+      })),
     );
   };
 
   const renderUserWorkflowStatusOverview = () => (
-    <Card className="portal-button-section-card" title="工作流状态" styles={{ body: { padding: 20 } }}>
-      <div className="portal-status-grid">
-        <button
-          type="button"
-          className="portal-status-card"
-          onClick={() => navigateToUserPortalDetail('workflow')}
-        >
-          <div className="portal-status-card__label">全部工作</div>
-          <div className="portal-status-card__value">{formatMetricDisplay(userWorkItems.length, '项')}</div>
-          <div className="portal-status-card__description">查看当前岗位全部工作流事项</div>
-        </button>
-
-        {workflowStatusCards.map((card: any) => {
+    renderUserShortcutSection(
+      '工作流',
+      '只保留进入明细页的快捷入口，不在首页堆叠更多内容。',
+      [
+        {
+          key: 'workflow-all',
+          label: '全部工作',
+          value: formatMetricDisplay(userWorkItems.length, '项'),
+          description: '查看当前岗位全部工作流事项',
+          onClick: () => navigateToUserPortalDetail('workflow'),
+        },
+        ...workflowStatusCards.map((card: any) => {
           const cardFilter = normalizeWorkflowFilterKey(card.filterKey ?? card.key);
-          return (
-            <button
-              key={String(card.key || card.label)}
-              type="button"
-              className="portal-status-card"
-              onClick={() => navigateToUserPortalDetail('workflow', { status: cardFilter })}
-            >
-              <div className="portal-status-card__label">{card.label}</div>
-              <div className="portal-status-card__value">{formatMetricDisplay(card.count, '项')}</div>
-              <div className="portal-status-card__description">{card.description || '点击查看该状态明细'}</div>
-            </button>
-          );
-        })}
-      </div>
-    </Card>
+          return {
+            key: String(card.key || card.label),
+            label: card.label,
+            value: formatMetricDisplay(card.count, '项'),
+            description: card.description || '点击查看该状态明细',
+            onClick: () => navigateToUserPortalDetail('workflow', { status: cardFilter }),
+          };
+        }),
+      ],
+    )
   );
 
   const renderUserWorkflowBucketOverview = () => (
-    <Card className="portal-button-section-card" title="工作维度" styles={{ body: { padding: 20 } }}>
-      {userWorkBuckets.length ? (
-        <div className="portal-bucket-grid">
-          {userWorkBuckets.map((bucket: any) => {
-            const filterValue = normalizeText(bucket.filterValue) || normalizeText(bucket.label) || 'ALL';
-            return (
-              <button
-                key={String(bucket.id || bucket.label)}
-                type="button"
-                className="portal-bucket-card"
-                onClick={() => navigateToUserPortalDetail('workflow', { stage: filterValue })}
-              >
-                <div className="portal-bucket-card__label">{bucket.label}</div>
-                <div className="portal-bucket-card__value">{formatMetricDisplay(bucket.count, '项')}</div>
-                <div className="portal-bucket-card__description">{bucket.description || '点击查看该维度明细'}</div>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无工作维度" />
-      )}
-    </Card>
+    (userWorkBuckets.length
+      ? renderUserShortcutSection(
+        '工作维度',
+        '按维度快速进入对应工作流明细。',
+        userWorkBuckets.map((bucket: any) => {
+          const filterValue = normalizeText(bucket.filterValue) || normalizeText(bucket.label) || 'ALL';
+          return {
+            key: String(bucket.id || bucket.label),
+            label: bucket.label,
+            value: formatMetricDisplay(bucket.count, '项'),
+            description: bucket.description || '点击查看该维度明细',
+            onClick: () => navigateToUserPortalDetail('workflow', { stage: filterValue }),
+          };
+        }),
+      )
+      : (
+        <section className="portal-shortcut-group">
+          <div className="portal-shortcut-group__header">
+            <div className="portal-shortcut-group__title">工作维度</div>
+            <div className="portal-shortcut-group__description">当前岗位暂无工作维度可展示。</div>
+          </div>
+          <div className="portal-shortcut-group__empty">
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无工作维度" />
+          </div>
+        </section>
+      ))
   );
 
-  const renderUserPlaceholderCard = () => (
-    <Card className="portal-placeholder-card" styles={{ body: { padding: 20 } }}>
-      <div className="portal-placeholder-card__header">
-        <div className="portal-placeholder-card__title">输入占位区</div>
-        <div className="portal-placeholder-card__description">按最新草图保留一个输入区域，当前仅做前端占位展示。</div>
+  const renderUserPromptPanel = () => (
+    <section className="portal-home__prompt">
+      <div className="portal-home__prompt-eyebrow">Input Placeholder</div>
+      <div className="portal-home__prompt-box">
+        <div className="portal-home__prompt-field">
+          <div className="portal-home__prompt-placeholder">你想处理什么？</div>
+        </div>
+        <div className="portal-home__prompt-note">此处预留输入能力，暂不开放实际操作。</div>
       </div>
-      <Input.TextArea
-        className="portal-placeholder-card__input"
-        rows={4}
-        disabled
-        placeholder="此处预留输入能力，暂不开放实际操作。"
-      />
-    </Card>
+    </section>
   );
 
   const renderUserWorkflowDetail = () => (
@@ -1454,12 +1469,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   );
 
   const renderUserMainPortal = () => (
-    <>
-      {renderUserPlaceholderCard()}
-      {renderSalesActionRow()}
-      {renderUserWorkflowStatusOverview()}
-      {renderUserWorkflowBucketOverview()}
-    </>
+    <div className="portal-home">
+      {renderUserPromptPanel()}
+      <div className="portal-shortcut-stack">
+        {renderSalesActionRow()}
+        {renderUserWorkflowStatusOverview()}
+        {renderUserWorkflowBucketOverview()}
+      </div>
+    </div>
   );
 
   const renderUserDetailPortal = () => {
@@ -1645,22 +1662,24 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         {!isInitialLoading && error ? <Alert type="error" showIcon message={error} /> : null}
         {!error && data ? (
           entityType === 'users' ? (
-            <div className="portal-dashboard">
+            <div className="portal-dashboard portal-dashboard--user">
               {isRefreshing ? <Alert type="info" showIcon message={refreshingMessage} /> : null}
-              <div className="page-toolbar" style={{ justifyContent: 'flex-start' }}>
-                <Space wrap>
-                  <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
-                    返回
-                  </Button>
-                  {isUserDetailRoute ? (
-                    <Button onClick={navigateToUserPortalHome}>
-                      返回主门户
+              <div className={`portal-user-shell${isUserDetailRoute ? ' portal-user-shell--detail' : ''}`}>
+                <div className="page-toolbar portal-user-toolbar" style={{ justifyContent: 'flex-start' }}>
+                  <Space wrap>
+                    <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
+                      返回
                     </Button>
-                  ) : null}
-                </Space>
+                    {isUserDetailRoute ? (
+                      <Button onClick={navigateToUserPortalHome}>
+                        返回主门户
+                      </Button>
+                    ) : null}
+                  </Space>
+                </div>
+                {renderUserHeaderStrip()}
+                {isUserDetailRoute ? renderUserDetailPortal() : renderUserMainPortal()}
               </div>
-              {renderUserHero()}
-              {isUserDetailRoute ? renderUserDetailPortal() : renderUserMainPortal()}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
