@@ -103,6 +103,9 @@ const userPortalDetailMetaMap: Record<UserPortalDetailSection, { title: string; 
   },
 };
 
+const productPortalBusinessLabels = ['业务一部', '业务二部', '业务三部'];
+const productPortalDepartmentSuffixes = ['一部', '二部', '三部'];
+
 function formatPortalVariantLabel(value: string | undefined) {
   if (!value) {
     return undefined;
@@ -345,6 +348,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const [error, setError] = useState('');
   const [pendingPortalValue, setPendingPortalValue] = useState<string>();
   const [userHomeView, setUserHomeView] = useState<'workflow' | 'sales'>('workflow');
+  const [selectedProductBusiness, setSelectedProductBusiness] = useState<string>();
+  const [selectedProductDepartment, setSelectedProductDepartment] = useState<string>();
 
   const positionIdParam = searchParams.get('positionId') || undefined;
   const scopeParam = searchParams.get('scope') || undefined;
@@ -430,6 +435,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const salesActionCards = Array.isArray(data?.salesActionCards) ? data.salesActionCards : summaryCards;
   const workflowStatusCards = Array.isArray(data?.workflowStatusCards) ? data.workflowStatusCards : [];
   const salesRankingRows = Array.isArray(data?.salesRanking) ? data.salesRanking : [];
+  const salesSummaryRows = Array.isArray(data?.salesSummary) ? data.salesSummary : [];
   const customerPerformanceRows = Array.isArray(data?.customerPerformance) ? data.customerPerformance : [];
   const relatedProductsRows = Array.isArray(data?.relatedProducts) ? data.relatedProducts : [];
   const performanceItemRows = Array.isArray(data?.performanceItems) ? data.performanceItems : [];
@@ -505,6 +511,131 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       || scopeOptions[0]
       || null;
   }, [data, hasScopeFeature, scopeOptions, scopeParam]);
+
+  const productScopeKey = normalizeText(activeScopeOption?.requestValue ?? data?.scope)?.toLowerCase() || 'personal';
+  const productPortalHierarchy = useMemo(() => {
+    const personBaseMap = new Map<string, any>();
+    const registerPersonRow = (row: any, orderCountFallback?: number) => {
+      const salespersonKey = normalizeText(row?.salespersonId) || normalizeText(row?.salespersonName) || `sales-${personBaseMap.size + 1}`;
+      const customerKey = normalizeText(row?.customerId) || normalizeText(row?.customerName);
+      const entry = personBaseMap.get(salespersonKey) || {
+        id: salespersonKey,
+        salespersonId: normalizeText(row?.salespersonId),
+        salespersonName: normalizeText(row?.salespersonName) || '未命名销售',
+        amount: 0,
+        orderCount: 0,
+        lastSoldAt: undefined as string | undefined,
+        customerIds: new Set<string>(),
+      };
+      entry.amount += Number(row?.amount || 0);
+      entry.orderCount += Number(row?.orderCount || orderCountFallback || 0);
+      if (customerKey) {
+        entry.customerIds.add(customerKey);
+      }
+      const lastSoldAt = normalizeText(row?.lastSoldAt) || normalizeText(row?.happenedAt);
+      if (lastSoldAt && (!entry.lastSoldAt || entry.lastSoldAt.localeCompare(lastSoldAt) < 0)) {
+        entry.lastSoldAt = lastSoldAt;
+      }
+      personBaseMap.set(salespersonKey, entry);
+    };
+
+    salesSummaryRows.forEach((row: any) => registerPersonRow(row));
+    if (!personBaseMap.size) {
+      performanceItemRows.forEach((row: any) => registerPersonRow(row, 1));
+    }
+
+    const baseScopeLabel = activeScopeOption?.label || scopeLabelMap[productScopeKey] || '当前范围';
+    const rawPeopleRows = Array.from(personBaseMap.values())
+      .map((row: any) => ({
+        ...row,
+        customerCount: row.customerIds.size,
+      }))
+      .sort((left: any, right: any) => Number(right.amount || 0) - Number(left.amount || 0));
+
+    const assignedPeopleRows = rawPeopleRows.map((row: any, index: number) => {
+      let businessName = '当前业务';
+      let departmentName = '当前部门';
+
+      if (productScopeKey === 'system') {
+        const businessLabel = productPortalBusinessLabels[index % productPortalBusinessLabels.length];
+        const departmentSuffix = productPortalDepartmentSuffixes[Math.floor(index / productPortalBusinessLabels.length) % productPortalDepartmentSuffixes.length];
+        businessName = businessLabel;
+        departmentName = `${businessLabel}-${departmentSuffix}`;
+      } else if (productScopeKey === 'business') {
+        const departmentSuffix = productPortalDepartmentSuffixes[index % productPortalDepartmentSuffixes.length];
+        businessName = baseScopeLabel;
+        departmentName = `${baseScopeLabel}-${departmentSuffix}`;
+      } else if (productScopeKey === 'department') {
+        businessName = baseScopeLabel;
+        departmentName = baseScopeLabel;
+      } else {
+        businessName = '个人视角';
+        departmentName = baseScopeLabel;
+      }
+
+      return {
+        ...row,
+        businessName,
+        departmentName,
+      };
+    });
+
+    const departmentMap = new Map<string, any>();
+    assignedPeopleRows.forEach((row: any) => {
+      const key = `${row.businessName}@@${row.departmentName}`;
+      const entry = departmentMap.get(key) || {
+        id: key,
+        businessName: row.businessName,
+        departmentName: row.departmentName,
+        salespersonCount: 0,
+        customerCount: 0,
+        orderCount: 0,
+        amount: 0,
+        lastSoldAt: undefined as string | undefined,
+      };
+      entry.salespersonCount += 1;
+      entry.customerCount += Number(row.customerCount || 0);
+      entry.orderCount += Number(row.orderCount || 0);
+      entry.amount += Number(row.amount || 0);
+      if (row.lastSoldAt && (!entry.lastSoldAt || entry.lastSoldAt.localeCompare(row.lastSoldAt) < 0)) {
+        entry.lastSoldAt = row.lastSoldAt;
+      }
+      departmentMap.set(key, entry);
+    });
+
+    const departmentRows = Array.from(departmentMap.values()).sort((left: any, right: any) => Number(right.amount || 0) - Number(left.amount || 0));
+
+    const businessMap = new Map<string, any>();
+    departmentRows.forEach((row: any) => {
+      const entry = businessMap.get(row.businessName) || {
+        id: row.businessName,
+        businessName: row.businessName,
+        departmentCount: 0,
+        salespersonCount: 0,
+        customerCount: 0,
+        orderCount: 0,
+        amount: 0,
+        lastSoldAt: undefined as string | undefined,
+      };
+      entry.departmentCount += 1;
+      entry.salespersonCount += Number(row.salespersonCount || 0);
+      entry.customerCount += Number(row.customerCount || 0);
+      entry.orderCount += Number(row.orderCount || 0);
+      entry.amount += Number(row.amount || 0);
+      if (row.lastSoldAt && (!entry.lastSoldAt || entry.lastSoldAt.localeCompare(row.lastSoldAt) < 0)) {
+        entry.lastSoldAt = row.lastSoldAt;
+      }
+      businessMap.set(row.businessName, entry);
+    });
+
+    return {
+      scopeKey: productScopeKey,
+      baseScopeLabel,
+      personRows: assignedPeopleRows,
+      departmentRows,
+      businessRows: Array.from(businessMap.values()).sort((left: any, right: any) => Number(right.amount || 0) - Number(left.amount || 0)),
+    };
+  }, [activeScopeOption?.label, performanceItemRows, productScopeKey, salesSummaryRows]);
 
   const showPortalSwitch = hasPortalFeature && portalOptions.length > 1;
   const showScopeSwitch = hasScopeFeature && scopeOptions.length > 1;
@@ -619,6 +750,11 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       setUserHomeView('workflow');
     }
   }, [isSalesUserPortal]);
+
+  useEffect(() => {
+    setSelectedProductBusiness(undefined);
+    setSelectedProductDepartment(undefined);
+  }, [id, productScopeKey]);
 
   const listRoute = useMemo(() => {
     if (entityType === 'users') return '/users';
@@ -906,81 +1042,192 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     </Card>
   );
 
-  const renderProductPortal = () => (
-    <>
-      <Card title="销售分布">
-        <Table
-          dataSource={data?.salesSummary || []}
-          rowKey={(record: any) => String(record.id || `${record.salespersonName}-${record.customerName}`)}
-          pagination={false}
-          size="small"
-          columns={[
-            {
-              title: '销售',
-              dataIndex: 'salespersonName',
-              width: 140,
-              render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
-            },
-            {
-              title: '客户',
-              dataIndex: 'customerName',
-              render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
-            },
-            {
-              title: '销售额',
-              dataIndex: 'amount',
-              width: 150,
-              render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
-            },
-            {
-              title: '成交次数',
-              dataIndex: 'orderCount',
-              width: 100,
-            },
-            {
-              title: '最近成交',
-              dataIndex: 'lastSoldAt',
-              width: 120,
-            },
-          ]}
-        />
-      </Card>
-
-      <Card title="绩效明细">
-        <Table
-          dataSource={data?.performanceItems || []}
-          rowKey={(record: any) => String(record.id || `${record.salespersonName}-${record.customerName}`)}
-          pagination={false}
-          size="small"
-          columns={[
-            { title: '日期', dataIndex: 'happenedAt', width: 120 },
-            {
-              title: '销售',
-              dataIndex: 'salespersonName',
-              width: 140,
-              render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
-            },
-            {
-              title: '客户',
-              dataIndex: 'customerName',
-              width: 180,
-              render: (_: unknown, record: any) => renderPortalLink('objects', record.customerId, record.customerName),
-            },
-            { title: '阶段', dataIndex: 'stage', width: 120 },
-            {
-              title: '金额',
-              dataIndex: 'amount',
-              width: 150,
-              render: (value: unknown) => formatAmount(value),
-            },
-            { title: '说明', dataIndex: 'note' },
-          ]}
-        />
-      </Card>
-
-      {renderWorkSection()}
-    </>
+  const renderProductBusinessSummary = () => (
+    <Card
+      title="业务部销售汇总"
+      extra={<Tag color="purple">{formatMetricDisplay(productPortalHierarchy.businessRows.length, '个')}</Tag>}
+    >
+      <Table
+        dataSource={productPortalHierarchy.businessRows}
+        rowKey={(record: any) => String(record.id || record.businessName)}
+        pagination={false}
+        size="small"
+        scroll={{ x: 880 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无业务部汇总数据" /> }}
+        columns={[
+          { title: '业务部', dataIndex: 'businessName', width: 180 },
+          { title: '覆盖部门', dataIndex: 'departmentCount', width: 100 },
+          { title: '销售人数', dataIndex: 'salespersonCount', width: 100 },
+          { title: '客户数', dataIndex: 'customerCount', width: 100 },
+          {
+            title: '销售额',
+            dataIndex: 'amount',
+            width: 150,
+            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+          },
+          { title: '最近成交', dataIndex: 'lastSoldAt', width: 120 },
+          {
+            title: '操作',
+            width: 120,
+            render: (_: unknown, record: any) => (
+              <Button size="small" type="link" onClick={() => {
+                setSelectedProductBusiness(record.businessName);
+                setSelectedProductDepartment(undefined);
+              }}>
+                查看部门
+              </Button>
+            ),
+          },
+        ]}
+      />
+    </Card>
   );
+
+  const renderProductDepartmentSummary = (rows: any[], title: string, showBackToBusiness = false) => (
+    <Card
+      title={title}
+      extra={(
+        <Space wrap>
+          {showBackToBusiness ? (
+            <Button
+              size="small"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => {
+                setSelectedProductBusiness(undefined);
+                setSelectedProductDepartment(undefined);
+              }}
+            >
+              返回业务部汇总
+            </Button>
+          ) : null}
+          <Tag color="geekblue">{formatMetricDisplay(rows.length, '个')}</Tag>
+        </Space>
+      )}
+    >
+      <Table
+        dataSource={rows}
+        rowKey={(record: any) => String(record.id || `${record.businessName}-${record.departmentName}`)}
+        pagination={false}
+        size="small"
+        scroll={{ x: 920 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无部门汇总数据" /> }}
+        columns={[
+          { title: '部门', dataIndex: 'departmentName', width: 220 },
+          { title: '销售人数', dataIndex: 'salespersonCount', width: 100 },
+          { title: '客户数', dataIndex: 'customerCount', width: 100 },
+          {
+            title: '销售额',
+            dataIndex: 'amount',
+            width: 150,
+            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+          },
+          { title: '成交次数', dataIndex: 'orderCount', width: 100 },
+          { title: '最近成交', dataIndex: 'lastSoldAt', width: 120 },
+          {
+            title: '操作',
+            width: 120,
+            render: (_: unknown, record: any) => (
+              <Button size="small" type="link" onClick={() => setSelectedProductDepartment(record.departmentName)}>
+                查看个人
+              </Button>
+            ),
+          },
+        ]}
+      />
+    </Card>
+  );
+
+  const renderProductPersonSummary = (rows: any[], title: string, showBackToDepartment = false) => (
+    <Card
+      title={title}
+      extra={(
+        <Space wrap>
+          {showBackToDepartment ? (
+            <Button size="small" icon={<ArrowLeftOutlined />} onClick={() => setSelectedProductDepartment(undefined)}>
+              返回部门汇总
+            </Button>
+          ) : null}
+          <Tag color="cyan">{formatMetricDisplay(rows.length, '人')}</Tag>
+        </Space>
+      )}
+    >
+      <Table
+        dataSource={rows}
+        rowKey={(record: any) => String(record.id || record.salespersonId || record.salespersonName)}
+        pagination={false}
+        size="small"
+        scroll={{ x: 900 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无个人销售汇总数据" /> }}
+        columns={[
+          {
+            title: '销售',
+            dataIndex: 'salespersonName',
+            width: 160,
+            render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
+          },
+          { title: '客户数', dataIndex: 'customerCount', width: 100 },
+          { title: '成交次数', dataIndex: 'orderCount', width: 100 },
+          {
+            title: '销售额',
+            dataIndex: 'amount',
+            width: 150,
+            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+          },
+          { title: '最近成交', dataIndex: 'lastSoldAt', width: 120 },
+          {
+            title: '归属',
+            render: (_: unknown, record: any) => buildHint([record.businessName, record.departmentName]) || '-',
+          },
+        ]}
+      />
+    </Card>
+  );
+
+  const renderProductPortal = () => {
+    const departmentRows = selectedProductBusiness
+      ? productPortalHierarchy.departmentRows.filter((row: any) => row.businessName === selectedProductBusiness)
+      : productPortalHierarchy.departmentRows;
+    const personRows = selectedProductDepartment
+      ? productPortalHierarchy.personRows.filter((row: any) => row.departmentName === selectedProductDepartment)
+      : productPortalHierarchy.personRows;
+
+    const hierarchyNotice = productScopeKey === 'system'
+      ? '体系口径先看业务部汇总，再下钻查看部门和个人汇总；产品门户主视图不再重复展示销售明细。'
+      : productScopeKey === 'business'
+        ? '业务部口径按部门汇总销售产品数据，需要看个人时进入部门汇总继续下钻。'
+        : productScopeKey === 'department'
+          ? '部门口径直接查看单个部门内个人销售产品情况汇总。'
+          : '个人口径仅保留为兜底视图；管理口径默认优先展示部门 / 业务部 / 体系汇总。';
+
+    return (
+      <>
+        <Alert
+          type="info"
+          showIcon
+          message="产品门户汇总口径"
+          description={hierarchyNotice}
+        />
+
+        {productScopeKey === 'system' ? renderProductBusinessSummary() : null}
+        {(productScopeKey === 'business' || selectedProductBusiness)
+          ? renderProductDepartmentSummary(
+              departmentRows,
+              selectedProductBusiness ? `部门销售汇总 · ${selectedProductBusiness}` : '部门销售汇总',
+              productScopeKey === 'system' && !!selectedProductBusiness,
+            )
+          : null}
+        {(productScopeKey === 'department' || productScopeKey === 'personal' || selectedProductDepartment)
+          ? renderProductPersonSummary(
+              personRows,
+              selectedProductDepartment ? `个人销售汇总 · ${selectedProductDepartment}` : '个人销售汇总',
+              (productScopeKey === 'business' || productScopeKey === 'system') && !!selectedProductDepartment,
+            )
+          : null}
+
+        {renderWorkSection()}
+      </>
+    );
+  };
 
   const renderCustomerObjectPortal = () => (
     <>

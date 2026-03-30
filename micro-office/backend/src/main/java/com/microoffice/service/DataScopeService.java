@@ -126,8 +126,11 @@ public class DataScopeService {
 
         List<ScopeOption> distinctOptions = deduplicateOptions(options);
         ScopeOption fallbackScope = distinctOptions.stream()
-            .filter(option -> PortalScope.PERSONAL == option.scope())
+            .filter(option -> PortalScope.SYSTEM == option.scope())
             .findFirst()
+            .or(() -> distinctOptions.stream().filter(option -> PortalScope.BUSINESS == option.scope()).findFirst())
+            .or(() -> distinctOptions.stream().filter(option -> PortalScope.DEPARTMENT == option.scope()).findFirst())
+            .or(() -> distinctOptions.stream().filter(option -> PortalScope.PERSONAL == option.scope()).findFirst())
             .orElse(buildScopeOption(PortalScope.PERSONAL, user.getOrgId(), orgNodes, "仅本人负责或参与的销售数据"));
         ScopeOption activeScope = distinctOptions.stream()
             .filter(option -> option.scope() == requestedScope)
