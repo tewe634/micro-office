@@ -431,6 +431,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const salesActionCards = Array.isArray(data?.salesActionCards) ? data.salesActionCards : summaryCards;
   const workflowStatusCards = Array.isArray(data?.workflowStatusCards) ? data.workflowStatusCards : [];
   const salesRankingRows = Array.isArray(data?.salesRanking) ? data.salesRanking : [];
+  const salesSummaryRows = Array.isArray(data?.salesSummary) ? data.salesSummary : [];
   const customerPerformanceRows = Array.isArray(data?.customerPerformance) ? data.customerPerformance : [];
   const relatedProductsRows = Array.isArray(data?.relatedProducts) ? data.relatedProducts : [];
   const performanceItemRows = Array.isArray(data?.performanceItems) ? data.performanceItems : [];
@@ -440,6 +441,21 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const customerPerspectiveHint = normalizeText(data?.perspectiveHint);
   const isCustomerObjectPortal = entityType === 'objects' && header.type === 'CUSTOMER';
   const customerParticipantLabel = normalizeText(data?.perspectiveMode) === 'OWNER' ? '负责人' : '关联人员';
+  const objectCustomerPerformanceSummary = useMemo(() => {
+    if (!salesSummaryRows.length) {
+      return null;
+    }
+
+    const rows = [...salesSummaryRows].sort((left, right) => Number(right.amount || 0) - Number(left.amount || 0));
+    const totalAmount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
+    return {
+      participantCount: rows.length,
+      averageAmount: rows.length ? totalAmount / rows.length : 0,
+      topAmount: Number(rows[0]?.amount || 0),
+      topRows: rows.slice(0, 3),
+    };
+  }, [salesSummaryRows]);
 
   const portalOptions = useMemo(() => {
     const primaryOptions = Array.isArray(data?.portalOptions) ? data.portalOptions : [];
@@ -932,37 +948,59 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     <>
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={16}>
-          <Card title={`${customerParticipantLabel}绩效分布`} style={{ height: '100%' }}>
-            <Table
-              dataSource={data?.salesSummary || []}
-              rowKey={(record: any) => String(record.id || record.salespersonName)}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: customerParticipantLabel,
-                  dataIndex: 'salespersonName',
-                  width: 140,
-                  render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
-                },
-                {
-                  title: '绩效金额',
-                  dataIndex: 'amount',
-                  width: 150,
-                  render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
-                },
-                { title: '涉及产品', dataIndex: 'productCount', width: 100 },
-                { title: '明细数', dataIndex: 'performanceItemCount', width: 90 },
-                { title: '最近跟进', dataIndex: 'lastActiveAt', width: 120 },
-              ]}
-            />
+          <Card title={`${customerParticipantLabel}绩效摘要`} style={{ height: '100%' }}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={8}>
+                <Statistic
+                  title={`${customerParticipantLabel}数量`}
+                  value={objectCustomerPerformanceSummary?.participantCount || 0}
+                  formatter={(value) => formatStatValue(value, '人')}
+                />
+              </Col>
+              <Col xs={24} sm={8}>
+                <Statistic
+                  title="人均绩效"
+                  value={objectCustomerPerformanceSummary?.averageAmount || 0}
+                  formatter={(value) => formatStatValue(value, '元')}
+                />
+              </Col>
+              <Col xs={24} sm={8}>
+                <Statistic
+                  title="最高绩效"
+                  value={objectCustomerPerformanceSummary?.topAmount || 0}
+                  formatter={(value) => formatStatValue(value, '元')}
+                />
+              </Col>
+            </Row>
+
+            <div style={{ marginTop: 20 }}>
+              <div style={{ marginBottom: 12, fontWeight: 600, color: '#111827' }}>重点贡献人</div>
+              <List
+                size="small"
+                dataSource={objectCustomerPerformanceSummary?.topRows || []}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
+                renderItem={(item: any) => (
+                  <List.Item>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div>{renderPortalLink('users', item.salespersonId, item.salespersonName)}</div>
+                        <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
+                          {`涉及 ${item.productCount || 0} 个产品 · ${item.performanceItemCount || 0} 条明细`}
+                        </div>
+                      </div>
+                      <div style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#111827' }}>{formatAmount(item.amount)}</div>
+                    </div>
+                  </List.Item>
+                )}
+              />
+            </div>
           </Card>
         </Col>
         <Col xs={24} xl={8}>
           <Card title="相关产品" style={{ height: '100%' }}>
             <List
               size="small"
-              dataSource={data?.relatedProducts || []}
+              dataSource={relatedProductsRows}
               locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
               renderItem={(item: any) => (
                 <List.Item>
@@ -981,7 +1019,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
       <Card title="绩效明细">
         <Table
-          dataSource={data?.performanceItems || []}
+          dataSource={performanceItemRows}
           rowKey={(record: any) => String(record.id || `${record.salespersonName}-${record.productName}`)}
           pagination={false}
           size="small"
