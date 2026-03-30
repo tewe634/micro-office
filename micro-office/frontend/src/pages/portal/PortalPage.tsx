@@ -1233,7 +1233,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   );
 
   const renderUserHomeToggle = () => {
-    const options: Array<{ key: 'workflow' | 'sales'; label: string }> = [{ key: 'workflow', label: '日常工作流信息' }];
+    const options: Array<{ key: 'workflow' | 'sales'; label: string }> = [{ key: 'workflow', label: '日常信息' }];
     if (isSalesUserPortal) {
       options.push({ key: 'sales', label: '销售信息' });
     }
@@ -1256,13 +1256,13 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const renderUserWorkflowMockPanel = () => (
     <div className="portal-home-panel-stack">
-      <div className="portal-home-panel-note">日常工作流信息仅展示待办和正在处理两块列表。</div>
+      <div className="portal-home-panel-note">日常信息仅展示待办和进行中两块列表。</div>
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={12}>
-          {renderUserWorkflowPreviewCard('待办工作流信息', todoUserWorkItems, 'default')}
+          {renderUserWorkflowPreviewCard('待办', todoUserWorkItems, 'default')}
         </Col>
         <Col xs={24} xl={12}>
-          {renderUserWorkflowPreviewCard('正在处理工作流信息', inProgressUserWorkItems, 'processing')}
+          {renderUserWorkflowPreviewCard('进行中', inProgressUserWorkItems, 'processing')}
         </Col>
       </Row>
     </div>
