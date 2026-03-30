@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeftOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SearchOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Col, Descriptions, Empty, Radio, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { portalApi } from '../../api';
@@ -76,8 +76,6 @@ const workflowFilterLabelMap: Record<WorkflowFilterKey, string> = {
   COMPLETED: '已完成',
   CANCELLED: '取消',
 };
-
-const workflowHomeStatusOrder: WorkflowFilterKey[] = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 const portalTypeLabelMap: Record<string, string> = {
   USER_SALES: '销售视图',
@@ -346,6 +344,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pendingPortalValue, setPendingPortalValue] = useState<string>();
+  const [userHomeView, setUserHomeView] = useState<'workflow' | 'sales'>('workflow');
 
   const positionIdParam = searchParams.get('positionId') || undefined;
   const scopeParam = searchParams.get('scope') || undefined;
@@ -435,6 +434,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const relatedProductsRows = Array.isArray(data?.relatedProducts) ? data.relatedProducts : [];
   const performanceItemRows = Array.isArray(data?.performanceItems) ? data.performanceItems : [];
   const currentPortalVariant = normalizeText(data?.variant);
+  const isSalesUserPortal = currentPortalVariant === 'USER_SALES';
   const currentPortalLabel = formatPortalVariantLabel(currentPortalVariant);
   const customerPerspectiveLabel = normalizeText(data?.perspectiveLabel);
   const customerPerspectiveHint = normalizeText(data?.perspectiveHint);
@@ -559,6 +559,66 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     });
   }, [userWorkItems, workflowStageFilter, workflowStatusFilter]);
   const activeWorkflowStatusLabel = workflowFilterLabelMap[workflowStatusFilter];
+  const todoUserWorkItems = useMemo(() => {
+    return [...userWorkItems]
+      .filter((item: any) => normalizeText(item.status) === 'TODO')
+      .sort((left: any, right: any) => String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')));
+  }, [userWorkItems]);
+  const inProgressUserWorkItems = useMemo(() => {
+    return [...userWorkItems]
+      .filter((item: any) => normalizeText(item.status) === 'IN_PROGRESS')
+      .sort((left: any, right: any) => String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')));
+  }, [userWorkItems]);
+  const currentSalesRankingRow = useMemo(() => {
+    return salesRankingRows.find((item: any) => item.currentUser) || salesRankingRows[0] || null;
+  }, [salesRankingRows]);
+  const currentSalesMetricValue = useMemo(() => {
+    const matchedCard = salesActionCards.find((card: any) => /业绩|销售额|金额/.test(normalizeText(card?.label) || ''));
+    if (matchedCard) {
+      return formatMetricDisplay(matchedCard.value, matchedCard.suffix);
+    }
+    if (currentSalesRankingRow?.salesAmount !== undefined && currentSalesRankingRow?.salesAmount !== null) {
+      return formatAmount(currentSalesRankingRow.salesAmount);
+    }
+    return '-';
+  }, [currentSalesRankingRow, salesActionCards]);
+  const currentSalesRateValue = useMemo(() => {
+    const matchedCard = salesActionCards.find((card: any) => /达成|完成率/.test(normalizeText(card?.label) || ''));
+    if (matchedCard) {
+      return formatMetricDisplay(matchedCard.value, matchedCard.suffix);
+    }
+    if (currentSalesRankingRow?.completionRate !== undefined && currentSalesRankingRow?.completionRate !== null) {
+      return `${currentSalesRankingRow.completionRate}%`;
+    }
+    return '-';
+  }, [currentSalesRankingRow, salesActionCards]);
+  const userSalesOverviewRows = useMemo(() => {
+    return [
+      {
+        label: '当前业绩',
+        value: currentSalesMetricValue,
+        description: currentSalesRankingRow?.salesAmount !== undefined && currentSalesRankingRow?.salesAmount !== null
+          ? `销售额 ${formatAmount(currentSalesRankingRow.salesAmount)}`
+          : '当前岗位业绩概览',
+      },
+      {
+        label: '当前排名',
+        value: currentSalesRankingRow?.rank ? `第 ${currentSalesRankingRow.rank} 名` : '-',
+        description: currentSalesRankingRow?.currentUser ? '当前登录人员排名' : '按当前岗位销售排名展示',
+      },
+      {
+        label: '达成率',
+        value: currentSalesRateValue,
+        description: currentSalesRankingRow?.focusProduct ? `主推产品：${currentSalesRankingRow.focusProduct}` : '当前岗位达成情况',
+      },
+    ];
+  }, [currentSalesMetricValue, currentSalesRateValue, currentSalesRankingRow]);
+
+  useEffect(() => {
+    if (!isSalesUserPortal) {
+      setUserHomeView('workflow');
+    }
+  }, [isSalesUserPortal]);
 
   const listRoute = useMemo(() => {
     if (entityType === 'users') return '/users';
@@ -661,16 +721,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     navigate(`/users/${id}/portal${buildUserPortalSearch()}`);
   };
 
-  const navigateToUserPortalDetail = (
-    section: UserPortalDetailSection,
-    updates?: { status?: string; stage?: string },
-  ) => {
-    if (!id) {
-      return;
-    }
-    navigate(`/users/${id}/portal/details/${section}${buildUserPortalSearch(updates)}`);
-  };
-
   const handleWorkflowStatusCard = (filter: WorkflowFilterKey) => {
     const nextStatus = workflowStatusFilter === filter || filter === 'ALL' ? undefined : filter;
     updateQueryParams({
@@ -693,18 +743,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       status: undefined,
       stage: undefined,
     });
-  };
-
-  const handleSalesActionCard = (card: Record<string, any>) => {
-    const targetSection = normalizeUserPortalDetailSection(card.targetSection);
-    const nextFilter = normalizeWorkflowFilterKey(card.filterKey);
-    if (targetSection === 'workflow') {
-      navigateToUserPortalDetail('workflow', {
-        status: nextFilter === 'ALL' ? undefined : nextFilter,
-      });
-      return;
-    }
-    navigateToUserPortalDetail(targetSection);
   };
 
   const headerTags = () => {
@@ -1089,87 +1127,163 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     );
   };
 
-  const renderUserShortcutSection = (
+  const renderUserWorkflowPreviewCard = (
     title: string,
-    items: Array<{
-      key: string;
-      label: string;
-      value: string;
-      onClick: () => void;
-      tone?: 'sales';
-    }>,
-  ) => {
-    if (!items.length) {
-      return null;
+    items: any[],
+    tone: 'default' | 'processing',
+  ) => (
+    <Card
+      className="portal-section-card"
+      title={title}
+      extra={<Tag color={tone}>{formatMetricDisplay(items.length, '项')}</Tag>}
+    >
+      {items.length ? (
+        <div className="portal-home-info-list">
+          {items.slice(0, 6).map((item: any) => (
+            <div className="portal-home-info-list__item" key={String(item.id || item.title)}>
+              <div className="portal-home-info-list__main">
+                <div className="portal-home-info-list__title">{item.title || '-'}</div>
+                <div className="portal-home-info-list__meta">
+                  {buildHint([item.stage, item.objectName, item.productName]) || '暂无关联对象/产品信息'}
+                </div>
+              </div>
+              <div className="portal-home-info-list__side">
+                <div className="portal-home-info-list__value">{item.updatedAt || '-'}</div>
+                <div className="portal-home-info-list__subvalue">最近更新</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="portal-home-info-list__empty">暂无数据</div>
+      )}
+    </Card>
+  );
+
+  const renderUserSalesOverviewCard = () => (
+    <Card className="portal-section-card" title="当前业绩与排名">
+      <div className="portal-home-info-list">
+        {userSalesOverviewRows.map(item => (
+          <div className="portal-home-info-list__item" key={item.label}>
+            <div className="portal-home-info-list__main">
+              <div className="portal-home-info-list__title">{item.label}</div>
+              <div className="portal-home-info-list__meta">{item.description}</div>
+            </div>
+            <div className="portal-home-info-list__side">
+              <div className="portal-home-info-list__value">{item.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+
+  const renderUserCustomerPreviewCard = () => (
+    <Card
+      className="portal-section-card"
+      title="客户"
+      extra={<Tag color="cyan">{formatMetricDisplay(customerPerformanceRows.length, '个')}</Tag>}
+    >
+      {customerPerformanceRows.length ? (
+        <div className="portal-home-info-list">
+          {customerPerformanceRows.slice(0, 6).map((item: any) => (
+            <div className="portal-home-info-list__item" key={String(item.id || item.name)}>
+              <div className="portal-home-info-list__main">
+                <div className="portal-home-info-list__title">{renderPortalLink('objects', item.id, item.name)}</div>
+                <div className="portal-home-info-list__meta">
+                  {buildHint([item.lastActiveAt ? `最近跟进 ${item.lastActiveAt}` : undefined, item.productCount ? `涉及 ${item.productCount} 个产品` : undefined]) || '暂无跟进信息'}
+                </div>
+              </div>
+              <div className="portal-home-info-list__side">
+                <div className="portal-home-info-list__value">{formatAmount(item.amount)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="portal-home-info-list__empty">暂无客户数据</div>
+      )}
+    </Card>
+  );
+
+  const renderUserProductPreviewCard = () => (
+    <Card
+      className="portal-section-card"
+      title="产品"
+      extra={<Tag color="geekblue">{formatMetricDisplay(relatedProductsRows.length, '项')}</Tag>}
+    >
+      {relatedProductsRows.length ? (
+        <div className="portal-home-info-list">
+          {relatedProductsRows.slice(0, 6).map((item: any) => (
+            <div className="portal-home-info-list__item" key={String(item.id || item.name)}>
+              <div className="portal-home-info-list__main">
+                <div className="portal-home-info-list__title">{renderPortalLink('products', item.id, item.name)}</div>
+                <div className="portal-home-info-list__meta">{item.code || '暂无编码信息'}</div>
+              </div>
+              <div className="portal-home-info-list__side">
+                <div className="portal-home-info-list__value">{formatAmount(item.amount)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="portal-home-info-list__empty">暂无产品数据</div>
+      )}
+    </Card>
+  );
+
+  const renderUserHomeToggle = () => {
+    const options: Array<{ key: 'workflow' | 'sales'; label: string }> = [{ key: 'workflow', label: '日常工作流信息' }];
+    if (isSalesUserPortal) {
+      options.push({ key: 'sales', label: '销售信息' });
     }
 
     return (
-      <section className="portal-shortcut-group">
-        <div className="portal-shortcut-group__header">
-          <div className="portal-shortcut-group__title">{title}</div>
-        </div>
-        <div className="portal-shortcut-grid">
-          {items.map(item => (
-            <button
-              key={item.key}
-              type="button"
-              className={`portal-shortcut-card${item.tone === 'sales' ? ' portal-shortcut-card--sales' : ''}`}
-              onClick={item.onClick}
-            >
-              <div className="portal-shortcut-card__topline">
-                <div className="portal-shortcut-card__label">{item.label}</div>
-                <div className="portal-shortcut-card__jump">
-                  <span>进入</span>
-                  <ArrowRightOutlined />
-                </div>
-              </div>
-              <div className="portal-shortcut-card__value">{item.value}</div>
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="portal-home-toggle">
+        {options.map(option => (
+          <button
+            key={option.key}
+            type="button"
+            className={`portal-home-toggle__button${userHomeView === option.key ? ' portal-home-toggle__button--active' : ''}`}
+            onClick={() => setUserHomeView(option.key)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     );
   };
 
-  const renderSalesActionRow = () => {
-    if (data?.variant !== 'USER_SALES' || !salesActionCards.length) {
-      return null;
-    }
+  const renderUserWorkflowMockPanel = () => (
+    <div className="portal-home-panel-stack">
+      <div className="portal-home-panel-note">日常工作流信息仅展示待办和正在处理两块列表。</div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={12}>
+          {renderUserWorkflowPreviewCard('待办工作流信息', todoUserWorkItems, 'default')}
+        </Col>
+        <Col xs={24} xl={12}>
+          {renderUserWorkflowPreviewCard('正在处理工作流信息', inProgressUserWorkItems, 'processing')}
+        </Col>
+      </Row>
+    </div>
+  );
 
-    return renderUserShortcutSection(
-      '销售',
-      salesActionCards.map((card: any) => ({
-        key: String(card.key || card.label),
-        label: card.label,
-        value: formatMetricDisplay(card.value, card.suffix),
-        onClick: () => handleSalesActionCard(card),
-        tone: 'sales',
-      })),
-    );
-  };
-
-  const renderUserWorkflowStatusOverview = () => {
-    const cardMap = new Map<WorkflowFilterKey, any>();
-    workflowStatusCards.forEach((card: any) => {
-      const key = normalizeWorkflowFilterKey(card.filterKey ?? card.key);
-      if (workflowHomeStatusOrder.includes(key)) {
-        cardMap.set(key, card);
-      }
-    });
-
-    return renderUserShortcutSection(
-      '工作流',
-      workflowHomeStatusOrder.map(statusKey => {
-        const card = cardMap.get(statusKey);
-        return {
-          key: `workflow-${statusKey}`,
-          label: workflowFilterLabelMap[statusKey],
-          value: formatMetricDisplay(card?.count ?? 0, '项'),
-          onClick: () => navigateToUserPortalDetail('workflow', { status: statusKey }),
-        };
-      }),
-    );
-  };
+  const renderUserSalesMockPanel = () => (
+    <div className="portal-home-panel-stack">
+      <div className="portal-home-panel-note">销售信息 mock 展示当前业绩与排名、客户、产品三块列表。</div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={8}>
+          {renderUserSalesOverviewCard()}
+        </Col>
+        <Col xs={24} xl={8}>
+          {renderUserCustomerPreviewCard()}
+        </Col>
+        <Col xs={24} xl={8}>
+          {renderUserProductPreviewCard()}
+        </Col>
+      </Row>
+    </div>
+  );
 
   const renderUserPromptPanel = () => (
     <section className="portal-home__prompt">
@@ -1428,10 +1542,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const renderUserMainPortal = () => (
     <div className="portal-home">
       {renderUserPromptPanel()}
-      <div className="portal-shortcut-stack">
-        {renderSalesActionRow()}
-        {renderUserWorkflowStatusOverview()}
-      </div>
+      {renderUserHomeToggle()}
+      {userHomeView === 'sales' && isSalesUserPortal ? renderUserSalesMockPanel() : renderUserWorkflowMockPanel()}
     </div>
   );
 

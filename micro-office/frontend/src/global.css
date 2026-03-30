@@ -542,6 +542,121 @@ body {
   line-height: 1.6;
 }
 
+.portal-home-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.portal-home-toggle__button {
+  min-width: 180px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.portal-home-toggle__button:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.08);
+}
+
+.portal-home-toggle__button--active {
+  border-color: #2563eb;
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.95) 0%, rgba(219, 234, 254, 0.95) 100%);
+  color: #1d4ed8;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.14);
+}
+
+.portal-home-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.portal-home-panel-note {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.portal-home-info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-home-info-list__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.86);
+}
+
+.portal-home-info-list__item:first-child {
+  padding-top: 0;
+}
+
+.portal-home-info-list__item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.portal-home-info-list__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-home-info-list__title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.portal-home-info-list__meta {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.portal-home-info-list__side {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.portal-home-info-list__value {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.portal-home-info-list__subvalue {
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.portal-home-info-list__empty {
+  padding: 18px 0 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+}
+
 .portal-shortcut-stack {
   display: flex;
   flex-direction: column;
@@ -981,6 +1096,28 @@ body {
 
   .portal-home__prompt-blank {
     height: 34px;
+  }
+
+  .portal-home-toggle {
+    justify-content: stretch;
+    gap: 10px;
+  }
+
+  .portal-home-toggle__button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .portal-home-panel-note {
+    text-align: left;
+  }
+
+  .portal-home-info-list__item {
+    gap: 12px;
+  }
+
+  .portal-home-info-list__side {
+    text-align: left;
   }
 
   .portal-context-card__controls {
