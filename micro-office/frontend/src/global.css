@@ -487,45 +487,19 @@ body {
 }
 
 .portal-home__prompt {
-  padding: 12px 0 4px;
+  padding: 4px 0;
 }
 
 .portal-home__prompt-panel {
   width: min(100%, 880px);
   margin: 0 auto;
-  padding: 4px 12px 0;
+  padding: 0 12px;
   text-align: center;
-}
-
-.portal-home__prompt-eyebrow {
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #94a3b8;
-}
-
-.portal-home__prompt-title {
-  margin-top: 10px;
-  font-size: clamp(26px, 4vw, 34px);
-  line-height: 1.08;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #0f172a;
-}
-
-.portal-home__prompt-subtitle {
-  width: min(100%, 560px);
-  margin: 12px auto 0;
-  color: #64748b;
-  font-size: 14px;
-  line-height: 1.7;
 }
 
 .portal-home__prompt-box {
   width: min(100%, 720px);
-  margin: 18px auto 0;
+  margin: 0 auto;
 }
 
 .portal-home__prompt-field {
@@ -981,11 +955,11 @@ body {
   }
 
   .portal-home__prompt-panel {
-    padding: 2px 0 0;
+    padding: 0;
   }
 
   .portal-home__prompt-box {
-    margin-top: 16px;
+    margin-top: 0;
   }
 
   .portal-home__prompt-field {

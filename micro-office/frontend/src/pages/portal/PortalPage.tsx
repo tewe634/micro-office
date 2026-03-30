@@ -1174,8 +1174,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const renderUserPromptPanel = () => (
     <section className="portal-home__prompt">
       <div className="portal-home__prompt-panel">
-        <div className="portal-home__prompt-eyebrow">AI 入口</div>
-        <div className="portal-home__prompt-title">想查什么，直接输入</div>
         <div className="portal-home__prompt-box">
           <div className="portal-home__prompt-field">
             <div className="portal-home__prompt-icon" aria-hidden="true">
