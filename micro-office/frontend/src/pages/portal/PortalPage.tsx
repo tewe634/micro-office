@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftOutlined, ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Descriptions, Empty, List, Radio, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Empty, Radio, Row, Segmented, Space, Statistic, Table, Tag } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { portalApi } from '../../api';
 import type { PortalOptionItem, PortalPayload, PortalRequestParams, PortalSelection } from '../../api';
@@ -444,19 +444,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     [isCustomerObjectPortal, summaryCards],
   );
   const customerParticipantLabel = normalizeText(data?.perspectiveMode) === 'OWNER' ? '负责人' : '关联人员';
-  const objectCustomerPerformanceOverview = useMemo(() => {
-    const latestAchievedAt = performanceItemRows
-      .map((item: any) => normalizeText(item?.achievedAt))
-      .filter((value): value is string => !!value)
-      .sort()
-      .at(-1);
-
-    return {
-      detailCount: performanceItemRows.length,
-      productCount: relatedProductsRows.length,
-      latestAchievedAt,
-    };
-  }, [performanceItemRows, relatedProductsRows]);
 
   const portalOptions = useMemo(() => {
     const primaryOptions = Array.isArray(data?.portalOptions) ? data.portalOptions : [];
@@ -959,55 +946,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const renderCustomerObjectPortal = () => (
     <>
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={16}>
-          <Card title="绩效摘要" style={{ height: '100%' }}>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={8}>
-                <Statistic
-                  title="绩效笔数"
-                  value={objectCustomerPerformanceOverview.detailCount}
-                  formatter={(value) => formatStatValue(value, '条')}
-                />
-              </Col>
-              <Col xs={24} sm={8}>
-                <Statistic
-                  title="覆盖产品"
-                  value={objectCustomerPerformanceOverview.productCount}
-                  formatter={(value) => formatStatValue(value, '项')}
-                />
-              </Col>
-              <Col xs={24} sm={8}>
-                <Statistic
-                  title="最近绩效"
-                  value={objectCustomerPerformanceOverview.latestAchievedAt || '-'}
-                  formatter={(value) => formatMetricDisplay(value)}
-                />
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-        <Col xs={24} xl={8}>
-          <Card title="相关产品" style={{ height: '100%' }}>
-            <List
-              size="small"
-              dataSource={relatedProductsRows}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
-              renderItem={(item: any) => (
-                <List.Item>
-                  <div style={{ width: '100%' }}>
-                    <div>{renderPortalLink('products', item.id, item.name)}</div>
-                    <div style={{ color: '#6b7280', fontSize: 12 }}>
-                      {(item.code || '-')}{' · '}{formatAmount(item.amount)}
-                    </div>
-                  </div>
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
-      </Row>
-
       <Card title="绩效明细">
         <Table
           dataSource={performanceItemRows}
