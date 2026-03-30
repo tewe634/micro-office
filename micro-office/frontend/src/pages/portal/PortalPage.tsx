@@ -431,7 +431,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const salesActionCards = Array.isArray(data?.salesActionCards) ? data.salesActionCards : summaryCards;
   const workflowStatusCards = Array.isArray(data?.workflowStatusCards) ? data.workflowStatusCards : [];
   const salesRankingRows = Array.isArray(data?.salesRanking) ? data.salesRanking : [];
-  const salesSummaryRows = Array.isArray(data?.salesSummary) ? data.salesSummary : [];
   const customerPerformanceRows = Array.isArray(data?.customerPerformance) ? data.customerPerformance : [];
   const relatedProductsRows = Array.isArray(data?.relatedProducts) ? data.relatedProducts : [];
   const performanceItemRows = Array.isArray(data?.performanceItems) ? data.performanceItems : [];
@@ -440,22 +439,24 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const customerPerspectiveLabel = normalizeText(data?.perspectiveLabel);
   const customerPerspectiveHint = normalizeText(data?.perspectiveHint);
   const isCustomerObjectPortal = entityType === 'objects' && header.type === 'CUSTOMER';
+  const displaySummaryCards = useMemo(
+    () => (isCustomerObjectPortal ? summaryCards.filter((card: any) => normalizeText(card?.key) !== 'participants') : summaryCards),
+    [isCustomerObjectPortal, summaryCards],
+  );
   const customerParticipantLabel = normalizeText(data?.perspectiveMode) === 'OWNER' ? '负责人' : '关联人员';
-  const objectCustomerPerformanceSummary = useMemo(() => {
-    if (!salesSummaryRows.length) {
-      return null;
-    }
-
-    const rows = [...salesSummaryRows].sort((left, right) => Number(right.amount || 0) - Number(left.amount || 0));
-    const totalAmount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const objectCustomerPerformanceOverview = useMemo(() => {
+    const latestAchievedAt = performanceItemRows
+      .map((item: any) => normalizeText(item?.achievedAt))
+      .filter((value): value is string => !!value)
+      .sort()
+      .at(-1);
 
     return {
-      participantCount: rows.length,
-      averageAmount: rows.length ? totalAmount / rows.length : 0,
-      topAmount: Number(rows[0]?.amount || 0),
-      topRows: rows.slice(0, 3),
+      detailCount: performanceItemRows.length,
+      productCount: relatedProductsRows.length,
+      latestAchievedAt,
     };
-  }, [salesSummaryRows]);
+  }, [performanceItemRows, relatedProductsRows]);
 
   const portalOptions = useMemo(() => {
     const primaryOptions = Array.isArray(data?.portalOptions) ? data.portalOptions : [];
@@ -559,7 +560,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     return portalOptions.find(option => (option.requestValue ?? option.key) === pendingPortalValue) || null;
   }, [pendingPortalValue, portalOptions]);
   const isPortalSwitchPending = !!pendingPortalOption && pendingPortalOption.requestValue !== activePortalValue;
-  const showContextPanel = hasPortalFeature || hasScopeFeature || !!customerPerspectiveLabel;
+  const showContextPanel = !isCustomerObjectPortal && (hasPortalFeature || hasScopeFeature || !!customerPerspectiveLabel);
   const filteredUserWorkItems = useMemo(() => {
     return userWorkItems.filter((item: any) => {
       const status = normalizeText(item.status) || '';
@@ -735,7 +736,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       return (
         <>
           <Tag color="blue">{formatObjectType(header.type)}</Tag>
-          {customerPerspectiveLabel ? <Tag color="cyan">{customerPerspectiveLabel}</Tag> : null}
+          {!isCustomerObjectPortal && customerPerspectiveLabel ? <Tag color="cyan">{customerPerspectiveLabel}</Tag> : null}
           {header.industry ? <Tag color="geekblue">{header.industry}</Tag> : null}
           <Tag color="processing">{header.year} 门户</Tag>
         </>
@@ -764,6 +765,18 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     }
 
     if (entityType === 'objects') {
+      if (isCustomerObjectPortal) {
+        return [
+          ['对象类型', formatObjectType(header.type)],
+          ['联系人', header.contact],
+          ['联系电话', header.phone],
+          ['所属组织', header.orgName],
+          ['所属部门', header.deptName],
+          ['地址', header.address],
+          ['备注', header.remark],
+        ];
+      }
+
       return [
         ['对象类型', formatObjectType(header.type)],
         ['联系人', header.contact],
@@ -832,7 +845,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const renderSummaryCards = () => (
     <Row gutter={[16, 16]}>
-      {summaryCards.map((card: any) => (
+      {displaySummaryCards.map((card: any) => (
         <Col xs={24} sm={12} xl={6} key={card.key}>
           <Card size="small" styles={{ body: { padding: 20 } }}>
             <Statistic
@@ -948,52 +961,30 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     <>
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={16}>
-          <Card title={`${customerParticipantLabel}绩效摘要`} style={{ height: '100%' }}>
+          <Card title="绩效摘要" style={{ height: '100%' }}>
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={8}>
                 <Statistic
-                  title={`${customerParticipantLabel}数量`}
-                  value={objectCustomerPerformanceSummary?.participantCount || 0}
-                  formatter={(value) => formatStatValue(value, '人')}
+                  title="绩效笔数"
+                  value={objectCustomerPerformanceOverview.detailCount}
+                  formatter={(value) => formatStatValue(value, '条')}
                 />
               </Col>
               <Col xs={24} sm={8}>
                 <Statistic
-                  title="人均绩效"
-                  value={objectCustomerPerformanceSummary?.averageAmount || 0}
-                  formatter={(value) => formatStatValue(value, '元')}
+                  title="覆盖产品"
+                  value={objectCustomerPerformanceOverview.productCount}
+                  formatter={(value) => formatStatValue(value, '项')}
                 />
               </Col>
               <Col xs={24} sm={8}>
                 <Statistic
-                  title="最高绩效"
-                  value={objectCustomerPerformanceSummary?.topAmount || 0}
-                  formatter={(value) => formatStatValue(value, '元')}
+                  title="最近绩效"
+                  value={objectCustomerPerformanceOverview.latestAchievedAt || '-'}
+                  formatter={(value) => formatMetricDisplay(value)}
                 />
               </Col>
             </Row>
-
-            <div style={{ marginTop: 20 }}>
-              <div style={{ marginBottom: 12, fontWeight: 600, color: '#111827' }}>重点贡献人</div>
-              <List
-                size="small"
-                dataSource={objectCustomerPerformanceSummary?.topRows || []}
-                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> }}
-                renderItem={(item: any) => (
-                  <List.Item>
-                    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div>{renderPortalLink('users', item.salespersonId, item.salespersonName)}</div>
-                        <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
-                          {`涉及 ${item.productCount || 0} 个产品 · ${item.performanceItemCount || 0} 条明细`}
-                        </div>
-                      </div>
-                      <div style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#111827' }}>{formatAmount(item.amount)}</div>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            </div>
           </Card>
         </Col>
         <Col xs={24} xl={8}>
