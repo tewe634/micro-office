@@ -532,9 +532,9 @@ body {
   min-height: 72px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 14px;
-  padding: 0 12px 0 18px;
+  padding: 0 18px;
   border-radius: 999px;
   border: 1px solid rgba(203, 213, 225, 0.95);
   background: rgba(255, 255, 255, 0.94);
@@ -554,26 +554,11 @@ body {
   font-size: 18px;
 }
 
-.portal-home__prompt-placeholder {
+.portal-home__prompt-blank {
   flex: 1;
   min-width: 0;
-  text-align: left;
-  font-size: clamp(15px, 2.4vw, 18px);
-  line-height: 1.3;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  color: #64748b;
-}
-
-.portal-home__prompt-field-note {
-  flex: 0 0 auto;
-  padding: 6px 12px;
+  height: 40px;
   border-radius: 999px;
-  border: 1px solid rgba(226, 232, 240, 0.82);
-  background: rgba(241, 245, 249, 0.92);
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .portal-home__prompt-note {
@@ -1020,12 +1005,8 @@ body {
     font-size: 16px;
   }
 
-  .portal-home__prompt-placeholder {
-    text-align: left;
-  }
-
-  .portal-home__prompt-field-note {
-    align-self: auto;
+  .portal-home__prompt-blank {
+    height: 34px;
   }
 
   .portal-context-card__controls {

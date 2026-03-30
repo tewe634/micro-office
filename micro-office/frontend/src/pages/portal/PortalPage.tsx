@@ -1181,8 +1181,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             <div className="portal-home__prompt-icon" aria-hidden="true">
               <SearchOutlined />
             </div>
-            <div className="portal-home__prompt-placeholder">搜索客户、产品、待办，或输入一句任务</div>
-            <div className="portal-home__prompt-field-note">即将接入</div>
+            <div className="portal-home__prompt-blank" aria-hidden="true" />
           </div>
         </div>
       </div>
