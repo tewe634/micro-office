@@ -14,6 +14,7 @@ import com.microoffice.service.MenuPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -145,7 +146,8 @@ public class PortalController {
     private Map<String, Object> buildProductPortal(Product product, DataScopeService.SalesPortalScope scopeContext) {
         int year = Year.now().getValue();
         int seed = stableSeed(product.getId() + "#" + scopeContext.activeScope().key(), 11);
-        List<RefItem> salesRefs = pickRefs(loadSalesRefs(scopeContext), 3 + seed % 2, seed);
+        List<RefItem> scopedSalesRefs = loadSalesRefs(scopeContext);
+        List<RefItem> salesRefs = pickRefs(scopedSalesRefs, 3 + seed % 2, seed);
         List<RefItem> customerRefs = pickRefs(loadCustomerRefs(scopeContext), 4, seed / 3 + 5);
 
         List<Map<String, Object>> salesSummary = new ArrayList<>();
@@ -190,6 +192,7 @@ public class PortalController {
         }
 
         List<Map<String, Object>> workItems = buildProductWorkItems(product, salesRefs, customerRefs, seed);
+        Map<String, Object> productHierarchy = buildProductHierarchy(scopedSalesRefs, salesSummary, scopeContext);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("portalType", "PRODUCT");
@@ -203,10 +206,239 @@ public class PortalController {
             summaryCard("openWork", "关联工作", countStatuses(workItems, "TODO") + countStatuses(workItems, "IN_PROGRESS"), "项")
         ));
         result.put("salesSummary", salesSummary);
+        result.put("productHierarchy", productHierarchy);
         result.put("performanceItems", performanceItems);
         result.put("workSummary", buildWorkSummary(workItems));
         result.put("workItems", workItems);
         return result;
+    }
+
+    private Map<String, Object> buildProductHierarchy(List<RefItem> salesRefs,
+                                                      List<Map<String, Object>> salesSummary,
+                                                      DataScopeService.SalesPortalScope scopeContext) {
+        Map<String, ProductOrgNode> orgNodes = loadProductOrgNodes();
+        Map<String, ProductSalespersonAssignment> assignments = loadProductSalespersonAssignments(salesRefs);
+        LinkedHashMap<String, ProductPersonAccumulator> personAccumulators = new LinkedHashMap<>();
+
+        for (RefItem salesperson : salesRefs) {
+            ProductSalespersonAssignment assignment = assignments.get(salesperson.id());
+            ProductHierarchyPlacement placement = resolveProductHierarchyPlacement(
+                assignment == null ? null : assignment.orgId(),
+                scopeContext.salesSystemOrgId(),
+                orgNodes
+            );
+            if (placement == null || !placement.hasBusiness()) {
+                continue;
+            }
+            personAccumulators.put(salesperson.id(), new ProductPersonAccumulator(
+                salesperson.id(),
+                salesperson.name(),
+                placement.businessOrgId(),
+                placement.businessName(),
+                placement.departmentOrgId(),
+                placement.departmentName()
+            ));
+        }
+
+        for (Map<String, Object> row : salesSummary) {
+            String salespersonId = toText(row.get("salespersonId"));
+            if (!hasText(salespersonId)) {
+                continue;
+            }
+            ProductPersonAccumulator accumulator = personAccumulators.get(salespersonId);
+            if (accumulator == null) {
+                ProductSalespersonAssignment assignment = assignments.get(salespersonId);
+                ProductHierarchyPlacement placement = resolveProductHierarchyPlacement(
+                    assignment == null ? null : assignment.orgId(),
+                    scopeContext.salesSystemOrgId(),
+                    orgNodes
+                );
+                if (placement == null || !placement.hasBusiness()) {
+                    continue;
+                }
+                accumulator = new ProductPersonAccumulator(
+                    salespersonId,
+                    toText(row.get("salespersonName")),
+                    placement.businessOrgId(),
+                    placement.businessName(),
+                    placement.departmentOrgId(),
+                    placement.departmentName()
+                );
+                personAccumulators.put(salespersonId, accumulator);
+            }
+
+            accumulator.mergeSale(
+                toText(row.get("customerId")),
+                toText(row.get("customerName")),
+                toInt(row.get("orderCount")),
+                toAmount(row.get("amount")),
+                toText(row.get("lastSoldAt"))
+            );
+        }
+
+        String activeOrgId = scopeContext.activeScope() == null ? null : scopeContext.activeScope().orgId();
+        List<Map<String, Object>> personRows = new ArrayList<>();
+        for (ProductPersonAccumulator accumulator : personAccumulators.values()) {
+            if (!matchesHierarchyScope(accumulator.businessOrgId(), accumulator.departmentOrgId(), activeOrgId, scopeContext)) {
+                continue;
+            }
+            personRows.add(accumulator.toRow());
+        }
+        personRows.sort((left, right) -> compareHierarchyRows(right, left, "salespersonName"));
+
+        LinkedHashMap<String, ProductDepartmentAccumulator> departmentAccumulators = new LinkedHashMap<>();
+        for (ProductPersonAccumulator person : personAccumulators.values()) {
+            if (!matchesHierarchyScope(person.businessOrgId(), person.departmentOrgId(), activeOrgId, scopeContext)) {
+                continue;
+            }
+            String departmentOrgId = person.departmentOrgId();
+            if (!hasText(departmentOrgId)) {
+                continue;
+            }
+            ProductDepartmentAccumulator accumulator = departmentAccumulators.computeIfAbsent(
+                departmentOrgId,
+                key -> new ProductDepartmentAccumulator(
+                    person.departmentOrgId(),
+                    person.departmentName(),
+                    person.businessOrgId(),
+                    person.businessName()
+                )
+            );
+            accumulator.mergePerson(person);
+        }
+
+        List<Map<String, Object>> departmentRows = new ArrayList<>();
+        for (ProductDepartmentAccumulator accumulator : departmentAccumulators.values()) {
+            departmentRows.add(accumulator.toRow());
+        }
+        departmentRows.sort((left, right) -> compareHierarchyRows(right, left, "departmentName"));
+
+        LinkedHashMap<String, ProductBusinessAccumulator> businessAccumulators = new LinkedHashMap<>();
+        for (ProductDepartmentAccumulator department : departmentAccumulators.values()) {
+            if (!hasText(department.businessOrgId())) {
+                continue;
+            }
+            ProductBusinessAccumulator accumulator = businessAccumulators.computeIfAbsent(
+                department.businessOrgId(),
+                key -> new ProductBusinessAccumulator(department.businessOrgId(), department.businessName())
+            );
+            accumulator.mergeDepartment(department);
+        }
+
+        List<Map<String, Object>> businessRows = new ArrayList<>();
+        for (ProductBusinessAccumulator accumulator : businessAccumulators.values()) {
+            businessRows.add(accumulator.toRow());
+        }
+        businessRows.sort((left, right) -> compareHierarchyRows(right, left, "businessName"));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("businessRows", businessRows);
+        result.put("departmentRows", departmentRows);
+        result.put("personRows", personRows);
+        return result;
+    }
+
+    private boolean matchesHierarchyScope(String businessOrgId,
+                                          String departmentOrgId,
+                                          String activeOrgId,
+                                          DataScopeService.SalesPortalScope scopeContext) {
+        if (scopeContext == null || scopeContext.activeScope() == null || scopeContext.activeScope().scope() == null) {
+            return true;
+        }
+        return switch (scopeContext.activeScope().scope()) {
+            case SYSTEM, PERSONAL -> true;
+            case BUSINESS -> Objects.equals(activeOrgId, businessOrgId);
+            case DEPARTMENT -> Objects.equals(activeOrgId, departmentOrgId);
+        };
+    }
+
+    private Map<String, ProductOrgNode> loadProductOrgNodes() {
+        LinkedHashMap<String, ProductOrgNode> nodes = new LinkedHashMap<>();
+        jdbc.query(
+            "SELECT id, name, parent_id FROM organization ORDER BY sort_order, id",
+            (RowCallbackHandler) rs -> nodes.put(
+                rs.getString("id"),
+                new ProductOrgNode(rs.getString("id"), rs.getString("name"), rs.getString("parent_id"))
+            )
+        );
+        return nodes;
+    }
+
+    private Map<String, ProductSalespersonAssignment> loadProductSalespersonAssignments(List<RefItem> salesRefs) {
+        LinkedHashMap<String, ProductSalespersonAssignment> assignments = new LinkedHashMap<>();
+        if (salesRefs == null || salesRefs.isEmpty()) {
+            return assignments;
+        }
+        LinkedHashSet<String> salespersonIds = new LinkedHashSet<>();
+        for (RefItem salesperson : salesRefs) {
+            if (salesperson != null && hasText(salesperson.id())) {
+                salespersonIds.add(salesperson.id());
+            }
+        }
+        if (salespersonIds.isEmpty()) {
+            return assignments;
+        }
+        jdbc.query(
+            "SELECT su.id, su.name, su.org_id " +
+                "FROM sys_user su " +
+                "WHERE su.id = ANY(?::varchar[])",
+            (RowCallbackHandler) rs -> assignments.put(
+                rs.getString("id"),
+                new ProductSalespersonAssignment(rs.getString("id"), rs.getString("name"), rs.getString("org_id"))
+            ),
+            (Object) salespersonIds.toArray(new String[0])
+        );
+        return assignments;
+    }
+
+    private ProductHierarchyPlacement resolveProductHierarchyPlacement(String orgId,
+                                                                      String salesSystemOrgId,
+                                                                      Map<String, ProductOrgNode> orgNodes) {
+        if (!hasText(orgId) || !hasText(salesSystemOrgId) || orgNodes.isEmpty()) {
+            return ProductHierarchyPlacement.empty();
+        }
+
+        ProductOrgNode businessNode = findAncestorWithParent(orgId, salesSystemOrgId, orgNodes);
+        if (businessNode == null) {
+            return ProductHierarchyPlacement.empty();
+        }
+
+        ProductOrgNode departmentNode = findAncestorWithParent(orgId, businessNode.id(), orgNodes);
+        if (departmentNode == null) {
+            departmentNode = businessNode;
+        }
+
+        return new ProductHierarchyPlacement(
+            businessNode.id(),
+            businessNode.name(),
+            departmentNode.id(),
+            departmentNode.name()
+        );
+    }
+
+    private ProductOrgNode findAncestorWithParent(String startOrgId,
+                                                  String expectedParentId,
+                                                  Map<String, ProductOrgNode> orgNodes) {
+        String currentOrgId = startOrgId;
+        while (hasText(currentOrgId)) {
+            ProductOrgNode node = orgNodes.get(currentOrgId);
+            if (node == null) {
+                return null;
+            }
+            if (Objects.equals(expectedParentId, node.parentId())) {
+                return node;
+            }
+            currentOrgId = node.parentId();
+        }
+        return null;
+    }
+
+    private int compareHierarchyRows(Map<String, Object> left, Map<String, Object> right, String labelKey) {
+        int amountCompare = toAmount(left.get("amount")).compareTo(toAmount(right.get("amount")));
+        if (amountCompare != 0) {
+            return amountCompare;
+        }
+        return Objects.toString(left.get(labelKey), "").compareTo(Objects.toString(right.get(labelKey), ""));
     }
 
     private Map<String, Object> buildCustomerPortal(ExternalObject object, String viewerId) {
@@ -1225,6 +1457,55 @@ public class PortalController {
         return parts.isEmpty() ? object.getId() : String.join("#", parts);
     }
 
+    private String toText(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = Objects.toString(value, "").trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private int toInt(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    private BigDecimal toAmount(Object value) {
+        if (value instanceof BigDecimal amount) {
+            return amount;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return new BigDecimal(text.trim());
+            } catch (NumberFormatException ignored) {
+                return BigDecimal.ZERO;
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private String maxDate(String current, String candidate) {
+        if (!hasText(candidate)) {
+            return current;
+        }
+        if (!hasText(current) || current.compareTo(candidate) < 0) {
+            return candidate;
+        }
+        return current;
+    }
+
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
@@ -1329,6 +1610,243 @@ public class PortalController {
         String shortLabel,
         String seedKey
     ) {}
+
+    private record ProductOrgNode(String id, String name, String parentId) {}
+
+    private record ProductSalespersonAssignment(String salespersonId, String salespersonName, String orgId) {}
+
+    private record ProductHierarchyPlacement(
+        String businessOrgId,
+        String businessName,
+        String departmentOrgId,
+        String departmentName
+    ) {
+        private static ProductHierarchyPlacement empty() {
+            return new ProductHierarchyPlacement(null, null, null, null);
+        }
+
+        private boolean hasBusiness() {
+            return businessOrgId != null && !businessOrgId.isBlank();
+        }
+    }
+
+    private final class ProductPersonAccumulator {
+        private final String salespersonId;
+        private final String salespersonName;
+        private final String businessOrgId;
+        private final String businessName;
+        private final String departmentOrgId;
+        private final String departmentName;
+        private final Set<String> customerIds = new LinkedHashSet<>();
+        private BigDecimal amount = BigDecimal.ZERO;
+        private int orderCount = 0;
+        private String lastSoldAt;
+
+        private ProductPersonAccumulator(String salespersonId,
+                                         String salespersonName,
+                                         String businessOrgId,
+                                         String businessName,
+                                         String departmentOrgId,
+                                         String departmentName) {
+            this.salespersonId = salespersonId;
+            this.salespersonName = salespersonName;
+            this.businessOrgId = businessOrgId;
+            this.businessName = businessName;
+            this.departmentOrgId = departmentOrgId;
+            this.departmentName = departmentName;
+        }
+
+        private void mergeSale(String customerId,
+                               String customerName,
+                               int orderCount,
+                               BigDecimal amount,
+                               String lastSoldAt) {
+            String customerKey = hasText(customerId) ? customerId : customerName;
+            if (hasText(customerKey)) {
+                customerIds.add(customerKey);
+            }
+            this.orderCount += Math.max(orderCount, 0);
+            this.amount = this.amount.add(amount == null ? BigDecimal.ZERO : amount);
+            this.lastSoldAt = maxDate(this.lastSoldAt, lastSoldAt);
+        }
+
+        private String salespersonId() {
+            return salespersonId;
+        }
+
+        private String salespersonName() {
+            return salespersonName;
+        }
+
+        private String businessOrgId() {
+            return businessOrgId;
+        }
+
+        private String businessName() {
+            return businessName;
+        }
+
+        private String departmentOrgId() {
+            return departmentOrgId;
+        }
+
+        private String departmentName() {
+            return departmentName;
+        }
+
+        private Set<String> customerIds() {
+            return customerIds;
+        }
+
+        private int orderCount() {
+            return orderCount;
+        }
+
+        private BigDecimal amount() {
+            return amount;
+        }
+
+        private String lastSoldAt() {
+            return lastSoldAt;
+        }
+
+        private Map<String, Object> toRow() {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("salespersonId", salespersonId);
+            row.put("salespersonName", salespersonName);
+            row.put("departmentOrgId", departmentOrgId);
+            row.put("departmentName", departmentName);
+            row.put("businessOrgId", businessOrgId);
+            row.put("businessName", businessName);
+            row.put("customerCount", customerIds.size());
+            row.put("orderCount", orderCount);
+            row.put("amount", amount);
+            row.put("lastSoldAt", lastSoldAt);
+            return row;
+        }
+    }
+
+    private final class ProductDepartmentAccumulator {
+        private final String departmentOrgId;
+        private final String departmentName;
+        private final String businessOrgId;
+        private final String businessName;
+        private final Set<String> salespersonIds = new LinkedHashSet<>();
+        private final Set<String> customerIds = new LinkedHashSet<>();
+        private BigDecimal amount = BigDecimal.ZERO;
+        private int orderCount = 0;
+        private String lastSoldAt;
+
+        private ProductDepartmentAccumulator(String departmentOrgId,
+                                             String departmentName,
+                                             String businessOrgId,
+                                             String businessName) {
+            this.departmentOrgId = departmentOrgId;
+            this.departmentName = departmentName;
+            this.businessOrgId = businessOrgId;
+            this.businessName = businessName;
+        }
+
+        private void mergePerson(ProductPersonAccumulator person) {
+            if (hasText(person.salespersonId())) {
+                salespersonIds.add(person.salespersonId());
+            }
+            customerIds.addAll(person.customerIds());
+            orderCount += person.orderCount();
+            amount = amount.add(person.amount());
+            lastSoldAt = maxDate(lastSoldAt, person.lastSoldAt());
+        }
+
+        private String departmentOrgId() {
+            return departmentOrgId;
+        }
+
+        private String departmentName() {
+            return departmentName;
+        }
+
+        private String businessOrgId() {
+            return businessOrgId;
+        }
+
+        private String businessName() {
+            return businessName;
+        }
+
+        private Set<String> salespersonIds() {
+            return salespersonIds;
+        }
+
+        private Set<String> customerIds() {
+            return customerIds;
+        }
+
+        private int orderCount() {
+            return orderCount;
+        }
+
+        private BigDecimal amount() {
+            return amount;
+        }
+
+        private String lastSoldAt() {
+            return lastSoldAt;
+        }
+
+        private Map<String, Object> toRow() {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("departmentOrgId", departmentOrgId);
+            row.put("departmentName", departmentName);
+            row.put("businessOrgId", businessOrgId);
+            row.put("businessName", businessName);
+            row.put("salespersonCount", salespersonIds.size());
+            row.put("customerCount", customerIds.size());
+            row.put("orderCount", orderCount);
+            row.put("amount", amount);
+            row.put("lastSoldAt", lastSoldAt);
+            return row;
+        }
+    }
+
+    private final class ProductBusinessAccumulator {
+        private final String businessOrgId;
+        private final String businessName;
+        private final Set<String> departmentOrgIds = new LinkedHashSet<>();
+        private final Set<String> salespersonIds = new LinkedHashSet<>();
+        private final Set<String> customerIds = new LinkedHashSet<>();
+        private BigDecimal amount = BigDecimal.ZERO;
+        private int orderCount = 0;
+        private String lastSoldAt;
+
+        private ProductBusinessAccumulator(String businessOrgId, String businessName) {
+            this.businessOrgId = businessOrgId;
+            this.businessName = businessName;
+        }
+
+        private void mergeDepartment(ProductDepartmentAccumulator department) {
+            if (hasText(department.departmentOrgId())) {
+                departmentOrgIds.add(department.departmentOrgId());
+            }
+            salespersonIds.addAll(department.salespersonIds());
+            customerIds.addAll(department.customerIds());
+            orderCount += department.orderCount();
+            amount = amount.add(department.amount());
+            lastSoldAt = maxDate(lastSoldAt, department.lastSoldAt());
+        }
+
+        private Map<String, Object> toRow() {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("businessOrgId", businessOrgId);
+            row.put("businessName", businessName);
+            row.put("departmentCount", departmentOrgIds.size());
+            row.put("salespersonCount", salespersonIds.size());
+            row.put("customerCount", customerIds.size());
+            row.put("orderCount", orderCount);
+            row.put("amount", amount);
+            row.put("lastSoldAt", lastSoldAt);
+            return row;
+        }
+    }
 
     private record RefItem(String id, String name, String meta) {}
 }
