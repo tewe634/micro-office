@@ -99,29 +99,18 @@ public class DataScopeService {
             orgNodes,
             "仅本人负责或参与的销售数据"
         ));
-        if (leaderCandidate && salesHierarchyMember && user.getOrgId() != null) {
-            options.add(buildScopeOption(
-                PortalScope.DEPARTMENT,
-                user.getOrgId(),
-                orgNodes,
-                "当前部门及下级部门的销售数据"
-            ));
-        }
-        if (leaderCandidate && businessRootOrgId != null && Objects.equals(user.getOrgId(), businessRootOrgId)) {
-            options.add(buildScopeOption(
-                PortalScope.BUSINESS,
-                businessRootOrgId,
-                orgNodes,
-                "当前业务部范围内的销售数据"
-            ));
-        }
-        if (salesSystemOrgId != null && ((leaderCandidate && Objects.equals(user.getOrgId(), salesSystemOrgId)) || globalAdmin)) {
-            options.add(buildScopeOption(
-                PortalScope.SYSTEM,
-                salesSystemOrgId,
-                orgNodes,
-                "销售体系内全部销售数据"
-            ));
+
+        ScopeOption highestManagementScope = resolveHighestSalesManagementScope(
+            user.getOrgId(),
+            salesSystemOrgId,
+            businessRootOrgId,
+            orgNodes,
+            salesHierarchyMember,
+            leaderCandidate,
+            globalAdmin
+        );
+        if (highestManagementScope != null) {
+            options.add(highestManagementScope);
         }
 
         List<ScopeOption> distinctOptions = deduplicateOptions(options);
@@ -139,9 +128,7 @@ public class DataScopeService {
 
         List<String> scopeOrgIds = switch (activeScope.scope()) {
             case PERSONAL -> user.getOrgId() == null ? List.of() : List.of(user.getOrgId());
-            case DEPARTMENT -> collectSubtreeOrgIds(user.getOrgId(), orgNodes);
-            case BUSINESS -> collectSubtreeOrgIds(businessRootOrgId, orgNodes);
-            case SYSTEM -> collectSubtreeOrgIds(salesSystemOrgId, orgNodes);
+            case DEPARTMENT, BUSINESS, SYSTEM -> collectSubtreeOrgIds(activeScope.orgId(), orgNodes);
         };
         List<String> scopeUserIds = activeScope.scope() == PortalScope.PERSONAL
             ? List.of(userId)
@@ -185,6 +172,43 @@ public class DataScopeService {
             }
         }
         return false;
+    }
+
+    private ScopeOption resolveHighestSalesManagementScope(String userOrgId,
+                                                           String salesSystemOrgId,
+                                                           String businessRootOrgId,
+                                                           Map<String, OrgNode> orgNodes,
+                                                           boolean salesHierarchyMember,
+                                                           boolean leaderCandidate,
+                                                           boolean globalAdmin) {
+        if (!leaderCandidate) {
+            return null;
+        }
+        if (salesSystemOrgId != null && (globalAdmin || (salesHierarchyMember && Objects.equals(userOrgId, salesSystemOrgId)))) {
+            return buildScopeOption(
+                PortalScope.SYSTEM,
+                salesSystemOrgId,
+                orgNodes,
+                "销售体系内全部销售数据"
+            );
+        }
+        if (salesHierarchyMember && businessRootOrgId != null && Objects.equals(userOrgId, businessRootOrgId)) {
+            return buildScopeOption(
+                PortalScope.BUSINESS,
+                businessRootOrgId,
+                orgNodes,
+                "当前业务部范围内的销售数据"
+            );
+        }
+        if (salesHierarchyMember && userOrgId != null) {
+            return buildScopeOption(
+                PortalScope.DEPARTMENT,
+                userOrgId,
+                orgNodes,
+                "当前部门及下级部门的销售数据"
+            );
+        }
+        return null;
     }
 
     private List<ScopeOption> deduplicateOptions(List<ScopeOption> options) {
