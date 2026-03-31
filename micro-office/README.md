@@ -68,13 +68,13 @@ docker compose up --build -d
 npm run smoke:api
 ```
 
-默认会登录 `http://127.0.0.1:8080/api`，使用当前本地演示栈默认管理员账号 `13305713391 / 123456`，并自动创建/清理临时数据，覆盖以下后端流转：
+默认会登录 `http://127.0.0.1:8080/api`，使用当前本地演示栈默认管理员账号 `13305713391 / 123456`，并自动创建/清理临时数据，覆盖以下当前后端流转：
 
 - auth（register/login）
 - org / positions / users
 - objects / products / portal
-- threads / nodes / comments / taskpool
 - admin permissions / user object types / position object types
+- admin sales-collab（meta / templates / org-bindings）
 
 如需覆盖其他地址或管理员账号，可设置环境变量：
 
@@ -114,12 +114,11 @@ npm run dev
 | 认证 | POST /api/auth/login, /register | 登录注册 |
 | 组织 | /api/orgs | 组织架构 CRUD |
 | 岗位 | /api/positions | 岗位管理 CRUD |
-| 外部对象 | /api/objects | 客户/供应商等 |
+| 用户 | /api/users | 用户资料、自助信息、权限可见范围内查询 |
+| 外部对象 | /api/objects | 客户 / 供应商等对象 CRUD |
 | 产品 | /api/products | 产品服务 CRUD |
-| 工作主帖 | /api/threads | 创建/查看工作 |
-| 节点 | /api/threads/:id/nodes, /api/nodes/:id/* | 节点 CRUD + 完成 + 回退 |
-| 评论 | /api/threads/:id/comments | 评论（含关键词触发） |
-| 任务池 | /api/taskpool | 查看 + 领取（Redis 分布式锁） |
-| 工作台 | /api/workbench?view=active\|done\|todo | 三视图 |
-| 打卡 | /api/clock | 上下班打卡 |
-| 管理 | /api/admin/modules, /templates | 模块配置 + 流程模板 |
+| 门户 | /api/portal/users/:id / objects/:id / products/:id | 用户 / 对象 / 产品门户 |
+| 管理权限 | /api/admin/permissions 等 | 角色菜单、用户菜单、对象类型配置 |
+| 销售协同配置 | /api/admin/sales-collab/* | 协同模板、规则、部门绑定 |
+
+> 注：旧版工作流相关接口（如 `/api/threads`、`/api/workbench`、`/api/taskpool`、`/api/clock`、`/api/admin/templates`）已在迁移 `V20__remove_workflow_and_unused_modules.sql` 中下线，不属于当前后端 API。

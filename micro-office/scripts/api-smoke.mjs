@@ -1,11 +1,6 @@
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-
 const BASE_URL = process.env.MICRO_OFFICE_BASE_URL ?? 'http://127.0.0.1:8080/api';
 const ADMIN_LOGIN = process.env.MICRO_OFFICE_ADMIN_LOGIN ?? '13305713391';
 const ADMIN_PASSWORD = process.env.MICRO_OFFICE_ADMIN_PASSWORD ?? '123456';
-const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 const RUN_ID = `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -41,25 +36,6 @@ function expectMembers(actual, expected, label) {
   assert(sameMembers(actual, expected), `${label} mismatch`, { actual, expected });
 }
 
-function composeExec(args) {
-  const result = spawnSync('docker', ['compose', ...args], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
-
-  if (result.status !== 0) {
-    fail(`docker compose ${args.join(' ')} failed`, {
-      stdout: result.stdout,
-      stderr: result.stderr,
-    });
-  }
-
-  return result.stdout;
-}
-
-function quoteSql(value) {
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
 
 async function api(method, route, { token, query, body } = {}) {
   const url = new URL(route.replace(/^\//, ''), BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`);
@@ -107,33 +83,9 @@ async function login(loginValue, password) {
   });
 }
 
-async function cleanupWorkflowArtifacts(threadIds) {
-  if (!threadIds.length) return;
-  const inClause = threadIds.map(quoteSql).join(', ');
-  const sql = [
-    `DELETE FROM comment WHERE thread_id IN (${inClause});`,
-    `DELETE FROM work_node WHERE thread_id IN (${inClause});`,
-    `DELETE FROM work_thread WHERE id IN (${inClause});`,
-  ].join(' ');
-
-  composeExec([
-    'exec',
-    '-T',
-    'postgres',
-    'psql',
-    '-U',
-    'postgres',
-    '-d',
-    'micro_office',
-    '-v',
-    'ON_ERROR_STOP=1',
-    '-c',
-    sql,
-  ]);
-}
-
 const cleanupState = {
-  threadIds: [],
+  salesCollabTemplateIds: [],
+  salesCollabBindingOrgIds: [],
   objectIds: [],
   productIds: [],
   userIds: [],
@@ -427,135 +379,83 @@ async function main() {
   const positionObjectTypesAfterSave = await api('GET', '/admin/position-object-types', { token: adminToken });
   expectMembers(positionObjectTypesAfterSave[createdPosition.id], ['CUSTOMER'], 'position object types for temp position');
 
-  log('checking thread/node/comment/taskpool endpoints');
-  const createdThread = await api('POST', '/threads', {
+  log('checking sales-collab admin endpoints');
+  const salesCollabMeta = await api('GET', '/admin/sales-collab/meta', { token: adminToken });
+  assert(Array.isArray(salesCollabMeta.groups) && salesCollabMeta.groups.length > 0, 'sales collab meta missing groups', salesCollabMeta);
+  assert(Array.isArray(salesCollabMeta.sourceTypes) && salesCollabMeta.sourceTypes.length > 0, 'sales collab meta missing source types', salesCollabMeta);
+  assert(Array.isArray(salesCollabMeta.scopeTypes) && salesCollabMeta.scopeTypes.length > 0, 'sales collab meta missing scope types', salesCollabMeta);
+
+  const salesCollabTemplates = await api('GET', '/admin/sales-collab/templates', { token: adminToken });
+  assert(Array.isArray(salesCollabTemplates), 'sales collab template list missing', salesCollabTemplates);
+
+  const createdSalesCollabTemplate = await api('POST', '/admin/sales-collab/templates', {
     token: adminToken,
     body: {
-      title: `${RUN_ID} thread`,
-      content: 'created by api smoke test',
-      objectId: createdObject.id,
-      productId: createdProduct.id,
-      assignToUserId: adminUserId,
-      firstNodeName: 'Smoke start',
+      name: `${RUN_ID} sales collab template`,
+      enabled: true,
+      remark: 'created by api smoke test',
     },
   });
-  cleanupState.threadIds.push(createdThread.id);
+  cleanupState.salesCollabTemplateIds.push(createdSalesCollabTemplate.id);
+  assert(createdSalesCollabTemplate?.id, 'sales collab template create did not return id', createdSalesCollabTemplate);
 
-  const threadListActive = await api('GET', '/threads', {
-    token: adminToken,
-    query: { status: 'ACTIVE', objectId: createdObject.id },
-  });
-  assert(threadListActive.some((thread) => thread.id === createdThread.id), 'created thread missing from active list');
+  const fetchedSalesCollabTemplate = await api('GET', `/admin/sales-collab/templates/${createdSalesCollabTemplate.id}`, { token: adminToken });
+  assert(fetchedSalesCollabTemplate?.id === createdSalesCollabTemplate.id, 'sales collab template detail mismatch', fetchedSalesCollabTemplate);
+  assert(Array.isArray(fetchedSalesCollabTemplate?.groups), 'sales collab template detail missing groups', fetchedSalesCollabTemplate);
 
-  await api('PUT', `/threads/${createdThread.id}`, {
+  const updatedSalesCollabTemplateName = `${RUN_ID} sales collab template updated`;
+  await api('PUT', `/admin/sales-collab/templates/${createdSalesCollabTemplate.id}`, {
     token: adminToken,
     body: {
-      title: `${RUN_ID} thread updated`,
-      content: 'updated by api smoke test',
-      objectId: createdObject.id,
-      productId: createdProduct.id,
+      name: updatedSalesCollabTemplateName,
+      enabled: false,
+      remark: 'updated by api smoke test',
     },
   });
+  const updatedSalesCollabTemplate = await api('GET', `/admin/sales-collab/templates/${createdSalesCollabTemplate.id}`, { token: adminToken });
+  assert(updatedSalesCollabTemplate?.name === updatedSalesCollabTemplateName, 'sales collab template update not visible', updatedSalesCollabTemplate);
+  assert(updatedSalesCollabTemplate?.enabled === false, 'sales collab template enabled flag did not update', updatedSalesCollabTemplate);
 
-  const threadDetail = await api('GET', `/threads/${createdThread.id}`, { token: adminToken });
-  assert(threadDetail?.title === `${RUN_ID} thread updated`, 'thread update not visible', threadDetail);
-  assert(Array.isArray(threadDetail.nodes) && threadDetail.nodes.length >= 1, 'thread detail missing initial node', threadDetail);
-  const initialNodeId = threadDetail.nodes[0].id;
-
-  const nodeList = await api('GET', `/threads/${createdThread.id}/nodes`, { token: adminToken });
-  assert(Array.isArray(nodeList) && nodeList.length >= 1, 'thread node list missing initial node', nodeList);
-  const initialNodeDetail = await api('GET', `/nodes/${initialNodeId}`, { token: adminToken });
-  assert(initialNodeDetail?.node?.id === initialNodeId, 'node detail mismatch', initialNodeDetail);
-
-  const createdComment = await api('POST', `/threads/${createdThread.id}/comments`, {
-    token: adminToken,
-    body: { content: 'smoke comment' },
-  });
-  const listedComments = await api('GET', `/threads/${createdThread.id}/comments`, { token: adminToken });
-  assert(listedComments.some((comment) => comment.id === createdComment.id), 'comment missing after create');
-  await api('PUT', `/comments/${createdComment.id}`, {
-    token: adminToken,
-    body: { content: 'smoke comment updated' },
-  });
-  await api('DELETE', `/comments/${createdComment.id}`, { token: adminToken });
-  const commentsAfterDelete = await api('GET', `/threads/${createdThread.id}/comments`, { token: adminToken });
-  assert(!commentsAfterDelete.some((comment) => comment.id === createdComment.id), 'comment still present after delete');
-
-  await api('POST', `/nodes/${initialNodeId}/messages`, {
-    token: adminToken,
-    body: { content: 'smoke node message' },
-  });
-  const nodeMessages = await api('GET', `/nodes/${initialNodeId}/messages`, { token: adminToken });
-  assert(nodeMessages.some((message) => message.content === 'smoke node message'), 'node message missing after create', nodeMessages);
-
-  await api('POST', `/nodes/${initialNodeId}/references`, {
+  const copiedSalesCollabTemplate = await api('POST', `/admin/sales-collab/templates/${createdSalesCollabTemplate.id}/copy`, {
     token: adminToken,
     body: {
-      refType: 'PRODUCT',
-      refId: createdProduct.id,
-      refLabel: 'Smoke product reference',
+      name: `${RUN_ID} sales collab template copy`,
     },
   });
-  const nodeDetailWithReference = await api('GET', `/nodes/${initialNodeId}`, { token: adminToken });
-  const addedReference = (nodeDetailWithReference.references ?? []).find((ref) => ref.ref_id === createdProduct.id || ref.refId === createdProduct.id);
-  assert(addedReference, 'node reference missing after create', nodeDetailWithReference.references);
-  await api('DELETE', `/nodes/${initialNodeId}/references/${addedReference.id}`, { token: adminToken });
-  const nodeDetailWithoutReference = await api('GET', `/nodes/${initialNodeId}`, { token: adminToken });
-  assert(!(nodeDetailWithoutReference.references ?? []).some((ref) => ref.id === addedReference.id), 'node reference still present after delete');
+  cleanupState.salesCollabTemplateIds.push(copiedSalesCollabTemplate.id);
+  assert(copiedSalesCollabTemplate?.id && copiedSalesCollabTemplate?.id !== createdSalesCollabTemplate.id, 'sales collab template copy failed', copiedSalesCollabTemplate);
 
-  const pooledNode = await api('PUT', `/nodes/${initialNodeId}/complete`, {
+  const salesCollabOrgBindings = await api('GET', '/admin/sales-collab/org-bindings', { token: adminToken });
+  assert(Array.isArray(salesCollabOrgBindings), 'sales collab org bindings missing list', salesCollabOrgBindings);
+
+  const initialOrgBinding = await api('GET', `/admin/sales-collab/org-binding/${createdOrg.id}`, { token: adminToken });
+  assert(initialOrgBinding?.orgId === createdOrg.id, 'sales collab org binding detail mismatch', initialOrgBinding);
+
+  cleanupState.salesCollabBindingOrgIds.push(createdOrg.id);
+  await api('PUT', `/admin/sales-collab/org-binding/${createdOrg.id}`, {
     token: adminToken,
     body: {
-      nextAction: 'POOL',
-      poolPositionId: createdPosition.id,
-      customNodeName: 'Smoke pooled',
+      orgId: createdOrg.id,
+      templateId: createdSalesCollabTemplate.id,
+      enabled: true,
+      remark: 'created by api smoke test',
     },
   });
-  assert(pooledNode?.poolPositionId === createdPosition.id, 'pooled node not created as expected', pooledNode);
-  const pooledNodeId = pooledNode.id;
+  const savedOrgBinding = await api('GET', `/admin/sales-collab/org-binding/${createdOrg.id}`, { token: adminToken });
+  assert(savedOrgBinding?.templateId === createdSalesCollabTemplate.id, 'sales collab org binding save did not stick', savedOrgBinding);
 
-  const taskPoolBeforeClaim = await api('GET', '/taskpool', {
-    token: adminToken,
-    query: { positionId: createdPosition.id },
-  });
-  assert(taskPoolBeforeClaim.some((node) => node.id === pooledNodeId), 'pooled node missing from task pool');
-
-  await api('POST', `/taskpool/${pooledNodeId}/claim`, { token: adminToken });
-  await api('PUT', `/nodes/${pooledNodeId}/transfer`, {
-    token: adminToken,
-    body: { targetUserId: crudUserId },
-  });
-  const transferredNode = await api('GET', `/nodes/${pooledNodeId}`, { token: adminToken });
-  assert(transferredNode?.node?.ownerId === crudUserId, 'node transfer did not change owner', transferredNode);
-  await api('PUT', `/nodes/${pooledNodeId}/assign`, {
-    token: adminToken,
-    body: { assigneeId: adminUserId },
-  });
-  const reassignedNode = await api('GET', `/nodes/${pooledNodeId}`, { token: adminToken });
-  assert(reassignedNode?.node?.ownerId === adminUserId, 'node assign did not change owner', reassignedNode);
-  await api('PUT', `/nodes/${pooledNodeId}/cancel`, { token: adminToken });
-  const cancelledNode = await api('GET', `/nodes/${pooledNodeId}`, { token: adminToken });
-  assert(cancelledNode?.node?.status === 'CANCELLED', 'node cancel did not stick', cancelledNode);
-
-  const manualNode = await api('POST', `/threads/${createdThread.id}/nodes`, {
+  await api('PUT', `/admin/sales-collab/org-binding/${createdOrg.id}`, {
     token: adminToken,
     body: {
-      name: 'Smoke manual node',
-      ownerId: adminUserId,
-      prevNodeId: pooledNodeId,
+      orgId: createdOrg.id,
+      templateId: null,
+      enabled: true,
+      remark: null,
     },
   });
-  await api('PUT', `/nodes/${manualNode.id}/complete`, {
-    token: adminToken,
-    body: { nextAction: 'COMPLETE_TASK' },
-  });
-  const completedThread = await api('GET', `/threads/${createdThread.id}`, { token: adminToken });
-  assert(completedThread?.status === 'COMPLETED', 'thread did not reach completed status', completedThread);
-  const completedThreadList = await api('GET', '/threads', {
-    token: adminToken,
-    query: { status: 'COMPLETED' },
-  });
-  assert(completedThreadList.some((thread) => thread.id === createdThread.id), 'completed thread missing from completed list');
+  const clearedOrgBinding = await api('GET', `/admin/sales-collab/org-binding/${createdOrg.id}`, { token: adminToken });
+  assert(!clearedOrgBinding?.templateId, 'sales collab org binding clear did not stick', clearedOrgBinding);
+  cleanupState.salesCollabBindingOrgIds = cleanupState.salesCollabBindingOrgIds.filter((orgId) => orgId !== createdOrg.id);
 
   log('all smoke checks passed');
 }
@@ -597,14 +497,30 @@ async function run() {
     }
 
     try {
-      await cleanupWorkflowArtifacts(cleanupState.threadIds);
-    } catch (error) {
-      cleanupErrors.push(`cleanup workflow artifacts: ${error.message}`);
-    }
-
-    try {
-      if (cleanupState.objectIds.length || cleanupState.productIds.length || cleanupState.userIds.length || cleanupState.positionIds.length || cleanupState.orgIds.length) {
+      if (
+        cleanupState.salesCollabBindingOrgIds.length ||
+        cleanupState.salesCollabTemplateIds.length ||
+        cleanupState.objectIds.length ||
+        cleanupState.productIds.length ||
+        cleanupState.userIds.length ||
+        cleanupState.positionIds.length ||
+        cleanupState.orgIds.length
+      ) {
         const current = await login(ADMIN_LOGIN, ADMIN_PASSWORD);
+        for (const orgId of [...cleanupState.salesCollabBindingOrgIds].reverse()) {
+          await api('PUT', `/admin/sales-collab/org-binding/${orgId}`, {
+            token: current.token,
+            body: {
+              orgId,
+              templateId: null,
+              enabled: true,
+              remark: null,
+            },
+          });
+        }
+        for (const templateId of [...cleanupState.salesCollabTemplateIds].reverse()) {
+          await api('DELETE', `/admin/sales-collab/templates/${templateId}`, { token: current.token });
+        }
         for (const objectId of [...cleanupState.objectIds].reverse()) {
           await api('DELETE', `/objects/${objectId}`, { token: current.token });
         }
