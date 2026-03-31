@@ -7,11 +7,11 @@ import java.time.OffsetDateTime;
 @Data
 @TableName("position")
 public class Position {
-    @TableId(type = IdType.AUTO)
-    private Integer id;
+    @TableId(type = IdType.ASSIGN_UUID)
+    private String id;
     private String name;
     private String code;
-    private Integer parentId;
+    private String parentId;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

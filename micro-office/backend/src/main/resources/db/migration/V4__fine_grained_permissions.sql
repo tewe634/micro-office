@@ -2,23 +2,23 @@
 
 -- 用户个人菜单权限覆盖（为空则走角色默认）
 CREATE TABLE user_menu_permission (
-    id       SERIAL PRIMARY KEY,
-    user_id  INT NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
+    id       VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id  VARCHAR(36) NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
     menu_key VARCHAR(50) NOT NULL,
     UNIQUE(user_id, menu_key)
 );
 
 -- 岗位可见的外部对象类型
 CREATE TABLE position_object_type (
-    id          SERIAL PRIMARY KEY,
-    position_id INT NOT NULL REFERENCES position(id) ON DELETE CASCADE,
+    id          VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    position_id VARCHAR(36) NOT NULL REFERENCES position(id) ON DELETE CASCADE,
     object_type VARCHAR(30) NOT NULL,
     UNIQUE(position_id, object_type)
 );
 
 -- 外部对象归属（关联到组织和负责人）
-ALTER TABLE external_object ADD COLUMN org_id INT REFERENCES organization(id);
-ALTER TABLE external_object ADD COLUMN owner_id INT REFERENCES sys_user(id);
+ALTER TABLE external_object ADD COLUMN org_id VARCHAR(36) REFERENCES organization(id);
+ALTER TABLE external_object ADD COLUMN owner_id VARCHAR(36) REFERENCES sys_user(id);
 
 -- 初始化岗位-对象类型权限
 -- 销售岗位看客户

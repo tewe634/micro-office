@@ -1,7 +1,7 @@
 -- V6: 个人门户 - 重大事件/奖励记录
 CREATE TABLE user_achievement (
-    id          SERIAL PRIMARY KEY,
-    user_id     INT NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
+    id          VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     VARCHAR(36) NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
     title       VARCHAR(200) NOT NULL,
     description TEXT,
     event_date  DATE,

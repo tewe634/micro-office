@@ -1,6 +1,6 @@
 -- V3: 角色菜单权限配置表
 CREATE TABLE role_menu_permission (
-    id       SERIAL PRIMARY KEY,
+    id       VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
     role     VARCHAR(20) NOT NULL,
     menu_key VARCHAR(50) NOT NULL,
     UNIQUE(role, menu_key)

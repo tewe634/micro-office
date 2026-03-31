@@ -1,0 +1,2 @@
+ALTER TABLE external_object ADD COLUMN IF NOT EXISTS account_no VARCHAR(100);
+ALTER TABLE external_object ADD COLUMN IF NOT EXISTS subject_code VARCHAR(50);

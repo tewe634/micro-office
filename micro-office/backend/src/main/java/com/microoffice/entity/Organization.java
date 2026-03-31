@@ -7,10 +7,10 @@ import java.time.OffsetDateTime;
 @Data
 @TableName("organization")
 public class Organization {
-    @TableId(type = IdType.AUTO)
-    private Integer id;
+    @TableId(type = IdType.ASSIGN_UUID)
+    private String id;
     private String name;
-    private Integer parentId;
+    private String parentId;
     private Integer sortOrder;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

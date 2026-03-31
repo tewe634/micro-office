@@ -2,6 +2,13 @@
   "name": "micro-office-tools",
   "private": true,
   "scripts": {
-    "smoke:api": "node scripts/api-smoke.mjs"
+    "smoke:api": "node scripts/api-smoke.mjs",
+    "import:employees": "node import_employees.js",
+    "import:customers": "node import_customers.js",
+    "import:banks": "node import_banks.js"
+  },
+  "dependencies": {
+    "pg": "^8.20.0",
+    "xlsx": "^0.18.5"
   }
 }
