@@ -13,6 +13,19 @@ const allTypeOptions = [
   { value: 'OTHER', label: '其他' },
 ];
 
+const customerRoleOptions = [
+  { value: '最终用户', label: '最终用户' },
+  { value: '总包商', label: '总包商' },
+  { value: '制造商', label: '制造商' },
+  { value: '分销商', label: '分销商' },
+];
+
+const customerScaleOptions = [
+  { value: '大客户', label: '大客户（业绩>1000万）' },
+  { value: '中型客户', label: '中型客户（业绩>500万）' },
+  { value: '小客户', label: '小客户（业绩<500万）' },
+];
+
 type OrgNode = {
   id: string;
   name: string;
@@ -29,6 +42,8 @@ type DepartmentNode = {
 type SearchFilters = {
   deptId?: string;
   name?: string;
+  customerRole?: string;
+  customerScale?: string;
 };
 
 function ObjectTable({
@@ -78,6 +93,8 @@ function ObjectTable({
       type,
       deptId: filters.deptId || undefined,
       name: filters.name?.trim() || undefined,
+      customerRole: isCustomerType ? filters.customerRole || undefined : undefined,
+      customerScale: isCustomerType ? filters.customerScale || undefined : undefined,
     });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
@@ -96,6 +113,8 @@ function ObjectTable({
     const nextFilters = {
       deptId: values.deptId || undefined,
       name: values.name?.trim() || undefined,
+      customerRole: isCustomerType ? values.customerRole || undefined : undefined,
+      customerScale: isCustomerType ? values.customerScale || undefined : undefined,
     };
     setActiveFilters(nextFilters);
     await load(1, size, nextFilters);
@@ -159,6 +178,8 @@ function ObjectTable({
       ownerId: values.ownerId ?? null,
       remark: values.remark ?? null,
       industry: isCustomerType ? values.industry ?? null : null,
+      customerRole: isCustomerType ? values.customerRole ?? null : null,
+      customerScale: isCustomerType ? values.customerScale ?? null : null,
     };
     if (edit) {
       await objectApi.update(edit.id, payload);
@@ -229,7 +250,13 @@ function ObjectTable({
     ];
 
     if (isCustomerType) {
-      baseColumns.splice(4, 0, { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true });
+      baseColumns.splice(
+        4,
+        0,
+        { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
+        { title: '角色', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
+        { title: '规模', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
+      );
     }
 
     baseColumns.push({
@@ -271,6 +298,28 @@ function ObjectTable({
             <Form.Item name="name" label="名称">
               <Input allowClear placeholder="请输入名称" style={{ width: 220 }} />
             </Form.Item>
+            {isCustomerType ? (
+              <>
+                <Form.Item name="customerRole" label="角色">
+                  <Select
+                    allowClear
+                    optionFilterProp="label"
+                    placeholder="请选择角色"
+                    style={{ width: 180 }}
+                    options={customerRoleOptions}
+                  />
+                </Form.Item>
+                <Form.Item name="customerScale" label="规模">
+                  <Select
+                    allowClear
+                    optionFilterProp="label"
+                    placeholder="请选择规模"
+                    style={{ width: 220 }}
+                    options={customerScaleOptions}
+                  />
+                </Form.Item>
+              </>
+            ) : null}
             <Form.Item>
               <Button type="primary" onClick={onSearch}>搜索</Button>
             </Form.Item>
@@ -301,7 +350,7 @@ function ObjectTable({
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: 1300, y: 'calc(100dvh - 495px)' }}
+              scroll={{ x: 1560, y: 'calc(100dvh - 495px)' }}
               columns={columns}
             />
           </div>
@@ -359,9 +408,35 @@ function ObjectTable({
               <Form.Item name="address" label="地址"><Input /></Form.Item>
             </Col>
             {isCustomerType ? (
-              <Col xs={24} sm={12}>
-                <Form.Item name="industry" label="行业"><Input /></Form.Item>
-              </Col>
+              <>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="industry" label="行业"><Input /></Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="customerRole" label="角色">
+                    <Select
+                      allowClear
+                      optionFilterProp="label"
+                      placeholder="请选择角色"
+                      options={customerRoleOptions}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="customerScale"
+                    label="规模"
+                    extra="大客户：业绩>1000万；中型客户：业绩>500万；小客户：业绩<500万"
+                  >
+                    <Select
+                      allowClear
+                      optionFilterProp="label"
+                      placeholder="请选择规模"
+                      options={customerScaleOptions}
+                    />
+                  </Form.Item>
+                </Col>
+              </>
             ) : null}
             <Col xs={24} sm={12}>
               <Form.Item name="orgId" label="所属组织">

@@ -260,6 +260,8 @@ async function main() {
       address: 'Smoke Street',
       remark: 'created by api smoke test',
       industry: '制造业',
+      customerRole: '制造商',
+      customerScale: '中型客户',
       ownerId: adminUserId,
     },
   });
@@ -280,10 +282,14 @@ async function main() {
       name: `${RUN_ID} customer updated`,
       remark: 'updated by api smoke test',
       industry: '工业',
+      customerRole: '总包商',
+      customerScale: '大客户',
     },
   });
   const fetchedObject = await api('GET', `/objects/${createdObject.id}`, { token: adminToken });
   assert(fetchedObject?.name === `${RUN_ID} customer updated`, 'object update not visible', fetchedObject);
+  assert(fetchedObject?.customerRole === '总包商', 'object customerRole update not visible', fetchedObject);
+  assert(fetchedObject?.customerScale === '大客户', 'object customerScale update not visible', fetchedObject);
 
   log('checking product endpoints');
   const productListBefore = await api('GET', '/products', {
@@ -327,6 +333,8 @@ async function main() {
   assert(userPortal?.header?.id === crudUserId, 'user portal header mismatch', userPortal);
   const objectPortal = await api('GET', `/portal/objects/${createdObject.id}`, { token: adminToken });
   assert(objectPortal?.header?.id === createdObject.id, 'object portal header mismatch', objectPortal);
+  assert(objectPortal?.header?.customerRole === '总包商', 'object portal header missing customerRole', objectPortal);
+  assert(objectPortal?.header?.customerScale === '大客户', 'object portal header missing customerScale', objectPortal);
   const productPortal = await api('GET', `/portal/products/${createdProduct.id}`, { token: adminToken });
   assert(productPortal?.header?.id === createdProduct.id, 'product portal header mismatch', productPortal);
 

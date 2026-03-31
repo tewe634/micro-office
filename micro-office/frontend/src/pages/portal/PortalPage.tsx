@@ -796,6 +796,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           <Tag color="blue">{formatObjectType(header.type)}</Tag>
           {!isCustomerObjectPortal && customerPerspectiveLabel ? <Tag color="cyan">{customerPerspectiveLabel}</Tag> : null}
           {header.industry ? <Tag color="geekblue">{header.industry}</Tag> : null}
+          {header.customerRole ? <Tag color="purple">{header.customerRole}</Tag> : null}
+          {header.customerScale ? <Tag color="gold">{header.customerScale}</Tag> : null}
           <Tag color="processing">{header.year} 门户</Tag>
         </>
       );
@@ -826,6 +828,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       if (isCustomerObjectPortal) {
         return [
           ['对象类型', formatObjectType(header.type)],
+          ['客户角色', header.customerRole],
+          ['客户规模', header.customerScale],
           ['联系人', header.contact],
           ['联系电话', header.phone],
           ['所属组织', header.orgName],

@@ -35,6 +35,17 @@ public class ObjectController {
         "业务三部",
         "产品支持体系"
     );
+    private static final Set<String> CUSTOMER_ROLE_OPTIONS = Set.of(
+        "最终用户",
+        "总包商",
+        "制造商",
+        "分销商"
+    );
+    private static final Set<String> CUSTOMER_SCALE_OPTIONS = Set.of(
+        "大客户",
+        "中型客户",
+        "小客户"
+    );
 
     private final ExternalObjectService service;
     private final SysUserMapper userMapper;
@@ -105,6 +116,8 @@ public class ObjectController {
         obj.setAccountNo(trimToNull(obj.getAccountNo()));
         obj.setSubjectCode(trimToNull(obj.getSubjectCode()));
         obj.setIndustry(trimToNull(obj.getIndustry()));
+        obj.setCustomerRole(trimToNull(obj.getCustomerRole()));
+        obj.setCustomerScale(trimToNull(obj.getCustomerScale()));
         obj.setOrgId(trimToNull(obj.getOrgId()));
         obj.setDeptId(trimToNull(obj.getDeptId()));
         obj.setOwnerId(trimToNull(obj.getOwnerId()));
@@ -114,6 +127,13 @@ public class ObjectController {
         }
         if (obj.getName() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "对象名称不能为空");
+        }
+        if (obj.getType() == ObjectType.CUSTOMER) {
+            validateCustomerRole(obj.getCustomerRole());
+            validateCustomerScale(obj.getCustomerScale());
+        } else {
+            obj.setCustomerRole(null);
+            obj.setCustomerScale(null);
         }
 
         normalizeObjectOrganization(obj, currentUser);
@@ -295,6 +315,20 @@ public class ObjectController {
         if (body.containsKey("deptId")) target.setDeptId(asString(body.get("deptId")));
         if (body.containsKey("ownerId")) target.setOwnerId(asString(body.get("ownerId")));
         if (body.containsKey("industry")) target.setIndustry(asString(body.get("industry")));
+        if (body.containsKey("customerRole")) target.setCustomerRole(asString(body.get("customerRole")));
+        if (body.containsKey("customerScale")) target.setCustomerScale(asString(body.get("customerScale")));
+    }
+
+    private void validateCustomerRole(String customerRole) {
+        if (customerRole != null && !CUSTOMER_ROLE_OPTIONS.contains(customerRole)) {
+            throw badRequest("客户角色仅支持：最终用户、总包商、制造商、分销商");
+        }
+    }
+
+    private void validateCustomerScale(String customerScale) {
+        if (customerScale != null && !CUSTOMER_SCALE_OPTIONS.contains(customerScale)) {
+            throw badRequest("客户规模仅支持：大客户、中型客户、小客户");
+        }
     }
 
     private String asString(Object value) {
@@ -326,9 +360,11 @@ public class ObjectController {
                                                   @RequestParam(required = false) String orgId,
                                                   @RequestParam(required = false) String deptId,
                                                   @RequestParam(required = false) String name,
+                                                  @RequestParam(required = false) String customerRole,
+                                                  @RequestParam(required = false) String customerScale,
                                                   Authentication auth) {
         RequestAccessContext ctx = buildRequestContext(auth);
-        List<ExternalObject> all = service.list(type, orgId, deptId, name);
+        List<ExternalObject> all = service.list(type, orgId, deptId, name, customerRole, customerScale);
         return ApiResponse.ok(filterAccessibleObjects(all, ctx));
     }
 
@@ -339,9 +375,11 @@ public class ObjectController {
                                                           @RequestParam(required = false) String orgId,
                                                           @RequestParam(required = false) String deptId,
                                                           @RequestParam(required = false) String name,
+                                                          @RequestParam(required = false) String customerRole,
+                                                          @RequestParam(required = false) String customerScale,
                                                           Authentication auth) {
         RequestAccessContext ctx = buildRequestContext(auth);
-        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId, name), ctx);
+        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId, name, customerRole, customerScale), ctx);
         long total = all.size();
         int fromIndex = (int) Math.max(0, (current - 1) * size);
         int toIndex = (int) Math.min(total, fromIndex + size);

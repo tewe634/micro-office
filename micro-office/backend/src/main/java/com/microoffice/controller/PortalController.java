@@ -1159,6 +1159,8 @@ public class PortalController {
         header.put("address", object.getAddress());
         header.put("remark", object.getRemark());
         header.put("industry", object.getIndustry());
+        header.put("customerRole", object.getCustomerRole());
+        header.put("customerScale", object.getCustomerScale());
         header.put("ownerId", object.getOwnerId());
         header.put("orgName", lookupName("SELECT name FROM organization WHERE id = ?", object.getOrgId()));
         header.put("deptName", lookupName("SELECT name FROM organization WHERE id = ?", object.getDeptId()));

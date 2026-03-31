@@ -22,6 +22,8 @@ public class ExternalObject {
     private String deptId;
     private String ownerId;
     private String industry;
+    private String customerRole;
+    private String customerScale;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

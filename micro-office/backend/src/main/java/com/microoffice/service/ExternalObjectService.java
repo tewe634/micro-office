@@ -16,12 +16,19 @@ public class ExternalObjectService {
     private final ExternalObjectMapper mapper;
     private final JdbcTemplate jdbc;
 
-    public List<ExternalObject> list(ObjectType type, String orgId, String deptId, String name) {
+    public List<ExternalObject> list(ObjectType type,
+                                     String orgId,
+                                     String deptId,
+                                     String name,
+                                     String customerRole,
+                                     String customerScale) {
         LambdaQueryWrapper<ExternalObject> q = new LambdaQueryWrapper<>();
         if (type != null) q.eq(ExternalObject::getType, type);
         if (orgId != null) q.eq(ExternalObject::getOrgId, orgId);
         if (deptId != null) q.eq(ExternalObject::getDeptId, deptId);
         if (name != null && !name.isBlank()) q.like(ExternalObject::getName, name.trim());
+        if (customerRole != null && !customerRole.isBlank()) q.eq(ExternalObject::getCustomerRole, customerRole.trim());
+        if (customerScale != null && !customerScale.isBlank()) q.eq(ExternalObject::getCustomerScale, customerScale.trim());
         q.orderByDesc(ExternalObject::getUpdatedAt)
             .orderByDesc(ExternalObject::getCreatedAt)
             .orderByDesc(ExternalObject::getId);
@@ -44,7 +51,7 @@ public class ExternalObjectService {
             "UPDATE external_object SET " +
                 "type = ?::object_type, " +
                 "name = ?, contact = ?, phone = ?, address = ?, remark = ?, " +
-                "account_no = ?, subject_code = ?, org_id = ?, dept_id = ?, owner_id = ?, industry = ?, updated_at = NOW() " +
+                "account_no = ?, subject_code = ?, org_id = ?, dept_id = ?, owner_id = ?, industry = ?, customer_role = ?, customer_scale = ?, updated_at = NOW() " +
             "WHERE id = ?",
             obj.getType() == null ? null : obj.getType().name(),
             obj.getName(),
@@ -58,6 +65,8 @@ public class ExternalObjectService {
             obj.getDeptId(),
             obj.getOwnerId(),
             obj.getIndustry(),
+            obj.getCustomerRole(),
+            obj.getCustomerScale(),
             obj.getId()
         );
     }
@@ -69,6 +78,8 @@ public class ExternalObjectService {
     private void sanitizeByType(ExternalObject obj) {
         if (obj.getType() != ObjectType.CUSTOMER) {
             obj.setIndustry(null);
+            obj.setCustomerRole(null);
+            obj.setCustomerScale(null);
         }
     }
 }
