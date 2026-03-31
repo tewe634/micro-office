@@ -392,6 +392,11 @@ async function main() {
   assert(Array.isArray(salesCollabMeta.groups) && salesCollabMeta.groups.length > 0, 'sales collab meta missing groups', salesCollabMeta);
   assert(Array.isArray(salesCollabMeta.sourceTypes) && salesCollabMeta.sourceTypes.length > 0, 'sales collab meta missing source types', salesCollabMeta);
   assert(Array.isArray(salesCollabMeta.scopeTypes) && salesCollabMeta.scopeTypes.length > 0, 'sales collab meta missing scope types', salesCollabMeta);
+  const salesCollabGroupKeys = new Set((salesCollabMeta.groups || []).map((group) => group.groupKey));
+  assert(salesCollabGroupKeys.has('COMMERCIAL_ASSISTANT'), 'sales collab meta missing COMMERCIAL_ASSISTANT group', salesCollabMeta.groups);
+  assert(salesCollabGroupKeys.has('COMMERCIAL_BUSINESS'), 'sales collab meta missing COMMERCIAL_BUSINESS group', salesCollabMeta.groups);
+  assert(salesCollabGroupKeys.has('COMMERCIAL_FINANCE'), 'sales collab meta missing COMMERCIAL_FINANCE group', salesCollabMeta.groups);
+  assert(!salesCollabGroupKeys.has('COMMERCIAL_DOCS'), 'legacy COMMERCIAL_DOCS group should not remain in meta', salesCollabMeta.groups);
 
   const salesCollabTemplates = await api('GET', '/admin/sales-collab/templates', { token: adminToken });
   assert(Array.isArray(salesCollabTemplates), 'sales collab template list missing', salesCollabTemplates);
