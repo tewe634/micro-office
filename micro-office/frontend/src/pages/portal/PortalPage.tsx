@@ -95,11 +95,11 @@ const userPortalDetailMetaMap: Record<UserPortalDetailSection, { title: string; 
   },
   customers: {
     title: '关联客户详情',
-    description: '查看当前销售岗位关联客户与推进情况。',
+    description: '查看当前销售岗位关联客户列表，更多客户信息可跳转客户门户查看。',
   },
   products: {
     title: '主推产品详情',
-    description: '查看当前销售岗位主推产品与金额分布。',
+    description: '查看当前销售岗位主推产品列表，更多产品信息可跳转产品门户查看。',
   },
 };
 
@@ -754,6 +754,18 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     navigate(`/users/${id}/portal${buildUserPortalSearch()}`);
   };
 
+  const navigateToUserPortalDetail = (section: Exclude<UserPortalDetailSection, 'workflow'>) => {
+    if (!id) {
+      return;
+    }
+    const next = new URLSearchParams();
+    if (positionIdParam) {
+      next.set('positionId', positionIdParam);
+    }
+    const query = next.toString();
+    navigate(`/users/${id}/portal/details/${section}${query ? `?${query}` : ''}`);
+  };
+
   const handleWorkflowStatusCard = (filter: WorkflowFilterKey) => {
     const nextStatus = workflowStatusFilter === filter || filter === 'ALL' ? undefined : filter;
     updateQueryParams({
@@ -1336,7 +1348,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     <Card
       className="portal-section-card"
       title="客户"
-      extra={<Tag color="cyan">{formatMetricDisplay(customerPerformanceRows.length, '个')}</Tag>}
+      extra={(
+        <Space size={8}>
+          <Tag color="cyan">{formatMetricDisplay(customerPerformanceRows.length, '个')}</Tag>
+          <Button type="link" size="small" onClick={() => navigateToUserPortalDetail('customers')}>
+            查看详情
+          </Button>
+        </Space>
+      )}
     >
       {customerPerformanceRows.length ? (
         <div className="portal-home-info-list">
@@ -1344,12 +1363,11 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             <div className="portal-home-info-list__item" key={String(item.id || item.name)}>
               <div className="portal-home-info-list__main">
                 <div className="portal-home-info-list__title">{renderPortalLink('objects', item.id, item.name)}</div>
-                <div className="portal-home-info-list__meta">
-                  {buildHint([item.lastActiveAt ? `最近跟进 ${item.lastActiveAt}` : undefined, item.productCount ? `涉及 ${item.productCount} 个产品` : undefined]) || '暂无跟进信息'}
-                </div>
+                <div className="portal-home-info-list__meta">点击客户名称进入客户门户</div>
               </div>
               <div className="portal-home-info-list__side">
-                <div className="portal-home-info-list__value">{formatAmount(item.amount)}</div>
+                <div className="portal-home-info-list__value">{item.lastActiveAt || '-'}</div>
+                <div className="portal-home-info-list__subvalue">最近跟进</div>
               </div>
             </div>
           ))}
@@ -1364,7 +1382,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     <Card
       className="portal-section-card"
       title="产品"
-      extra={<Tag color="geekblue">{formatMetricDisplay(relatedProductsRows.length, '项')}</Tag>}
+      extra={(
+        <Space size={8}>
+          <Tag color="geekblue">{formatMetricDisplay(relatedProductsRows.length, '项')}</Tag>
+          <Button type="link" size="small" onClick={() => navigateToUserPortalDetail('products')}>
+            查看详情
+          </Button>
+        </Space>
+      )}
     >
       {relatedProductsRows.length ? (
         <div className="portal-home-info-list">
@@ -1372,10 +1397,11 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
             <div className="portal-home-info-list__item" key={String(item.id || item.name)}>
               <div className="portal-home-info-list__main">
                 <div className="portal-home-info-list__title">{renderPortalLink('products', item.id, item.name)}</div>
-                <div className="portal-home-info-list__meta">{item.code || '暂无编码信息'}</div>
+                <div className="portal-home-info-list__meta">点击产品名称进入产品门户</div>
               </div>
               <div className="portal-home-info-list__side">
-                <div className="portal-home-info-list__value">{formatAmount(item.amount)}</div>
+                <div className="portal-home-info-list__value">{item.code || '-'}</div>
+                <div className="portal-home-info-list__subvalue">产品编码</div>
               </div>
             </div>
           ))}
@@ -1424,7 +1450,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
   const renderUserSalesMockPanel = () => (
     <div className="portal-home-panel-stack">
-      <div className="portal-home-panel-note">销售信息 mock 展示当前业绩与排名、客户、产品三块列表。</div>
+      <div className="portal-home-panel-note">销售信息保留业绩概览，客户/产品列表仅展示基础信息；更多内容可跳转详情或对应门户查看。</div>
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={8}>
           {renderUserSalesOverviewCard()}
@@ -1617,41 +1643,46 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   );
 
   const renderUserCustomerDetail = () => (
-    <Card className="portal-section-card" title="关联客户">
+    <Card
+      className="portal-section-card"
+      title="关联客户"
+      extra={<Tag color="cyan">{formatMetricDisplay(customerPerformanceRows.length, '个')}</Tag>}
+    >
       <Table
         dataSource={customerPerformanceRows}
         rowKey={(record: any) => String(record.id || record.name)}
         pagination={false}
         size="small"
-        scroll={{ x: 760 }}
+        scroll={{ x: 620 }}
         columns={[
           {
             title: '客户',
             dataIndex: 'name',
             render: (_: unknown, record: any) => renderPortalLink('objects', record.id, record.name),
           },
+          { title: '最近跟进', dataIndex: 'lastActiveAt', width: 140 },
           {
-            title: '绩效金额',
-            dataIndex: 'amount',
-            width: 150,
-            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+            title: '详情',
+            width: 140,
+            render: (_: unknown, record: any) => renderPortalLink('objects', record.id, '查看客户门户'),
           },
-          { title: '涉及产品', dataIndex: 'productCount', width: 100 },
-          { title: '相关工作', dataIndex: 'workItemCount', width: 100 },
-          { title: '最近跟进', dataIndex: 'lastActiveAt', width: 120 },
         ]}
       />
     </Card>
   );
 
   const renderUserProductDetail = () => (
-    <Card className="portal-section-card" title="主推产品">
+    <Card
+      className="portal-section-card"
+      title="主推产品"
+      extra={<Tag color="geekblue">{formatMetricDisplay(relatedProductsRows.length, '项')}</Tag>}
+    >
       <Table
         dataSource={relatedProductsRows}
         rowKey={(record: any) => String(record.id || record.name)}
         pagination={false}
         size="small"
-        scroll={{ x: 680 }}
+        scroll={{ x: 620 }}
         columns={[
           {
             title: '产品',
@@ -1660,10 +1691,9 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           },
           { title: '编码', dataIndex: 'code', width: 180 },
           {
-            title: '金额',
-            dataIndex: 'amount',
-            width: 150,
-            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+            title: '详情',
+            width: 140,
+            render: (_: unknown, record: any) => renderPortalLink('products', record.id, '查看产品门户'),
           },
         ]}
       />
