@@ -8,6 +8,7 @@ import com.microoffice.service.MenuPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -248,11 +249,14 @@ public class UserController {
         return ApiResponse.ok(null);
     }
 
+    @Transactional
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable String id) {
         String currentUserId = (String) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         menuPermissionService.requireMenu(currentUserId, "/users");
+        jdbc.update("DELETE FROM auth_session WHERE user_id = ?", id);
         jdbc.update("DELETE FROM user_position WHERE user_id = ?", id);
+        jdbc.update("UPDATE external_object SET owner_id = NULL WHERE owner_id = ?", id);
         userMapper.deleteById(id);
         return ApiResponse.ok(null);
     }
