@@ -264,19 +264,32 @@ function ObjectTable({
       return [
         { title: '序号', key: 'index', width: 64, fixed: 'left' as const, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
         { title: '名称', dataIndex: 'name', width: 180, fixed: 'left' as const, ellipsis: true },
-        { title: '行业', dataIndex: 'industry', width: 110, ellipsis: true },
-        { title: '属性', dataIndex: 'customerRole', width: 110, ellipsis: true, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
-        { title: '类型', dataIndex: 'customerScale', width: 130, ellipsis: true, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
-        { title: '上级客户', dataIndex: 'parentObjectId', width: 160, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
-        { title: '健康度', dataIndex: 'customerHealth', width: 110, ellipsis: true, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
+        { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
+        { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
+        { title: '地址', dataIndex: 'address', width: 220, ellipsis: true },
+        { title: '行业', dataIndex: 'industry', width: 120, ellipsis: true },
+        { title: '属性', dataIndex: 'customerRole', width: 120, ellipsis: true, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
+        { title: '类型', dataIndex: 'customerScale', width: 140, ellipsis: true, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
+        { title: '上级客户', dataIndex: 'parentObjectId', width: 180, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
+        { title: '健康度', dataIndex: 'customerHealth', width: 120, ellipsis: true, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
         {
           title: '所属组织',
           dataIndex: 'orgId',
-          width: 130,
+          width: 140,
           ellipsis: true,
           render: (_: string, record: any) => record?.orgId ? <Tag color="blue">{resolveOrgName(record)}</Tag> : '-',
         },
-        { title: '负责人', dataIndex: 'ownerId', width: 96, ellipsis: true, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+        {
+          title: '所属部门',
+          dataIndex: 'deptId',
+          width: 140,
+          ellipsis: true,
+          render: (_: string, record: any) => (record?.deptId || (record?.orgId && !orgIdSet.has(record.orgId) && departmentMap.has(record.orgId)))
+            ? <Tag color="purple">{resolveDeptName(record)}</Tag>
+            : '-',
+        },
+        { title: '负责人', dataIndex: 'ownerId', width: 110, ellipsis: true, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+        { title: '备注', dataIndex: 'remark', width: 220, ellipsis: true },
         actionColumn,
       ];
     }
@@ -371,7 +384,7 @@ function ObjectTable({
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: isCustomerType ? 1220 : 1100 }}
+              scroll={{ x: isCustomerType ? 2140 : 1100 }}
               sticky
               columns={columns}
             />
