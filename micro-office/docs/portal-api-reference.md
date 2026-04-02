@@ -408,11 +408,8 @@ GET /api/portal/objects/{id}
 | `address` | string/null | 地址 |
 | `remark` | string/null | 备注 |
 | `industry` | string/null | 行业 |
-| `customerRole` | string/null | 客户属性 |
-| `customerScale` | string/null | 客户类型 |
-| `parentObjectId` | string/null | 上级客户 ID |
-| `parentObjectName` | string/null | 上级客户名称 |
-| `customerHealth` | string/null | 当前阶段客户健康度 |
+| `customerRole` | string/null | 客户角色 |
+| `customerScale` | string/null | 客户规模 |
 | `ownerId` | string/null | 负责人 ID |
 | `orgName` | string/null | 所属组织名 |
 | `deptName` | string/null | 所属部门名 |

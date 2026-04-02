@@ -31,8 +31,6 @@ type SearchFilters = {
   name?: string;
   customerRole?: string;
   customerScale?: string;
-  parentObjectId?: string;
-  customerHealth?: string;
 };
 
 function ObjectTable({
@@ -56,7 +54,6 @@ function ObjectTable({
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
-  const [customerOptionsData, setCustomerOptionsData] = useState<any[]>([]);
   const [searchForm] = Form.useForm();
   const [form] = Form.useForm();
   const selectedOrgId = Form.useWatch('orgId', form);
@@ -75,22 +72,6 @@ function ObjectTable({
     [departments, selectedOrgId],
   );
   const userOptions = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
-  const customerMap = useMemo(() => new Map(customerOptionsData.map(item => [item.id, item])), [customerOptionsData]);
-  const parentCustomerOptions = useMemo(
-    () => customerOptionsData
-      .filter(item => item.id !== edit?.id)
-      .map(item => ({ value: item.id, label: item.name })),
-    [customerOptionsData, edit?.id],
-  );
-
-  const loadCustomerOptions = async () => {
-    if (!isCustomerType) {
-      setCustomerOptionsData([]);
-      return;
-    }
-    const r: any = await objectApi.list('CUSTOMER');
-    setCustomerOptionsData(r.data || []);
-  };
 
   const load = async (c = current, s = size, filters: SearchFilters = activeFilters) => {
     const r: any = await objectApi.page({
@@ -101,8 +82,6 @@ function ObjectTable({
       name: filters.name?.trim() || undefined,
       customerRole: isCustomerType ? filters.customerRole || undefined : undefined,
       customerScale: isCustomerType ? filters.customerScale || undefined : undefined,
-      parentObjectId: isCustomerType ? filters.parentObjectId || undefined : undefined,
-      customerHealth: isCustomerType ? filters.customerHealth?.trim() || undefined : undefined,
     });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
@@ -114,7 +93,6 @@ function ObjectTable({
     setActiveFilters({});
     searchForm.resetFields();
     load(1, size, {});
-    loadCustomerOptions().catch(() => setCustomerOptionsData([]));
   }, [type]);
 
   const onSearch = async () => {
@@ -124,8 +102,6 @@ function ObjectTable({
       name: values.name?.trim() || undefined,
       customerRole: isCustomerType ? values.customerRole || undefined : undefined,
       customerScale: isCustomerType ? values.customerScale || undefined : undefined,
-      parentObjectId: isCustomerType ? values.parentObjectId || undefined : undefined,
-      customerHealth: isCustomerType ? values.customerHealth?.trim() || undefined : undefined,
     };
     setActiveFilters(nextFilters);
     await load(1, size, nextFilters);
@@ -191,8 +167,6 @@ function ObjectTable({
       industry: isCustomerType ? values.industry ?? null : null,
       customerRole: isCustomerType ? values.customerRole ?? null : null,
       customerScale: isCustomerType ? values.customerScale ?? null : null,
-      parentObjectId: isCustomerType ? values.parentObjectId ?? null : null,
-      customerHealth: isCustomerType ? values.customerHealth ?? null : null,
     };
     if (edit) {
       await objectApi.update(edit.id, payload);
@@ -203,27 +177,17 @@ function ObjectTable({
     setModal(false);
     form.resetFields();
     setEdit(null);
-    await load(current, size, activeFilters);
-    if (isCustomerType) {
-      await loadCustomerOptions();
-    }
+    load(current, size, activeFilters);
   };
 
   const reloadAfterDelete = async (id: string) => {
     await objectApi.delete(id);
     message.success('已删除');
     const nextCurrent = current > 1 && data.length === 1 ? current - 1 : current;
-    await load(nextCurrent, size, activeFilters);
-    if (isCustomerType) {
-      await loadCustomerOptions();
-    }
+    load(nextCurrent, size, activeFilters);
   };
 
   const userName = (id: string) => users.find(u => u.id === id)?.name || '-';
-  const parentCustomerName = (id?: string) => {
-    if (!id) return '-';
-    return customerMap.get(id)?.name || id;
-  };
 
   const resolveOrgName = (record: any) => {
     if (!record?.orgId) {
@@ -277,10 +241,8 @@ function ObjectTable({
         4,
         0,
         { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
-        { title: '属性', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
-        { title: '类型', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
-        { title: '上级客户', dataIndex: 'parentObjectId', width: 180, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
-        { title: '客户健康度', dataIndex: 'customerHealth', width: 140, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
+        { title: '角色', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
+        { title: '规模', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
       );
     }
 
@@ -299,7 +261,7 @@ function ObjectTable({
     });
 
     return baseColumns;
-  }, [current, size, isCustomerType, orgIdSet, departmentMap, allNodeMap, users, customerMap]);
+  }, [current, size, isCustomerType, orgIdSet, departmentMap, allNodeMap, users]);
 
   return (
     <>
@@ -325,24 +287,11 @@ function ObjectTable({
             </Form.Item>
             {isCustomerType ? (
               <>
-                <Form.Item name="customerRole" label="属性">
-                  <Input allowClear placeholder="请输入原始客户属性" style={{ width: 180 }} />
+                <Form.Item name="customerRole" label="角色">
+                  <Input allowClear placeholder="请输入原始角色/客户类型" style={{ width: 180 }} />
                 </Form.Item>
-                <Form.Item name="customerScale" label="类型">
-                  <Input allowClear placeholder="请输入原始客户类型" style={{ width: 220 }} />
-                </Form.Item>
-                <Form.Item name="parentObjectId" label="上级客户">
-                  <Select
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    placeholder="请选择上级客户"
-                    style={{ width: 240 }}
-                    options={parentCustomerOptions}
-                  />
-                </Form.Item>
-                <Form.Item name="customerHealth" label="客户健康度">
-                  <Input allowClear placeholder="请输入客户健康度" style={{ width: 180 }} />
+                <Form.Item name="customerScale" label="规模">
+                  <Input allowClear placeholder="请输入原始规模/客户属性" style={{ width: 220 }} />
                 </Form.Item>
               </>
             ) : null}
@@ -376,7 +325,7 @@ function ObjectTable({
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: 1880, y: 'calc(100dvh - 495px)' }}
+              scroll={{ x: 1560, y: 'calc(100dvh - 495px)' }}
               columns={columns}
             />
           </div>
@@ -439,41 +388,17 @@ function ObjectTable({
                   <Form.Item name="industry" label="行业"><Input /></Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Form.Item name="customerRole" label="属性">
-                    <Input allowClear placeholder="请输入原始客户属性" />
+                  <Form.Item name="customerRole" label="角色">
+                    <Input allowClear placeholder="请输入原始角色/客户类型" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
                     name="customerScale"
-                    label="类型"
-                    extra="直接保存原始导入值，例如：原始设备制造商、系统集成商、盘柜厂、经销商、工程总包商、最终用户"
+                    label="规模"
+                    extra="直接保存原始导入值，例如：大客户-M、普通客户-N、OEM客户-X、项目客户-P、非注册"
                   >
-                    <Input allowClear placeholder="请输入原始客户类型" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="parentObjectId"
-                    label="上级客户"
-                    extra="用于维护母子公司、集团与子公司等上下级关系。"
-                  >
-                    <Select
-                      allowClear
-                      showSearch
-                      optionFilterProp="label"
-                      placeholder="请选择上级客户"
-                      options={parentCustomerOptions}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="customerHealth"
-                    label="客户健康度"
-                    extra="例如：健康、稳定、关注、风险、培育中。"
-                  >
-                    <Input allowClear placeholder="请输入当前阶段客户健康度" />
+                    <Input allowClear placeholder="请输入原始规模/客户属性" />
                   </Form.Item>
                 </Col>
               </>

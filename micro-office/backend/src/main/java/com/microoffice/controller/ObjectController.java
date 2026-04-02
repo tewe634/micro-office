@@ -106,8 +106,6 @@ public class ObjectController {
         obj.setIndustry(trimToNull(obj.getIndustry()));
         obj.setCustomerRole(trimToNull(obj.getCustomerRole()));
         obj.setCustomerScale(trimToNull(obj.getCustomerScale()));
-        obj.setParentObjectId(trimToNull(obj.getParentObjectId()));
-        obj.setCustomerHealth(trimToNull(obj.getCustomerHealth()));
         obj.setOrgId(trimToNull(obj.getOrgId()));
         obj.setDeptId(trimToNull(obj.getDeptId()));
         obj.setOwnerId(trimToNull(obj.getOwnerId()));
@@ -121,47 +119,12 @@ public class ObjectController {
         if (obj.getType() != ObjectType.CUSTOMER) {
             obj.setCustomerRole(null);
             obj.setCustomerScale(null);
-            obj.setParentObjectId(null);
-            obj.setCustomerHealth(null);
         }
 
         normalizeObjectOrganization(obj, currentUser);
 
         if (obj.getOwnerId() == null && obj.getOrgId() == null && obj.getDeptId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未设置负责人时，至少需要选择组织或部门");
-        }
-    }
-
-    private void validateCustomerRelations(ExternalObject obj, RequestAccessContext ctx, String currentObjectId) {
-        if (obj.getType() != ObjectType.CUSTOMER || obj.getParentObjectId() == null) {
-            return;
-        }
-        if (obj.getParentObjectId().equals(currentObjectId)) {
-            throw badRequest("上级客户不能选择自己");
-        }
-        ExternalObject parent = service.getById(obj.getParentObjectId());
-        if (parent == null) {
-            throw badRequest("上级客户不存在");
-        }
-        if (parent.getType() != ObjectType.CUSTOMER) {
-            throw badRequest("上级对象必须是客户");
-        }
-        if (!ctx.globalAdmin() && (!hasTypeAccess(parent, ctx.allowedTypes()) || !objectAccessService.canAccess(parent, ctx.objectAccessContext(), ctx.scopeOrgIds()))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权关联该上级客户");
-        }
-
-        String cursorId = parent.getParentObjectId();
-        int depth = 0;
-        while (cursorId != null && depth < 20) {
-            if (cursorId.equals(currentObjectId)) {
-                throw badRequest("不能形成循环上下级关系");
-            }
-            ExternalObject cursor = service.getById(cursorId);
-            if (cursor == null) {
-                break;
-            }
-            cursorId = cursor.getParentObjectId();
-            depth++;
         }
     }
 
@@ -339,8 +302,6 @@ public class ObjectController {
         if (body.containsKey("industry")) target.setIndustry(asString(body.get("industry")));
         if (body.containsKey("customerRole")) target.setCustomerRole(asString(body.get("customerRole")));
         if (body.containsKey("customerScale")) target.setCustomerScale(asString(body.get("customerScale")));
-        if (body.containsKey("parentObjectId")) target.setParentObjectId(asString(body.get("parentObjectId")));
-        if (body.containsKey("customerHealth")) target.setCustomerHealth(asString(body.get("customerHealth")));
     }
 
     private String asString(Object value) {
@@ -374,11 +335,9 @@ public class ObjectController {
                                                   @RequestParam(required = false) String name,
                                                   @RequestParam(required = false) String customerRole,
                                                   @RequestParam(required = false) String customerScale,
-                                                  @RequestParam(required = false) String parentObjectId,
-                                                  @RequestParam(required = false) String customerHealth,
                                                   Authentication auth) {
         RequestAccessContext ctx = buildRequestContext(auth);
-        List<ExternalObject> all = service.list(type, orgId, deptId, name, customerRole, customerScale, parentObjectId, customerHealth);
+        List<ExternalObject> all = service.list(type, orgId, deptId, name, customerRole, customerScale);
         return ApiResponse.ok(filterAccessibleObjects(all, ctx));
     }
 
@@ -391,11 +350,9 @@ public class ObjectController {
                                                           @RequestParam(required = false) String name,
                                                           @RequestParam(required = false) String customerRole,
                                                           @RequestParam(required = false) String customerScale,
-                                                          @RequestParam(required = false) String parentObjectId,
-                                                          @RequestParam(required = false) String customerHealth,
                                                           Authentication auth) {
         RequestAccessContext ctx = buildRequestContext(auth);
-        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId, name, customerRole, customerScale, parentObjectId, customerHealth), ctx);
+        List<ExternalObject> all = filterAccessibleObjects(service.list(type, orgId, deptId, name, customerRole, customerScale), ctx);
         long total = all.size();
         int fromIndex = (int) Math.max(0, (current - 1) * size);
         int toIndex = (int) Math.min(total, fromIndex + size);
@@ -416,7 +373,6 @@ public class ObjectController {
         }
         SysUser currentUser = userMapper.selectById(ctx.userId());
         normalizeObjectForSave(obj, currentUser);
-        validateCustomerRelations(obj, ctx, null);
         return ApiResponse.ok(service.create(obj));
     }
 
@@ -430,7 +386,6 @@ public class ObjectController {
         }
         SysUser currentUser = userMapper.selectById(ctx.userId());
         normalizeObjectForSave(existing, currentUser);
-        validateCustomerRelations(existing, ctx, existing.getId());
         service.update(existing);
         return ApiResponse.ok(null);
     }
