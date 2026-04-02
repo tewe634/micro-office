@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message, Row, Col } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { objectApi, userApi } from '../../api';
@@ -53,6 +53,8 @@ function ObjectTable({
   const [edit, setEdit] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
   const [customerOptionsData, setCustomerOptionsData] = useState<any[]>([]);
+  const [tableScrollY, setTableScrollY] = useState(360);
+   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const [searchForm] = Form.useForm();
   const [form] = Form.useForm();
   const selectedOrgId = Form.useWatch('orgId', form);
@@ -108,6 +110,32 @@ function ObjectTable({
     load(1, size, {});
     loadCustomerOptions().catch(() => setCustomerOptionsData([]));
   }, [type]);
+
+  useEffect(() => {
+    const updateTableScrollY = () => {
+      if (!tableWrapRef.current) {
+        return;
+      }
+      const rect = tableWrapRef.current.getBoundingClientRect();
+      const available = window.innerHeight - rect.top - 96;
+      setTableScrollY(Math.max(260, Math.floor(available)));
+    };
+
+    const rafId = window.requestAnimationFrame(updateTableScrollY);
+    window.addEventListener('resize', updateTableScrollY);
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && tableWrapRef.current) {
+      observer = new ResizeObserver(() => updateTableScrollY());
+      observer.observe(tableWrapRef.current);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', updateTableScrollY);
+      observer?.disconnect();
+    };
+  }, [type, data.length, total]);
 
   const onSearch = async () => {
     const values = searchForm.getFieldsValue();
@@ -376,7 +404,7 @@ function ObjectTable({
             overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 16px', overflow: 'auto' }}>
+          <div ref={tableWrapRef} style={{ flex: 1, minHeight: 0, padding: '12px 12px 8px', overflow: 'hidden' }}>
             <Table
               size="small"
               dataSource={data}
@@ -384,8 +412,8 @@ function ObjectTable({
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: isCustomerType ? 2140 : 1100 }}
-              sticky
+              scroll={{ x: isCustomerType ? 2140 : 1100, y: tableScrollY }}
+              sticky={{ offsetHeader: 0, offsetScroll: 0 }}
               columns={columns}
             />
           </div>
