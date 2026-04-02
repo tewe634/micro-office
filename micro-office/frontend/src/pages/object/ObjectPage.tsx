@@ -29,10 +29,6 @@ type DepartmentNode = {
 type SearchFilters = {
   deptId?: string;
   name?: string;
-  customerRole?: string;
-  customerScale?: string;
-  parentObjectId?: string;
-  customerHealth?: string;
 };
 
 function ObjectTable({
@@ -99,10 +95,6 @@ function ObjectTable({
       type,
       deptId: filters.deptId || undefined,
       name: filters.name?.trim() || undefined,
-      customerRole: isCustomerType ? filters.customerRole || undefined : undefined,
-      customerScale: isCustomerType ? filters.customerScale || undefined : undefined,
-      parentObjectId: isCustomerType ? filters.parentObjectId || undefined : undefined,
-      customerHealth: isCustomerType ? filters.customerHealth?.trim() || undefined : undefined,
     });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
@@ -122,10 +114,6 @@ function ObjectTable({
     const nextFilters = {
       deptId: values.deptId || undefined,
       name: values.name?.trim() || undefined,
-      customerRole: isCustomerType ? values.customerRole || undefined : undefined,
-      customerScale: isCustomerType ? values.customerScale || undefined : undefined,
-      parentObjectId: isCustomerType ? values.parentObjectId || undefined : undefined,
-      customerHealth: isCustomerType ? values.customerHealth?.trim() || undefined : undefined,
     };
     setActiveFilters(nextFilters);
     await load(1, size, nextFilters);
@@ -257,7 +245,43 @@ function ObjectTable({
   };
 
   const columns = useMemo(() => {
-    const baseColumns: any[] = [
+    const actionColumn = {
+      title: '操作',
+      width: 180,
+      fixed: 'right' as const,
+      render: (_: any, r: any) => (
+        <Space size={6} wrap>
+          <Button size="small" onClick={() => nav(`/objects/${r.id}/portal`)}>门户</Button>
+          <Button size="small" onClick={() => openEditor(r)}>编辑</Button>
+          <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
+            <Button size="small" danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    };
+
+    if (isCustomerType) {
+      return [
+        { title: '序号', key: 'index', width: 64, fixed: 'left' as const, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
+        { title: '名称', dataIndex: 'name', width: 180, fixed: 'left' as const, ellipsis: true },
+        { title: '行业', dataIndex: 'industry', width: 110, ellipsis: true },
+        { title: '属性', dataIndex: 'customerRole', width: 110, ellipsis: true, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
+        { title: '类型', dataIndex: 'customerScale', width: 130, ellipsis: true, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
+        { title: '上级客户', dataIndex: 'parentObjectId', width: 160, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
+        { title: '健康度', dataIndex: 'customerHealth', width: 110, ellipsis: true, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
+        {
+          title: '所属组织',
+          dataIndex: 'orgId',
+          width: 130,
+          ellipsis: true,
+          render: (_: string, record: any) => record?.orgId ? <Tag color="blue">{resolveOrgName(record)}</Tag> : '-',
+        },
+        { title: '负责人', dataIndex: 'ownerId', width: 96, ellipsis: true, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+        actionColumn,
+      ];
+    }
+
+    return [
       { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
       { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
       { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
@@ -277,35 +301,8 @@ function ObjectTable({
           : '-',
       },
       { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
+      actionColumn,
     ];
-
-    if (isCustomerType) {
-      baseColumns.splice(
-        4,
-        0,
-        { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
-        { title: '属性', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
-        { title: '类型', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
-        { title: '上级客户', dataIndex: 'parentObjectId', width: 180, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
-        { title: '客户健康度', dataIndex: 'customerHealth', width: 140, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
-      );
-    }
-
-    baseColumns.push({
-      title: '操作',
-      width: 200,
-      render: (_: any, r: any) => (
-        <Space size={6} wrap>
-          <Button size="small" onClick={() => nav(`/objects/${r.id}/portal`)}>门户</Button>
-          <Button size="small" onClick={() => openEditor(r)}>编辑</Button>
-          <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
-            <Button size="small" danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    });
-
-    return baseColumns;
   }, [current, size, isCustomerType, orgIdSet, departmentMap, allNodeMap, users, customerMap]);
 
   return (
@@ -338,36 +335,6 @@ function ObjectTable({
                   <Input allowClear placeholder="请输入名称" />
                 </Form.Item>
               </Col>
-              {isCustomerType ? (
-                <>
-                  <Col xs={24} sm={12} md={8} xl={6}>
-                    <Form.Item name="customerRole" label="属性" style={{ marginBottom: 12 }}>
-                      <Input allowClear placeholder="请输入原始客户属性" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12} md={8} xl={6}>
-                    <Form.Item name="customerScale" label="类型" style={{ marginBottom: 12 }}>
-                      <Input allowClear placeholder="请输入原始客户类型" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12} md={8} xl={6}>
-                    <Form.Item name="parentObjectId" label="上级客户" style={{ marginBottom: 12 }}>
-                      <Select
-                        allowClear
-                        showSearch
-                        optionFilterProp="label"
-                        placeholder="请选择上级客户"
-                        options={parentCustomerOptions}
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12} md={8} xl={6}>
-                    <Form.Item name="customerHealth" label="客户健康度" style={{ marginBottom: 12 }}>
-                      <Input allowClear placeholder="请输入客户健康度" />
-                    </Form.Item>
-                  </Col>
-                </>
-              ) : null}
             </Row>
 
             <div className="page-toolbar" style={{ marginTop: 4 }}>
@@ -404,7 +371,7 @@ function ObjectTable({
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: 1880 }}
+              scroll={{ x: isCustomerType ? 1220 : 1100 }}
               sticky
               columns={columns}
             />
