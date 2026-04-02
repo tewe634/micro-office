@@ -250,6 +250,23 @@ async function main() {
   assert(Array.isArray(objectOrgStructure.orgs), 'object org structure missing orgs');
   const objectDepartments = await api('GET', '/objects/departments', { token: adminToken });
   assert(Array.isArray(objectDepartments), 'object departments missing list');
+  const parentCustomer = await api('POST', '/objects', {
+    token: adminToken,
+    body: {
+      type: 'CUSTOMER',
+      name: `${RUN_ID} parent customer`,
+      contact: 'Parent Contact',
+      phone: '400-000-0001',
+      address: 'Parent Street',
+      remark: 'parent created by api smoke test',
+      industry: '制造业',
+      customerRole: '大客户-M',
+      customerScale: '集团客户',
+      customerHealth: '稳定',
+      ownerId: adminUserId,
+    },
+  });
+  cleanupState.objectIds.push(parentCustomer.id);
   const createdObject = await api('POST', '/objects', {
     token: adminToken,
     body: {
@@ -262,6 +279,8 @@ async function main() {
       industry: '制造业',
       customerRole: '普通客户-N',
       customerScale: '原始设备制造商',
+      parentObjectId: parentCustomer.id,
+      customerHealth: '健康',
       ownerId: adminUserId,
     },
   });
@@ -282,14 +301,18 @@ async function main() {
       name: `${RUN_ID} customer updated`,
       remark: 'updated by api smoke test',
       industry: '工业',
-      customerRole: '大客户-M',
+      customerRole: '重点客户',
       customerScale: '系统集成商',
+      parentObjectId: parentCustomer.id,
+      customerHealth: '关注',
     },
   });
   const fetchedObject = await api('GET', `/objects/${createdObject.id}`, { token: adminToken });
   assert(fetchedObject?.name === `${RUN_ID} customer updated`, 'object update not visible', fetchedObject);
-  assert(fetchedObject?.customerRole === '大客户-M', 'object customerRole update not visible', fetchedObject);
+  assert(fetchedObject?.customerRole === '重点客户', 'object customerRole update not visible', fetchedObject);
   assert(fetchedObject?.customerScale === '系统集成商', 'object customerScale update not visible', fetchedObject);
+  assert(fetchedObject?.parentObjectId === parentCustomer.id, 'object parentObjectId update not visible', fetchedObject);
+  assert(fetchedObject?.customerHealth === '关注', 'object customerHealth update not visible', fetchedObject);
 
   log('checking product endpoints');
   const productListBefore = await api('GET', '/products', {
@@ -333,8 +356,11 @@ async function main() {
   assert(userPortal?.header?.id === crudUserId, 'user portal header mismatch', userPortal);
   const objectPortal = await api('GET', `/portal/objects/${createdObject.id}`, { token: adminToken });
   assert(objectPortal?.header?.id === createdObject.id, 'object portal header mismatch', objectPortal);
-  assert(objectPortal?.header?.customerRole === '大客户-M', 'object portal header missing customerRole', objectPortal);
+  assert(objectPortal?.header?.customerRole === '重点客户', 'object portal header missing customerRole', objectPortal);
   assert(objectPortal?.header?.customerScale === '系统集成商', 'object portal header missing customerScale', objectPortal);
+  assert(objectPortal?.header?.parentObjectId === parentCustomer.id, 'object portal header missing parentObjectId', objectPortal);
+  assert(objectPortal?.header?.parentObjectName === `${RUN_ID} parent customer`, 'object portal header missing parentObjectName', objectPortal);
+  assert(objectPortal?.header?.customerHealth === '关注', 'object portal header missing customerHealth', objectPortal);
   const productPortal = await api('GET', `/portal/products/${createdProduct.id}`, { token: adminToken });
   assert(productPortal?.header?.id === createdProduct.id, 'product portal header mismatch', productPortal);
 
