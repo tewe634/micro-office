@@ -840,8 +840,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       if (isCustomerObjectPortal) {
         return [
           ['对象类型', formatObjectType(header.type)],
-          ['客户角色', header.customerRole],
-          ['客户规模', header.customerScale],
+          ['客户属性', header.customerRole],
+          ['客户类型', header.customerScale],
           ['联系人', header.contact],
           ['联系电话', header.phone],
           ['所属组织', header.orgName],

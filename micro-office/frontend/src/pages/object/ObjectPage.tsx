@@ -241,8 +241,8 @@ function ObjectTable({
         4,
         0,
         { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
-        { title: '角色', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
-        { title: '规模', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
+        { title: '属性', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
+        { title: '类型', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
       );
     }
 
@@ -287,11 +287,11 @@ function ObjectTable({
             </Form.Item>
             {isCustomerType ? (
               <>
-                <Form.Item name="customerRole" label="角色">
-                  <Input allowClear placeholder="请输入原始角色/客户类型" style={{ width: 180 }} />
+                <Form.Item name="customerRole" label="属性">
+                  <Input allowClear placeholder="请输入原始客户属性" style={{ width: 180 }} />
                 </Form.Item>
-                <Form.Item name="customerScale" label="规模">
-                  <Input allowClear placeholder="请输入原始规模/客户属性" style={{ width: 220 }} />
+                <Form.Item name="customerScale" label="类型">
+                  <Input allowClear placeholder="请输入原始客户类型" style={{ width: 220 }} />
                 </Form.Item>
               </>
             ) : null}
@@ -388,17 +388,17 @@ function ObjectTable({
                   <Form.Item name="industry" label="行业"><Input /></Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Form.Item name="customerRole" label="角色">
-                    <Input allowClear placeholder="请输入原始角色/客户类型" />
+                  <Form.Item name="customerRole" label="属性">
+                    <Input allowClear placeholder="请输入原始客户属性" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
                     name="customerScale"
-                    label="规模"
-                    extra="直接保存原始导入值，例如：大客户-M、普通客户-N、OEM客户-X、项目客户-P、非注册"
+                    label="类型"
+                    extra="直接保存原始导入值，例如：原始设备制造商、系统集成商、盘柜厂、经销商、工程总包商、最终用户"
                   >
-                    <Input allowClear placeholder="请输入原始规模/客户属性" />
+                    <Input allowClear placeholder="请输入原始客户类型" />
                   </Form.Item>
                 </Col>
               </>

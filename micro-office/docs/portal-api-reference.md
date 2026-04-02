@@ -408,8 +408,8 @@ GET /api/portal/objects/{id}
 | `address` | string/null | 地址 |
 | `remark` | string/null | 备注 |
 | `industry` | string/null | 行业 |
-| `customerRole` | string/null | 客户角色 |
-| `customerScale` | string/null | 客户规模 |
+| `customerRole` | string/null | 客户属性 |
+| `customerScale` | string/null | 客户类型 |
 | `ownerId` | string/null | 负责人 ID |
 | `orgName` | string/null | 所属组织名 |
 | `deptName` | string/null | 所属部门名 |

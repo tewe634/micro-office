@@ -78,8 +78,8 @@ function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
   const plans = [];
 
   for (const record of byName.values()) {
-    const roleValues = [...record.rawCustomerTypes];
-    const scaleValues = [...record.rawCustomerAttrs];
+    const roleValues = [...record.rawCustomerAttrs];
+    const scaleValues = [...record.rawCustomerTypes];
 
     if (roleValues.length > 1 || scaleValues.length > 1) {
       conflicts.push({
@@ -102,8 +102,8 @@ function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
       name: record.name,
       customerRole,
       customerScale,
-      rawCustomerType: customerRole,
-      rawCustomerAttr: customerScale,
+      rawCustomerType: scaleValues[0] || null,
+      rawCustomerAttr: roleValues[0] || null,
       rowCount: record.rowCount,
     });
   }
@@ -155,7 +155,7 @@ async function main() {
       matchedPlans.push({ ...plan, matches });
     }
 
-    console.log('=== 客户角色/规模原值回填预检查 ===');
+    console.log('=== 客户属性/类型原值回填预检查 ===');
     console.log(`Excel 数据行数: ${dataRows.filter(r => normalize(r[nameIdx])).length}`);
     console.log(`Excel 客户去重数: ${uniqueCustomerCount}`);
     console.log(`可生成回填计划数: ${plans.length}`);
@@ -165,7 +165,7 @@ async function main() {
     console.log(`执行模式: ${APPLY ? 'APPLY（将写入数据库）' : 'DRY-RUN（仅预览，不写库）'}`);
 
     if (conflicts.length) {
-      console.log('\n冲突客户（同名客户对应多个原始角色或规模，已跳过）：');
+      console.log('\n冲突客户（同名客户对应多个原始属性或类型，已跳过）：');
       conflicts.slice(0, 20).forEach((item) => {
         console.log(`  - ${item.name}`);
         console.log(`    原始客户类型: ${item.rawCustomerTypes.join(', ') || '-'}`);
@@ -179,7 +179,7 @@ async function main() {
     if (missingInDb.length) {
       console.log('\n数据库中未找到的客户（按名称+组织匹配，已跳过）：');
       missingInDb.slice(0, 20).forEach((item) => {
-        console.log(`  - ${item.name} | 角色=${item.customerRole || '-'} | 规模=${item.customerScale || '-'}`);
+        console.log(`  - ${item.name} | 属性=${item.customerRole || '-'} | 类型=${item.customerScale || '-'}`);
       });
       if (missingInDb.length > 20) {
         console.log(`  ... 其余 ${missingInDb.length - 20} 条未展示`);
@@ -192,7 +192,7 @@ async function main() {
       const beforeScaleSet = [...new Set(item.matches.map((m) => normalize(m.customer_scale) || '-'))].join(', ');
       console.log(
         `  - ${item.name}\n` +
-        `    原始: 客户类型=${item.rawCustomerType || '-'} / 客户属性=${item.rawCustomerAttr || '-'}\n` +
+        `    原始: 客户属性=${item.rawCustomerAttr || '-'} / 客户类型=${item.rawCustomerType || '-'}\n` +
         `    更新: customer_role ${beforeRoleSet} -> ${item.customerRole || '(清空)'} ; customer_scale ${beforeScaleSet} -> ${item.customerScale || '(清空)'}`,
       );
     });

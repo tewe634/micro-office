@@ -24,8 +24,8 @@ db.connect().then(async () => {
     const phone = String(r[11]).trim();
     const salesman = String(r[14]).trim();
     const industry = String(r[15]).trim();
-    const customerRole = String(r[4]).trim(); // 原始客户类型
-    const customerScale = String(r[17]).trim(); // 原始客户属性
+    const customerRole = String(r[17]).trim(); // 原始客户属性
+    const customerScale = String(r[4]).trim(); // 原始客户类型
     const ownerId = userMap[salesman] || null;
 
     await db.query(
