@@ -13,19 +13,6 @@ const allTypeOptions = [
   { value: 'OTHER', label: '其他' },
 ];
 
-const customerRoleOptions = [
-  { value: '最终用户', label: '最终用户' },
-  { value: '总包商', label: '总包商' },
-  { value: '制造商', label: '制造商' },
-  { value: '分销商', label: '分销商' },
-];
-
-const customerScaleOptions = [
-  { value: '大客户', label: '大客户（业绩>1000万）' },
-  { value: '中型客户', label: '中型客户（业绩>500万）' },
-  { value: '小客户', label: '小客户（业绩<500万）' },
-];
-
 type OrgNode = {
   id: string;
   name: string;
@@ -301,22 +288,10 @@ function ObjectTable({
             {isCustomerType ? (
               <>
                 <Form.Item name="customerRole" label="角色">
-                  <Select
-                    allowClear
-                    optionFilterProp="label"
-                    placeholder="请选择角色"
-                    style={{ width: 180 }}
-                    options={customerRoleOptions}
-                  />
+                  <Input allowClear placeholder="请输入原始角色/客户类型" style={{ width: 180 }} />
                 </Form.Item>
                 <Form.Item name="customerScale" label="规模">
-                  <Select
-                    allowClear
-                    optionFilterProp="label"
-                    placeholder="请选择规模"
-                    style={{ width: 220 }}
-                    options={customerScaleOptions}
-                  />
+                  <Input allowClear placeholder="请输入原始规模/客户属性" style={{ width: 220 }} />
                 </Form.Item>
               </>
             ) : null}
@@ -414,26 +389,16 @@ function ObjectTable({
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item name="customerRole" label="角色">
-                    <Select
-                      allowClear
-                      optionFilterProp="label"
-                      placeholder="请选择角色"
-                      options={customerRoleOptions}
-                    />
+                    <Input allowClear placeholder="请输入原始角色/客户类型" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
                     name="customerScale"
                     label="规模"
-                    extra="大客户：业绩>1000万；中型客户：业绩>500万；小客户：业绩<500万"
+                    extra="直接保存原始导入值，例如：大客户-M、普通客户-N、OEM客户-X、项目客户-P、非注册"
                   >
-                    <Select
-                      allowClear
-                      optionFilterProp="label"
-                      placeholder="请选择规模"
-                      options={customerScaleOptions}
-                    />
+                    <Input allowClear placeholder="请输入原始规模/客户属性" />
                   </Form.Item>
                 </Col>
               </>

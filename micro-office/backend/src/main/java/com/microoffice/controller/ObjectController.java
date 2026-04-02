@@ -35,18 +35,6 @@ public class ObjectController {
         "业务三部",
         "产品支持体系"
     );
-    private static final Set<String> CUSTOMER_ROLE_OPTIONS = Set.of(
-        "最终用户",
-        "总包商",
-        "制造商",
-        "分销商"
-    );
-    private static final Set<String> CUSTOMER_SCALE_OPTIONS = Set.of(
-        "大客户",
-        "中型客户",
-        "小客户"
-    );
-
     private final ExternalObjectService service;
     private final SysUserMapper userMapper;
     private final JdbcTemplate jdbc;
@@ -128,10 +116,7 @@ public class ObjectController {
         if (obj.getName() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "对象名称不能为空");
         }
-        if (obj.getType() == ObjectType.CUSTOMER) {
-            validateCustomerRole(obj.getCustomerRole());
-            validateCustomerScale(obj.getCustomerScale());
-        } else {
+        if (obj.getType() != ObjectType.CUSTOMER) {
             obj.setCustomerRole(null);
             obj.setCustomerScale(null);
         }
@@ -317,18 +302,6 @@ public class ObjectController {
         if (body.containsKey("industry")) target.setIndustry(asString(body.get("industry")));
         if (body.containsKey("customerRole")) target.setCustomerRole(asString(body.get("customerRole")));
         if (body.containsKey("customerScale")) target.setCustomerScale(asString(body.get("customerScale")));
-    }
-
-    private void validateCustomerRole(String customerRole) {
-        if (customerRole != null && !CUSTOMER_ROLE_OPTIONS.contains(customerRole)) {
-            throw badRequest("客户角色仅支持：最终用户、总包商、制造商、分销商");
-        }
-    }
-
-    private void validateCustomerScale(String customerScale) {
-        if (customerScale != null && !CUSTOMER_SCALE_OPTIONS.contains(customerScale)) {
-            throw badRequest("客户规模仅支持：大客户、中型客户、小客户");
-        }
     }
 
     private String asString(Object value) {

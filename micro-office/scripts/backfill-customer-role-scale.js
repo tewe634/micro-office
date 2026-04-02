@@ -14,27 +14,6 @@ const db = new Client({
   password: process.env.PGPASSWORD || 'postgres',
 });
 
-// 原始 Excel 值 -> 系统允许值
-// ObjectController 当前仅允许：最终用户、总包商、制造商、分销商
-const CUSTOMER_ROLE_MAP = {
-  '原始设备制造商': '制造商',
-  '工程总包商': '总包商',
-  '最终用户': '最终用户',
-  '盘柜厂': '制造商',
-  '系统集成商': '总包商',
-  '经销商、贸易商': '分销商',
-};
-
-// Excel 中“客户属性”字段映射到系统 customerScale
-// 系统允许：大客户、中型客户、小客户
-const CUSTOMER_SCALE_MAP = {
-  '大客户-M': '大客户',
-  '普通客户-N': '中型客户',
-  'OEM客户-X': '中型客户',
-  '项目客户-P': '中型客户',
-  '非注册': '小客户',
-};
-
 function normalize(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
@@ -62,7 +41,6 @@ function loadSheetRows() {
   };
 
   return {
-    header,
     dataRows: rows.slice(1),
     nameIdx: indexOf('单位名称'),
     customerTypeIdx: indexOf('客户类型'),
@@ -72,8 +50,6 @@ function loadSheetRows() {
 
 function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
   const byName = new Map();
-  const unknownRoleValues = new Map();
-  const unknownScaleValues = new Map();
 
   for (const row of dataRows) {
     const name = normalize(row[nameIdx]);
@@ -82,24 +58,12 @@ function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
     const rawCustomerType = normalize(row[customerTypeIdx]);
     const rawCustomerAttr = normalize(row[customerAttrIdx]);
 
-    const mappedRole = rawCustomerType ? CUSTOMER_ROLE_MAP[rawCustomerType] : undefined;
-    const mappedScale = rawCustomerAttr ? CUSTOMER_SCALE_MAP[rawCustomerAttr] : undefined;
-
-    if (rawCustomerType && !mappedRole) {
-      unknownRoleValues.set(rawCustomerType, (unknownRoleValues.get(rawCustomerType) || 0) + 1);
-    }
-    if (rawCustomerAttr && !mappedScale) {
-      unknownScaleValues.set(rawCustomerAttr, (unknownScaleValues.get(rawCustomerAttr) || 0) + 1);
-    }
-
     let record = byName.get(name);
     if (!record) {
       record = {
         name,
         rawCustomerTypes: new Set(),
         rawCustomerAttrs: new Set(),
-        mappedRoles: new Set(),
-        mappedScales: new Set(),
         rowCount: 0,
       };
       byName.set(name, record);
@@ -108,31 +72,27 @@ function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
     record.rowCount += 1;
     if (rawCustomerType) record.rawCustomerTypes.add(rawCustomerType);
     if (rawCustomerAttr) record.rawCustomerAttrs.add(rawCustomerAttr);
-    if (mappedRole) record.mappedRoles.add(mappedRole);
-    if (mappedScale) record.mappedScales.add(mappedScale);
   }
 
   const conflicts = [];
   const plans = [];
 
   for (const record of byName.values()) {
-    const roles = [...record.mappedRoles];
-    const scales = [...record.mappedScales];
+    const roleValues = [...record.rawCustomerTypes];
+    const scaleValues = [...record.rawCustomerAttrs];
 
-    if (roles.length > 1 || scales.length > 1) {
+    if (roleValues.length > 1 || scaleValues.length > 1) {
       conflicts.push({
         name: record.name,
         rowCount: record.rowCount,
-        rawCustomerTypes: [...record.rawCustomerTypes],
-        rawCustomerAttrs: [...record.rawCustomerAttrs],
-        mappedRoles: roles,
-        mappedScales: scales,
+        rawCustomerTypes: roleValues,
+        rawCustomerAttrs: scaleValues,
       });
       continue;
     }
 
-    const customerRole = roles[0];
-    const customerScale = scales[0];
+    const customerRole = roleValues[0] || null;
+    const customerScale = scaleValues[0] || null;
 
     if (!customerRole && !customerScale) {
       continue;
@@ -142,8 +102,8 @@ function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
       name: record.name,
       customerRole,
       customerScale,
-      rawCustomerType: [...record.rawCustomerTypes].join(' / '),
-      rawCustomerAttr: [...record.rawCustomerAttrs].join(' / '),
+      rawCustomerType: customerRole,
+      rawCustomerAttr: customerScale,
       rowCount: record.rowCount,
     });
   }
@@ -151,27 +111,13 @@ function buildPlans(dataRows, nameIdx, customerTypeIdx, customerAttrIdx) {
   return {
     plans,
     conflicts,
-    unknownRoleValues,
-    unknownScaleValues,
     uniqueCustomerCount: byName.size,
   };
 }
 
-function printMap(title, map) {
-  const rows = [...map.entries()].sort((a, b) => b[1] - a[1]);
-  console.log(`\n${title}`);
-  if (!rows.length) {
-    console.log('  无');
-    return;
-  }
-  for (const [key, count] of rows) {
-    console.log(`  - ${key}: ${count}`);
-  }
-}
-
 async function main() {
   const { dataRows, nameIdx, customerTypeIdx, customerAttrIdx } = loadSheetRows();
-  const { plans, conflicts, unknownRoleValues, unknownScaleValues, uniqueCustomerCount } = buildPlans(
+  const { plans, conflicts, uniqueCustomerCount } = buildPlans(
     dataRows,
     nameIdx,
     customerTypeIdx,
@@ -209,7 +155,7 @@ async function main() {
       matchedPlans.push({ ...plan, matches });
     }
 
-    console.log('=== 客户角色/规模回填预检查 ===');
+    console.log('=== 客户角色/规模原值回填预检查 ===');
     console.log(`Excel 数据行数: ${dataRows.filter(r => normalize(r[nameIdx])).length}`);
     console.log(`Excel 客户去重数: ${uniqueCustomerCount}`);
     console.log(`可生成回填计划数: ${plans.length}`);
@@ -218,17 +164,12 @@ async function main() {
     console.log(`冲突客户数: ${conflicts.length}`);
     console.log(`执行模式: ${APPLY ? 'APPLY（将写入数据库）' : 'DRY-RUN（仅预览，不写库）'}`);
 
-    printMap('未识别的客户类型原始值', unknownRoleValues);
-    printMap('未识别的客户属性原始值', unknownScaleValues);
-
     if (conflicts.length) {
-      console.log('\n冲突客户（同名客户映射出多个角色或规模，已跳过）：');
+      console.log('\n冲突客户（同名客户对应多个原始角色或规模，已跳过）：');
       conflicts.slice(0, 20).forEach((item) => {
         console.log(`  - ${item.name}`);
         console.log(`    原始客户类型: ${item.rawCustomerTypes.join(', ') || '-'}`);
         console.log(`    原始客户属性: ${item.rawCustomerAttrs.join(', ') || '-'}`);
-        console.log(`    映射角色: ${item.mappedRoles.join(', ') || '-'}`);
-        console.log(`    映射规模: ${item.mappedScales.join(', ') || '-'}`);
       });
       if (conflicts.length > 20) {
         console.log(`  ... 其余 ${conflicts.length - 20} 条未展示`);
@@ -252,12 +193,12 @@ async function main() {
       console.log(
         `  - ${item.name}\n` +
         `    原始: 客户类型=${item.rawCustomerType || '-'} / 客户属性=${item.rawCustomerAttr || '-'}\n` +
-        `    更新: customer_role ${beforeRoleSet} -> ${item.customerRole || '(保持原值)'} ; customer_scale ${beforeScaleSet} -> ${item.customerScale || '(保持原值)'}`,
+        `    更新: customer_role ${beforeRoleSet} -> ${item.customerRole || '(清空)'} ; customer_scale ${beforeScaleSet} -> ${item.customerScale || '(清空)'}`,
       );
     });
 
     if (!APPLY) {
-      console.log('\nDRY-RUN 完成。若确认映射无误，执行：');
+      console.log('\nDRY-RUN 完成。若确认无误，执行：');
       console.log('node scripts/backfill-customer-role-scale.js --apply');
       return;
     }
@@ -269,13 +210,13 @@ async function main() {
     for (const item of matchedPlans) {
       const result = await db.query(
         `UPDATE external_object
-            SET customer_role = COALESCE($3, customer_role),
-                customer_scale = COALESCE($4, customer_scale),
+            SET customer_role = $3,
+                customer_scale = $4,
                 updated_at = NOW()
           WHERE type = 'CUSTOMER'::object_type
             AND org_id = $1
             AND name = $2`,
-        [ORG_ID, item.name, item.customerRole || null, item.customerScale || null],
+        [ORG_ID, item.name, item.customerRole, item.customerScale],
       );
       updatedNameCount += 1;
       updatedRowCount += result.rowCount || 0;
@@ -283,7 +224,7 @@ async function main() {
 
     await db.query('COMMIT');
 
-    console.log('\n✅ 回填完成');
+    console.log('\n✅ 原值回填完成');
     console.log(`已更新客户名称数: ${updatedNameCount}`);
     console.log(`已更新数据库行数: ${updatedRowCount}`);
   } catch (error) {

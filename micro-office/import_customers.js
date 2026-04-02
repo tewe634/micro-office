@@ -24,13 +24,25 @@ db.connect().then(async () => {
     const phone = String(r[11]).trim();
     const salesman = String(r[14]).trim();
     const industry = String(r[15]).trim();
+    const customerRole = String(r[4]).trim(); // 原始客户类型
+    const customerScale = String(r[17]).trim(); // 原始客户属性
     const ownerId = userMap[salesman] || null;
 
     await db.query(
-      `INSERT INTO external_object (type, name, address, contact, phone, industry, org_id, owner_id)
-       VALUES ('CUSTOMER', $1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO external_object (type, name, address, contact, phone, industry, customer_role, customer_scale, org_id, owner_id)
+       VALUES ('CUSTOMER', $1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT DO NOTHING`,
-      [name, address || null, contact || null, phone || null, industry || null, ORG_ID, ownerId]
+      [
+        name,
+        address || null,
+        contact || null,
+        phone || null,
+        industry || null,
+        customerRole || null,
+        customerScale || null,
+        ORG_ID,
+        ownerId,
+      ]
     );
     count++;
   }
