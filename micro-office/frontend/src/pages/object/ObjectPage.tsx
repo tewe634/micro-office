@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, Tag, message, Row, Col } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { objectApi, userApi } from '../../api';
@@ -29,6 +29,10 @@ type DepartmentNode = {
 type SearchFilters = {
   deptId?: string;
   name?: string;
+  customerRole?: string;
+  customerScale?: string;
+  parentObjectId?: string;
+  customerHealth?: string;
 };
 
 function ObjectTable({
@@ -53,8 +57,6 @@ function ObjectTable({
   const [edit, setEdit] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
   const [customerOptionsData, setCustomerOptionsData] = useState<any[]>([]);
-  const [tableScrollY, setTableScrollY] = useState(360);
-   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const [searchForm] = Form.useForm();
   const [form] = Form.useForm();
   const selectedOrgId = Form.useWatch('orgId', form);
@@ -97,6 +99,10 @@ function ObjectTable({
       type,
       deptId: filters.deptId || undefined,
       name: filters.name?.trim() || undefined,
+      customerRole: isCustomerType ? filters.customerRole || undefined : undefined,
+      customerScale: isCustomerType ? filters.customerScale || undefined : undefined,
+      parentObjectId: isCustomerType ? filters.parentObjectId || undefined : undefined,
+      customerHealth: isCustomerType ? filters.customerHealth?.trim() || undefined : undefined,
     });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
@@ -111,45 +117,16 @@ function ObjectTable({
     loadCustomerOptions().catch(() => setCustomerOptionsData([]));
   }, [type]);
 
-  useEffect(() => {
-    const updateTableScrollY = () => {
-      if (!tableWrapRef.current) {
-        return;
-      }
-      const rect = tableWrapRef.current.getBoundingClientRect();
-      const available = window.innerHeight - rect.top - 96;
-      setTableScrollY(Math.max(260, Math.floor(available)));
-    };
-
-    const rafId = window.requestAnimationFrame(updateTableScrollY);
-    window.addEventListener('resize', updateTableScrollY);
-
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && tableWrapRef.current) {
-      observer = new ResizeObserver(() => updateTableScrollY());
-      observer.observe(tableWrapRef.current);
-    }
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', updateTableScrollY);
-      observer?.disconnect();
-    };
-  }, [type, data.length, total]);
-
   const onSearch = async () => {
     const values = searchForm.getFieldsValue();
     const nextFilters = {
       deptId: values.deptId || undefined,
       name: values.name?.trim() || undefined,
+      customerRole: isCustomerType ? values.customerRole || undefined : undefined,
+      customerScale: isCustomerType ? values.customerScale || undefined : undefined,
+      parentObjectId: isCustomerType ? values.parentObjectId || undefined : undefined,
+      customerHealth: isCustomerType ? values.customerHealth?.trim() || undefined : undefined,
     };
-    setActiveFilters(nextFilters);
-    await load(1, size, nextFilters);
-  };
-
-  const onReset = async () => {
-    searchForm.resetFields();
-    const nextFilters = {};
     setActiveFilters(nextFilters);
     await load(1, size, nextFilters);
   };
@@ -273,56 +250,7 @@ function ObjectTable({
   };
 
   const columns = useMemo(() => {
-    const actionColumn = {
-      title: '操作',
-      width: 180,
-      fixed: 'right' as const,
-      render: (_: any, r: any) => (
-        <Space size={6} wrap>
-          <Button size="small" onClick={() => nav(`/objects/${r.id}/portal`)}>门户</Button>
-          <Button size="small" onClick={() => openEditor(r)}>编辑</Button>
-          <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
-            <Button size="small" danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    };
-
-    if (isCustomerType) {
-      return [
-        { title: '序号', key: 'index', width: 64, fixed: 'left' as const, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
-        { title: '名称', dataIndex: 'name', width: 180, fixed: 'left' as const, ellipsis: true },
-        { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
-        { title: '电话', dataIndex: 'phone', width: 140, ellipsis: true },
-        { title: '地址', dataIndex: 'address', width: 220, ellipsis: true },
-        { title: '行业', dataIndex: 'industry', width: 120, ellipsis: true },
-        { title: '属性', dataIndex: 'customerRole', width: 120, ellipsis: true, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
-        { title: '类型', dataIndex: 'customerScale', width: 140, ellipsis: true, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
-        { title: '上级客户', dataIndex: 'parentObjectId', width: 180, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
-        { title: '健康度', dataIndex: 'customerHealth', width: 120, ellipsis: true, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
-        {
-          title: '所属组织',
-          dataIndex: 'orgId',
-          width: 140,
-          ellipsis: true,
-          render: (_: string, record: any) => record?.orgId ? <Tag color="blue">{resolveOrgName(record)}</Tag> : '-',
-        },
-        {
-          title: '所属部门',
-          dataIndex: 'deptId',
-          width: 140,
-          ellipsis: true,
-          render: (_: string, record: any) => (record?.deptId || (record?.orgId && !orgIdSet.has(record.orgId) && departmentMap.has(record.orgId)))
-            ? <Tag color="purple">{resolveDeptName(record)}</Tag>
-            : '-',
-        },
-        { title: '负责人', dataIndex: 'ownerId', width: 110, ellipsis: true, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
-        { title: '备注', dataIndex: 'remark', width: 220, ellipsis: true },
-        actionColumn,
-      ];
-    }
-
-    return [
+    const baseColumns: any[] = [
       { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
       { title: '名称', dataIndex: 'name', width: 180, ellipsis: true },
       { title: '联系人', dataIndex: 'contact', width: 120, ellipsis: true },
@@ -342,54 +270,91 @@ function ObjectTable({
           : '-',
       },
       { title: '负责人', dataIndex: 'ownerId', width: 100, render: (v: string) => v ? <Tag color="green">{userName(v)}</Tag> : '-' },
-      actionColumn,
     ];
+
+    if (isCustomerType) {
+      baseColumns.splice(
+        4,
+        0,
+        { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
+        { title: '属性', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
+        { title: '类型', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
+        { title: '上级客户', dataIndex: 'parentObjectId', width: 180, ellipsis: true, render: (v: string) => v ? <Tag color="blue">{parentCustomerName(v)}</Tag> : '-' },
+        { title: '客户健康度', dataIndex: 'customerHealth', width: 140, render: (v: string) => v ? <Tag color="lime">{v}</Tag> : '-' },
+      );
+    }
+
+    baseColumns.push({
+      title: '操作',
+      width: 200,
+      render: (_: any, r: any) => (
+        <Space size={6} wrap>
+          <Button size="small" onClick={() => nav(`/objects/${r.id}/portal`)}>门户</Button>
+          <Button size="small" onClick={() => openEditor(r)}>编辑</Button>
+          <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => reloadAfterDelete(r.id)}>
+            <Button size="small" danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    });
+
+    return baseColumns;
   }, [current, size, isCustomerType, orgIdSet, departmentMap, allNodeMap, users, customerMap]);
 
   return (
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div
-          style={{
-            background: '#fff',
-            border: '1px solid #f0f0f0',
-            borderRadius: 12,
-            padding: 16,
-            flex: '0 0 auto',
-          }}
-        >
-          <Form form={searchForm} layout="vertical">
-            <Row gutter={[12, 8]}>
-              <Col xs={24} sm={12} md={8} xl={6}>
-                <Form.Item name="deptId" label="所属部门" style={{ marginBottom: 12 }}>
+        <div className="page-toolbar">
+          <Form
+            form={searchForm}
+            layout="inline"
+            style={{ display: 'flex', flexWrap: 'wrap', rowGap: 12, columnGap: 8, minWidth: 0, flex: '1 1 0' }}
+          >
+            <Form.Item name="deptId" label="所属部门">
+              <Select
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                placeholder="请选择部门"
+                style={{ width: 220 }}
+                options={departmentOptions}
+              />
+            </Form.Item>
+            <Form.Item name="name" label="名称">
+              <Input allowClear placeholder="请输入名称" style={{ width: 220 }} />
+            </Form.Item>
+            {isCustomerType ? (
+              <>
+                <Form.Item name="customerRole" label="属性">
+                  <Input allowClear placeholder="请输入原始客户属性" style={{ width: 180 }} />
+                </Form.Item>
+                <Form.Item name="customerScale" label="类型">
+                  <Input allowClear placeholder="请输入原始客户类型" style={{ width: 220 }} />
+                </Form.Item>
+                <Form.Item name="parentObjectId" label="上级客户">
                   <Select
                     allowClear
                     showSearch
                     optionFilterProp="label"
-                    placeholder="请选择部门"
-                    options={departmentOptions}
+                    placeholder="请选择上级客户"
+                    style={{ width: 240 }}
+                    options={parentCustomerOptions}
                   />
                 </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={8} xl={6}>
-                <Form.Item name="name" label="名称" style={{ marginBottom: 12 }}>
-                  <Input allowClear placeholder="请输入名称" />
+                <Form.Item name="customerHealth" label="客户健康度">
+                  <Input allowClear placeholder="请输入客户健康度" style={{ width: 180 }} />
                 </Form.Item>
-              </Col>
-            </Row>
-
-            <div className="page-toolbar" style={{ marginTop: 4 }}>
-              <Space wrap>
-                <Button type="primary" onClick={onSearch}>搜索</Button>
-                <Button onClick={onReset}>重置</Button>
-              </Space>
-              <div className="page-toolbar-right">
-                <Button type="primary" onClick={() => openEditor()}>
-                  新增{typeLabel}
-                </Button>
-              </div>
-            </div>
+              </>
+            ) : null}
+            <Form.Item>
+              <Button type="primary" onClick={onSearch}>搜索</Button>
+            </Form.Item>
           </Form>
+          <div className="page-toolbar-right">
+            <Button type="primary" onClick={() => openEditor()}>
+              新增{typeLabel}
+            </Button>
+          </div>
         </div>
 
         <div
@@ -404,16 +369,14 @@ function ObjectTable({
             overflow: 'hidden',
           }}
         >
-          <div ref={tableWrapRef} style={{ flex: 1, minHeight: 0, padding: '12px 12px 8px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
             <Table
-              size="small"
               dataSource={data}
               rowKey="id"
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: isCustomerType ? 2140 : 1100, y: tableScrollY }}
-              sticky={{ offsetHeader: 0, offsetScroll: 0 }}
+              scroll={{ x: 1880, y: 'calc(100dvh - 495px)' }}
               columns={columns}
             />
           </div>
