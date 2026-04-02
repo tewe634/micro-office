@@ -54,6 +54,7 @@ function ObjectTable({
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
+  const [customerOptionsData, setCustomerOptionsData] = useState<any[]>([]);
   const [searchForm] = Form.useForm();
   const [form] = Form.useForm();
   const selectedOrgId = Form.useWatch('orgId', form);
@@ -72,6 +73,21 @@ function ObjectTable({
     [departments, selectedOrgId],
   );
   const userOptions = useMemo(() => users.map(u => ({ value: u.id, label: u.name })), [users]);
+  const parentCustomerOptions = useMemo(
+    () => customerOptionsData
+      .filter(item => item.id !== edit?.id)
+      .map(item => ({ value: item.id, label: item.name })),
+    [customerOptionsData, edit?.id],
+  );
+
+  const loadCustomerOptions = async () => {
+    if (!isCustomerType) {
+      setCustomerOptionsData([]);
+      return;
+    }
+    const r: any = await objectApi.list('CUSTOMER');
+    setCustomerOptionsData(r.data || []);
+  };
 
   const load = async (c = current, s = size, filters: SearchFilters = activeFilters) => {
     const r: any = await objectApi.page({
@@ -93,6 +109,7 @@ function ObjectTable({
     setActiveFilters({});
     searchForm.resetFields();
     load(1, size, {});
+    loadCustomerOptions().catch(() => setCustomerOptionsData([]));
   }, [type]);
 
   const onSearch = async () => {
@@ -167,6 +184,8 @@ function ObjectTable({
       industry: isCustomerType ? values.industry ?? null : null,
       customerRole: isCustomerType ? values.customerRole ?? null : null,
       customerScale: isCustomerType ? values.customerScale ?? null : null,
+      parentObjectId: isCustomerType ? values.parentObjectId ?? null : null,
+      customerHealth: isCustomerType ? values.customerHealth ?? null : null,
     };
     if (edit) {
       await objectApi.update(edit.id, payload);
@@ -177,14 +196,20 @@ function ObjectTable({
     setModal(false);
     form.resetFields();
     setEdit(null);
-    load(current, size, activeFilters);
+    await load(current, size, activeFilters);
+    if (isCustomerType) {
+      await loadCustomerOptions();
+    }
   };
 
   const reloadAfterDelete = async (id: string) => {
     await objectApi.delete(id);
     message.success('已删除');
     const nextCurrent = current > 1 && data.length === 1 ? current - 1 : current;
-    load(nextCurrent, size, activeFilters);
+    await load(nextCurrent, size, activeFilters);
+    if (isCustomerType) {
+      await loadCustomerOptions();
+    }
   };
 
   const userName = (id: string) => users.find(u => u.id === id)?.name || '-';
@@ -399,6 +424,30 @@ function ObjectTable({
                     extra="直接保存原始导入值，例如：大客户-M、普通客户-N、OEM客户-X、项目客户-P、非注册"
                   >
                     <Input allowClear placeholder="请输入原始规模/客户属性" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="parentObjectId"
+                    label="上级客户"
+                    extra="用于维护母子公司、集团与子公司等上下级关系。"
+                  >
+                    <Select
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      placeholder="请选择上级客户"
+                      options={parentCustomerOptions}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="customerHealth"
+                    label="客户健康度"
+                    extra="例如：健康、稳定、关注、风险、培育中。"
+                  >
+                    <Input allowClear placeholder="请输入当前阶段客户健康度" />
                   </Form.Item>
                 </Col>
               </>
