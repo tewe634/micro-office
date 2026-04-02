@@ -131,6 +131,13 @@ function ObjectTable({
     await load(1, size, nextFilters);
   };
 
+  const onReset = async () => {
+    searchForm.resetFields();
+    const nextFilters = {};
+    setActiveFilters(nextFilters);
+    await load(1, size, nextFilters);
+  };
+
   const normalizeRecordForForm = (record: any) => {
     const next = { ...record };
 
@@ -304,57 +311,77 @@ function ObjectTable({
   return (
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="page-toolbar">
-          <Form
-            form={searchForm}
-            layout="inline"
-            style={{ display: 'flex', flexWrap: 'wrap', rowGap: 12, columnGap: 8, minWidth: 0, flex: '1 1 0' }}
-          >
-            <Form.Item name="deptId" label="所属部门">
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                placeholder="请选择部门"
-                style={{ width: 220 }}
-                options={departmentOptions}
-              />
-            </Form.Item>
-            <Form.Item name="name" label="名称">
-              <Input allowClear placeholder="请输入名称" style={{ width: 220 }} />
-            </Form.Item>
-            {isCustomerType ? (
-              <>
-                <Form.Item name="customerRole" label="属性">
-                  <Input allowClear placeholder="请输入原始客户属性" style={{ width: 180 }} />
-                </Form.Item>
-                <Form.Item name="customerScale" label="类型">
-                  <Input allowClear placeholder="请输入原始客户类型" style={{ width: 220 }} />
-                </Form.Item>
-                <Form.Item name="parentObjectId" label="上级客户">
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #f0f0f0',
+            borderRadius: 12,
+            padding: 16,
+            flex: '0 0 auto',
+          }}
+        >
+          <Form form={searchForm} layout="vertical">
+            <Row gutter={[12, 8]}>
+              <Col xs={24} sm={12} md={8} xl={6}>
+                <Form.Item name="deptId" label="所属部门" style={{ marginBottom: 12 }}>
                   <Select
                     allowClear
                     showSearch
                     optionFilterProp="label"
-                    placeholder="请选择上级客户"
-                    style={{ width: 240 }}
-                    options={parentCustomerOptions}
+                    placeholder="请选择部门"
+                    options={departmentOptions}
                   />
                 </Form.Item>
-                <Form.Item name="customerHealth" label="客户健康度">
-                  <Input allowClear placeholder="请输入客户健康度" style={{ width: 180 }} />
+              </Col>
+              <Col xs={24} sm={12} md={8} xl={6}>
+                <Form.Item name="name" label="名称" style={{ marginBottom: 12 }}>
+                  <Input allowClear placeholder="请输入名称" />
                 </Form.Item>
-              </>
-            ) : null}
-            <Form.Item>
-              <Button type="primary" onClick={onSearch}>搜索</Button>
-            </Form.Item>
+              </Col>
+              {isCustomerType ? (
+                <>
+                  <Col xs={24} sm={12} md={8} xl={6}>
+                    <Form.Item name="customerRole" label="属性" style={{ marginBottom: 12 }}>
+                      <Input allowClear placeholder="请输入原始客户属性" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12} md={8} xl={6}>
+                    <Form.Item name="customerScale" label="类型" style={{ marginBottom: 12 }}>
+                      <Input allowClear placeholder="请输入原始客户类型" />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12} md={8} xl={6}>
+                    <Form.Item name="parentObjectId" label="上级客户" style={{ marginBottom: 12 }}>
+                      <Select
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="请选择上级客户"
+                        options={parentCustomerOptions}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12} md={8} xl={6}>
+                    <Form.Item name="customerHealth" label="客户健康度" style={{ marginBottom: 12 }}>
+                      <Input allowClear placeholder="请输入客户健康度" />
+                    </Form.Item>
+                  </Col>
+                </>
+              ) : null}
+            </Row>
+
+            <div className="page-toolbar" style={{ marginTop: 4 }}>
+              <Space wrap>
+                <Button type="primary" onClick={onSearch}>搜索</Button>
+                <Button onClick={onReset}>重置</Button>
+              </Space>
+              <div className="page-toolbar-right">
+                <Button type="primary" onClick={() => openEditor()}>
+                  新增{typeLabel}
+                </Button>
+              </div>
+            </div>
           </Form>
-          <div className="page-toolbar-right">
-            <Button type="primary" onClick={() => openEditor()}>
-              新增{typeLabel}
-            </Button>
-          </div>
         </div>
 
         <div
@@ -369,14 +396,16 @@ function ObjectTable({
             overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 16px', overflow: 'auto' }}>
             <Table
+              size="small"
               dataSource={data}
               rowKey="id"
               pagination={false}
               tableLayout="fixed"
               showSorterTooltip={false}
-              scroll={{ x: 1880, y: 'calc(100dvh - 495px)' }}
+              scroll={{ x: 1880 }}
+              sticky
               columns={columns}
             />
           </div>
