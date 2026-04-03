@@ -26,22 +26,50 @@ ALTER TABLE IF EXISTS mo_conversations
     DROP CONSTRAINT IF EXISTS fk_conversations_workflow_project;
 
 -- 保留待办/会话记录，但清空已下线 workflow 引用，避免留下悬空 ID。
-UPDATE mo_todos
-SET workflow_id = NULL,
-    node_id = NULL,
-    updated_at = NOW()
-WHERE workflow_id IS NOT NULL
-   OR node_id IS NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'mo_todos'
+          AND column_name = 'workflow_id'
+    ) AND EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'mo_todos'
+          AND column_name = 'node_id'
+    ) THEN
+        UPDATE mo_todos
+        SET workflow_id = NULL,
+            node_id = NULL,
+            updated_at = NOW()
+        WHERE workflow_id IS NOT NULL
+           OR node_id IS NOT NULL;
+    END IF;
+END $$;
 
-UPDATE mo_conversations
-SET type = CASE
-        WHEN workflow_id IS NOT NULL AND type = 'PROJECT_WORKFLOW'::mo_conversation_type
-            THEN 'PROJECT_GENERAL'::mo_conversation_type
-        ELSE type
-    END,
-    workflow_id = NULL,
-    updated_at = NOW()
-WHERE workflow_id IS NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'mo_conversations'
+          AND column_name = 'workflow_id'
+    ) THEN
+        UPDATE mo_conversations
+        SET type = CASE
+                WHEN workflow_id IS NOT NULL AND type = 'PROJECT_WORKFLOW'::mo_conversation_type
+                    THEN 'PROJECT_GENERAL'::mo_conversation_type
+                ELSE type
+            END,
+            workflow_id = NULL,
+            updated_at = NOW()
+        WHERE workflow_id IS NOT NULL;
+    END IF;
+END $$;
 
 -- 删除 workflow runtime 基表。
 DROP TABLE IF EXISTS mo_workflow_node_ai_prefill CASCADE;

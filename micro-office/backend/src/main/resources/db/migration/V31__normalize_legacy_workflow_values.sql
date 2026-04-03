@@ -11,29 +11,40 @@ SET source_type = 'PROJECT_TASK',
     updated_at = NOW()
 WHERE source_type = 'WORKFLOW_NODE';
 
-UPDATE mo_conversations
-SET type = 'PROJECT_GENERAL'::mo_conversation_type,
-    workflow_id = NULL,
-    updated_at = NOW()
-WHERE type = 'PROJECT_WORKFLOW'::mo_conversation_type;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'mo_conversations'
+          AND column_name = 'workflow_id'
+    ) THEN
+        UPDATE mo_conversations
+        SET type = 'PROJECT_GENERAL'::mo_conversation_type,
+            workflow_id = NULL,
+            updated_at = NOW()
+        WHERE type = 'PROJECT_WORKFLOW'::mo_conversation_type;
 
-ALTER TABLE IF EXISTS mo_conversations
-    DROP CONSTRAINT IF EXISTS ck_conversations_scope;
+        ALTER TABLE IF EXISTS mo_conversations
+            DROP CONSTRAINT IF EXISTS ck_conversations_scope;
 
-ALTER TABLE IF EXISTS mo_conversations
-    ADD CONSTRAINT ck_conversations_scope CHECK (
-        (
-            type = 'PROJECT_GENERAL'::mo_conversation_type
-            AND project_id IS NOT NULL
-            AND workflow_id IS NULL
-            AND daily_entry_id IS NULL
-        )
-        OR (
-            type = 'DAILY_ENTRY'::mo_conversation_type
-            AND project_id IS NULL
-            AND daily_entry_id IS NOT NULL
-            AND workflow_id IS NULL
-        )
-    );
+        ALTER TABLE IF EXISTS mo_conversations
+            ADD CONSTRAINT ck_conversations_scope CHECK (
+                (
+                    type = 'PROJECT_GENERAL'::mo_conversation_type
+                    AND project_id IS NOT NULL
+                    AND workflow_id IS NULL
+                    AND daily_entry_id IS NULL
+                )
+                OR (
+                    type = 'DAILY_ENTRY'::mo_conversation_type
+                    AND project_id IS NULL
+                    AND daily_entry_id IS NOT NULL
+                    AND workflow_id IS NULL
+                )
+            );
+    END IF;
+END $$;
 
 COMMIT;

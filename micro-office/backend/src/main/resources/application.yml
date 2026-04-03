@@ -27,7 +27,8 @@ mybatis-plus:
 
 jwt:
   secret: change-this-in-production-use-a-long-random-string
-  expiration: 86400000
+  # <= 0 表示不写入 exp，只要 auth_session 未撤销就持续有效
+  expiration: 0
 
 logging:
   level:
