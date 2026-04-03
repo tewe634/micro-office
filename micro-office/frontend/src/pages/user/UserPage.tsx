@@ -43,7 +43,7 @@ export default function UserPage() {
   return (
     <Card title="人员管理" styles={{ body: { padding: 0 } }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }} extra={
       <Space>
-        <Select allowClear placeholder="按组织筛选" style={{ width: 160 }}
+        <Select allowClear showSearch optionFilterProp="label" placeholder="按组织筛选" style={{ width: 160 }}
           options={orgs.map(o => ({ value: o.id, label: o.name }))}
           onChange={v => setFilterOrg(v)} />
         <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增人员</Button>
@@ -86,7 +86,7 @@ export default function UserPage() {
             <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
           </Form.Item>
           <Form.Item name="orgId" label="所属组织">
-            <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+            <Select allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
           <Form.Item name="primaryPositionId" label="主岗位">
             <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />

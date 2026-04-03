@@ -86,6 +86,8 @@ export default function UserTab() {
         <div className="page-toolbar">
           <Select
             allowClear
+            showSearch
+            optionFilterProp="label"
             placeholder="按组织筛选"
             style={{ width: 220 }}
             options={orgs.map(o => ({ value: o.id, label: o.name }))}
@@ -185,7 +187,7 @@ export default function UserTab() {
             <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
           </Form.Item>
           <Form.Item name="orgId" label="所属组织">
-            <Select allowClear placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+            <Select allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
           <Form.Item name="primaryPositionId" label="主岗位">
             <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
