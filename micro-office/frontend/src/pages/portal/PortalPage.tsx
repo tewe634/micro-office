@@ -1016,11 +1016,9 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           <Col xs={24} xl={16}>
             <Space wrap size={[8, 8]}>
               <Tag color="blue">{formatObjectType(header.type)}</Tag>
-              {customerPerspectiveLabel ? <Tag color="cyan">口径：{customerPerspectiveLabel}</Tag> : null}
               {header.industry ? <Tag color="geekblue">{header.industry}</Tag> : null}
               {header.customerRole ? <Tag color="purple">{header.customerRole}</Tag> : null}
               {header.customerScale ? <Tag color="gold">{header.customerScale}</Tag> : null}
-              <Tag color={customerHealthColor(header.customerHealth)}>健康度：{customerHealthText}</Tag>
             </Space>
 
             <div style={{ marginTop: 14, fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>
