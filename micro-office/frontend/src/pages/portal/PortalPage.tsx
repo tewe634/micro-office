@@ -1004,7 +1004,10 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       { label: '联系人', value: header.contact },
       { label: '联系电话', value: header.phone },
       { label: '上级客户', value: header.parentObjectName },
-      { label: '最近跟进', value: customerLatestFollowUp?.updatedAt },
+      {
+        label: '健康度',
+        value: <Tag color={customerHealthColor(header.customerHealth)} style={{ marginInlineEnd: 0 }}>{customerHealthText}</Tag>,
+      },
     ];
 
     return (
