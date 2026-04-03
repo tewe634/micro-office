@@ -1036,15 +1036,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                 : '暂无待推进事项'}
             </div>
 
-            {customerPerspectiveLabel || customerPerspectiveHint ? (
-              <Alert
-                style={{ marginTop: 16 }}
-                type="info"
-                showIcon
-                message={`当前口径：${customerPerspectiveLabel || '客户经营视角'}`}
-                description={customerPerspectiveHint || '当前客户门户围绕负责人及关联人员的经营动作、产品与绩效信息组织。'}
-              />
-            ) : null}
           </Col>
 
           <Col xs={24} xl={8}>
