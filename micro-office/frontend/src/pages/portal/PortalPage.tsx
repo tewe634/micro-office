@@ -162,6 +162,27 @@ function formatMetricDisplay(value: unknown, suffix?: string) {
   return '-';
 }
 
+function customerHealthLabel(value: unknown) {
+  return normalizeText(value) || '待评估';
+}
+
+function customerHealthColor(value: unknown) {
+  const text = normalizeText(value);
+  if (!text) {
+    return 'gold';
+  }
+  if (/风险|流失|预警|异常|低/.test(text)) {
+    return 'red';
+  }
+  if (/关注|一般|中/.test(text)) {
+    return 'orange';
+  }
+  if (/健康|稳定|良好|高/.test(text)) {
+    return 'green';
+  }
+  return 'blue';
+}
+
 function isRealEntityId(id?: string | number | null) {
   return !!id && !String(id).startsWith('mock-');
 }
@@ -446,6 +467,23 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     [isCustomerObjectPortal, summaryCards],
   );
   const customerParticipantLabel = normalizeText(data?.perspectiveMode) === 'OWNER' ? '负责人' : '关联人员';
+  const customerSalesSummaryRows = Array.isArray((data as any)?.salesSummary) ? (data as any).salesSummary : [];
+  const customerHealthText = customerHealthLabel(header.customerHealth);
+  const customerRecentWorkItems = useMemo(() => {
+    return [...userWorkItems]
+      .sort((left: any, right: any) => String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')))
+      .slice(0, 5);
+  }, [userWorkItems]);
+  const customerOpenWorkItems = useMemo(() => {
+    return [...userWorkItems]
+      .filter((item: any) => {
+        const status = normalizeText(item.status) || '';
+        return status === 'TODO' || status === 'IN_PROGRESS';
+      })
+      .sort((left: any, right: any) => String(right.updatedAt || '').localeCompare(String(left.updatedAt || '')));
+  }, [userWorkItems]);
+  const customerLatestFollowUp = customerRecentWorkItems[0] || null;
+  const customerNextAction = customerOpenWorkItems[0] || null;
 
   const portalOptions = useMemo(() => {
     const primaryOptions = Array.isArray(data?.portalOptions) ? data.portalOptions : [];
@@ -844,8 +882,10 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           ['对象类型', formatObjectType(header.type)],
           ['客户角色', header.customerRole],
           ['客户规模', header.customerScale],
+          ['负责人', header.ownerName],
+          ['客户门户口径', customerPerspectiveLabel],
           ['上级客户', header.parentObjectName],
-          ['客户健康度', header.customerHealth],
+          ['客户健康度', customerHealthText],
           ['联系人', header.contact],
           ['联系电话', header.phone],
           ['所属组织', header.orgName],
@@ -956,6 +996,229 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
         pagination={false}
         size="small"
       />
+    </Card>
+  );
+
+  const renderCustomerOverviewCard = () => {
+    const facts = [
+      { label: '联系人', value: header.contact },
+      { label: '联系电话', value: header.phone },
+      { label: '上级客户', value: header.parentObjectName },
+      { label: '最近跟进', value: customerLatestFollowUp?.updatedAt },
+    ];
+
+    return (
+      <Card className="portal-section-card" styles={{ body: { padding: 24 } }}>
+        <Row gutter={[20, 20]} align="middle">
+          <Col xs={24} xl={16}>
+            <Space wrap size={[8, 8]}>
+              <Tag color="blue">{formatObjectType(header.type)}</Tag>
+              {customerPerspectiveLabel ? <Tag color="cyan">口径：{customerPerspectiveLabel}</Tag> : null}
+              {header.industry ? <Tag color="geekblue">{header.industry}</Tag> : null}
+              {header.customerRole ? <Tag color="purple">{header.customerRole}</Tag> : null}
+              {header.customerScale ? <Tag color="gold">{header.customerScale}</Tag> : null}
+              <Tag color={customerHealthColor(header.customerHealth)}>健康度：{customerHealthText}</Tag>
+            </Space>
+
+            <div style={{ marginTop: 14, fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>
+              {header.name || '-'}
+            </div>
+
+            <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 12, color: '#475569', fontSize: 14 }}>
+              <span>负责人：{renderPortalLink('users', header.ownerId, header.ownerName || '-')}</span>
+              <span>归属：{buildHint([header.orgName, header.deptName]) || '-'}</span>
+              <span>最近跟进：{customerLatestFollowUp?.updatedAt || '-'}</span>
+            </div>
+
+            <div style={{ marginTop: 8, color: '#64748b', fontSize: 14, lineHeight: 1.7 }}>
+              下一步动作：{customerNextAction
+                ? `${customerNextAction.title || '-'}（${statusLabelMap[normalizeText(customerNextAction.status) || ''] || customerNextAction.status || '-'}）`
+                : '暂无待推进事项'}
+            </div>
+
+            {customerPerspectiveLabel || customerPerspectiveHint ? (
+              <Alert
+                style={{ marginTop: 16 }}
+                type="info"
+                showIcon
+                message={`当前口径：${customerPerspectiveLabel || '客户经营视角'}`}
+                description={customerPerspectiveHint || '当前客户门户围绕负责人及关联人员的经营动作、产品与绩效信息组织。'}
+              />
+            ) : null}
+          </Col>
+
+          <Col xs={24} xl={8}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+              {facts.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    border: '1px solid rgba(226, 232, 240, 0.95)',
+                    borderRadius: 16,
+                    padding: 14,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.92) 100%)',
+                    minHeight: 88,
+                  }}
+                >
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                  <div style={{ marginTop: 8, color: '#0f172a', fontSize: 14, fontWeight: 700, lineHeight: 1.5, wordBreak: 'break-word' }}>
+                    {item.value || '-'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Col>
+        </Row>
+      </Card>
+    );
+  };
+
+  const renderCustomerParticipantSummary = () => (
+    <Card
+      className="portal-section-card"
+      title={`${customerParticipantLabel}汇总`}
+      extra={<Tag color="cyan">{formatMetricDisplay(customerSalesSummaryRows.length, '人')}</Tag>}
+    >
+      <Table
+        dataSource={customerSalesSummaryRows}
+        rowKey={(record: any) => String(record.id || record.salespersonId || record.salespersonName)}
+        pagination={false}
+        size="small"
+        scroll={{ x: 860 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无负责人/参与人汇总数据" /> }}
+        columns={[
+          {
+            title: customerParticipantLabel,
+            dataIndex: 'salespersonName',
+            width: 160,
+            render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, record.salespersonName),
+          },
+          {
+            title: '贡献金额',
+            dataIndex: 'amount',
+            width: 150,
+            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+          },
+          { title: '相关产品', dataIndex: 'productCount', width: 100 },
+          { title: '绩效明细', dataIndex: 'performanceItemCount', width: 100 },
+          { title: '最近活跃', dataIndex: 'lastActiveAt', width: 120 },
+          {
+            title: '详情',
+            width: 120,
+            render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, '查看人员门户'),
+          },
+        ]}
+      />
+    </Card>
+  );
+
+  const renderCustomerProductSummary = () => (
+    <Card
+      className="portal-section-card"
+      title="相关产品"
+      extra={<Tag color="geekblue">{formatMetricDisplay(relatedProductsRows.length, '项')}</Tag>}
+    >
+      <Table
+        dataSource={relatedProductsRows}
+        rowKey={(record: any) => String(record.id || record.code || record.name)}
+        pagination={false}
+        size="small"
+        scroll={{ x: 760 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无相关产品数据" /> }}
+        columns={[
+          {
+            title: '产品',
+            dataIndex: 'name',
+            render: (_: unknown, record: any) => renderPortalLink('products', record.id, record.name),
+          },
+          { title: '编码', dataIndex: 'code', width: 180 },
+          {
+            title: '累计金额',
+            dataIndex: 'amount',
+            width: 150,
+            render: (value: unknown) => <span style={{ fontWeight: 600 }}>{formatAmount(value)}</span>,
+          },
+          {
+            title: '详情',
+            width: 120,
+            render: (_: unknown, record: any) => renderPortalLink('products', record.id, '查看产品门户'),
+          },
+        ]}
+      />
+    </Card>
+  );
+
+  const renderCustomerProgressPanel = () => (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} xl={12}>
+        <Card className="portal-section-card" title="最近跟进">
+          {customerRecentWorkItems.length ? (
+            <div className="portal-home-info-list">
+              {customerRecentWorkItems.map((item: any) => (
+                <div className="portal-home-info-list__item" key={String(item.id || item.title)}>
+                  <div className="portal-home-info-list__main">
+                    <div className="portal-home-info-list__title">{item.title || '-'}</div>
+                    <div className="portal-home-info-list__meta">
+                      {buildHint([
+                        item.stage,
+                        item.ownerName,
+                        item.productName,
+                        statusLabelMap[normalizeText(item.status) || ''] || normalizeText(item.status),
+                      ]) || '暂无补充说明'}
+                    </div>
+                  </div>
+                  <div className="portal-home-info-list__side">
+                    <div className="portal-home-info-list__value">{item.updatedAt || '-'}</div>
+                    <div className="portal-home-info-list__subvalue">最近更新</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="portal-home-info-list__empty">暂无跟进记录</div>
+          )}
+        </Card>
+      </Col>
+      <Col xs={24} xl={12}>
+        <Card className="portal-section-card" title="下一步动作">
+          {customerOpenWorkItems.length ? (
+            <div className="portal-home-info-list">
+              {customerOpenWorkItems.slice(0, 5).map((item: any) => (
+                <div className="portal-home-info-list__item" key={String(item.id || item.title)}>
+                  <div className="portal-home-info-list__main">
+                    <div className="portal-home-info-list__title">{item.title || '-'}</div>
+                    <div className="portal-home-info-list__meta">
+                      {buildHint([item.stage, item.ownerName, item.productName]) || '暂无补充说明'}
+                    </div>
+                  </div>
+                  <div className="portal-home-info-list__side">
+                    <div className="portal-home-info-list__value">
+                      <Tag color={statusColorMap[normalizeText(item.status) || ''] || 'default'}>
+                        {statusLabelMap[normalizeText(item.status) || ''] || item.status || '-'}
+                      </Tag>
+                    </div>
+                    <div className="portal-home-info-list__subvalue">当前状态</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="portal-home-info-list__empty">暂无待推进事项</div>
+          )}
+        </Card>
+      </Col>
+    </Row>
+  );
+
+  const renderCustomerArchiveCard = () => (
+    <Card className="portal-section-card" title="客户基础档案">
+      <Descriptions column={2} bordered size="small">
+        {descriptionItems().map(([label, value]) => (
+          <Descriptions.Item key={label} label={label}>
+            {value || '-'}
+          </Descriptions.Item>
+        ))}
+      </Descriptions>
     </Card>
   );
 
@@ -1153,13 +1416,29 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   };
 
   const renderCustomerObjectPortal = () => (
-    <>
-      <Card title="绩效明细">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {renderCustomerOverviewCard()}
+      {renderSummaryCards()}
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={14}>
+          {renderCustomerParticipantSummary()}
+        </Col>
+        <Col xs={24} xl={10}>
+          {renderCustomerProductSummary()}
+        </Col>
+      </Row>
+
+      {renderCustomerProgressPanel()}
+
+      <Card className="portal-section-card" title="绩效明细">
         <Table
           dataSource={performanceItemRows}
           rowKey={(record: any) => String(record.id || `${record.salespersonName}-${record.productName}`)}
           pagination={false}
           size="small"
+          scroll={{ x: 900 }}
+          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无绩效明细数据" /> }}
           columns={[
             { title: '日期', dataIndex: 'achievedAt', width: 120 },
             {
@@ -1187,7 +1466,8 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       </Card>
 
       {renderWorkSection()}
-    </>
+      {renderCustomerArchiveCard()}
+    </div>
   );
 
   const renderWorkObjectPortal = () => (
@@ -1900,6 +2180,59 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     );
   };
 
+  const renderNonUserPortal = () => {
+    if (isCustomerObjectPortal) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {isRefreshing ? <Alert type="info" showIcon message={refreshingMessage} /> : null}
+          <div className="page-toolbar" style={{ justifyContent: 'flex-start' }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
+              返回
+            </Button>
+          </div>
+          {renderCustomerObjectPortal()}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {isRefreshing ? <Alert type="info" showIcon message={refreshingMessage} /> : null}
+        <div className="page-toolbar" style={{ justifyContent: 'flex-start' }}>
+          <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
+            返回
+          </Button>
+        </div>
+
+        {renderContextPanel()}
+
+        <Card>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: '#111827' }}>{header.name || '-'}</div>
+                <Space wrap style={{ marginTop: 8 }}>
+                  {headerTags()}
+                </Space>
+              </div>
+            </div>
+
+            <Descriptions column={2} bordered size="small">
+              {descriptionItems().map(([label, value]) => (
+                <Descriptions.Item key={label} label={label}>
+                  {value || '-'}
+                </Descriptions.Item>
+              ))}
+            </Descriptions>
+          </div>
+        </Card>
+
+        {renderSummaryCards()}
+        {renderVariant()}
+      </div>
+    );
+  };
+
   const isInitialLoading = loading && !data;
   const isRefreshing = loading && !!data;
   const refreshingMessage = entityType === 'users'
@@ -1937,42 +2270,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
                 {isUserDetailRoute ? renderUserDetailPortal() : renderUserMainPortal()}
               </div>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {isRefreshing ? <Alert type="info" showIcon message={refreshingMessage} /> : null}
-              <div className="page-toolbar" style={{ justifyContent: 'flex-start' }}>
-                <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>
-                  返回
-                </Button>
-              </div>
-
-              {renderContextPanel()}
-
-              <Card>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-                    <div>
-                      <div style={{ fontSize: 26, fontWeight: 700, color: '#111827' }}>{header.name || '-'}</div>
-                      <Space wrap style={{ marginTop: 8 }}>
-                        {headerTags()}
-                      </Space>
-                    </div>
-                  </div>
-
-                  <Descriptions column={2} bordered size="small">
-                    {descriptionItems().map(([label, value]) => (
-                      <Descriptions.Item key={label} label={label}>
-                        {value || '-'}
-                      </Descriptions.Item>
-                    ))}
-                  </Descriptions>
-                </div>
-              </Card>
-
-              {renderSummaryCards()}
-              {renderVariant()}
-            </div>
-          )
+          ) : renderNonUserPortal()
         ) : null}
       </div>
     </Card>
