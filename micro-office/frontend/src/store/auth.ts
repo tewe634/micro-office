@@ -57,7 +57,9 @@ export const parseJwtPayload = (token: string | null): Record<string, unknown> |
 
 export const isTokenExpired = (token: string | null, skewMs = 5000) => {
   const payload = parseJwtPayload(token);
-  if (!payload || typeof payload.exp !== 'number') return true;
+  if (!payload) return true;
+  // 后端配置 jwt.expiration <= 0 时不会写入 exp，改由服务端 auth_session 控制会话有效性。
+  if (typeof payload.exp !== 'number') return false;
   return payload.exp * 1000 <= Date.now() + skewMs;
 };
 
