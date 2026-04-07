@@ -496,7 +496,7 @@ export default function AdminSalesCollabPage() {
   })), [orgNameMap, users]);
   const positionOptions = useMemo(() => positions.map(position => ({
     value: position.id,
-    label: position.code ? `${position.name}（${position.code}）` : position.name,
+    label: position.name,
   })), [positions]);
   const salesRoot = useMemo(() => orgs.find(org => org.name === '销售体系'), [orgs]);
   const salesOrgIds = useMemo(() => (salesRoot ? collectDescendantIds(salesRoot.id, orgs) : new Set<string>()), [orgs, salesRoot]);

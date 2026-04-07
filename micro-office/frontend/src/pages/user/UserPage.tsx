@@ -89,7 +89,7 @@ export default function UserPage() {
             <Select allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
           <Form.Item name="primaryPositionId" label="主岗位">
-            <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
+            <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>
           <Form.Item
             name="extraPositionIds"
@@ -97,7 +97,7 @@ export default function UserPage() {
             extra="辅助岗位会出现在人员门户的岗位切换中，可用于多岗位门户测试。"
           >
             <Select mode="multiple" allowClear placeholder="选择辅助岗位"
-              options={positions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))} />
+              options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>
           <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>
         </Form>

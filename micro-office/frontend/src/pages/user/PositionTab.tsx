@@ -66,7 +66,6 @@ export default function PositionTab() {
               columns={[
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '岗位名称', dataIndex: 'name', ellipsis: true },
-                { title: '编码', dataIndex: 'code', width: 220, ellipsis: true },
                 ...(canManagePersonnel ? [{
                   title: '操作',
                   width: 140,

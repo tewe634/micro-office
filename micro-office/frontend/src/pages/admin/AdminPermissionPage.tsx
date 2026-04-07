@@ -354,7 +354,7 @@ function ObjectTypePermTab() {
           size="middle"
           scroll={{ x: 900 }}
           columns={[
-            { title: '岗位', width: 140, render: (_: any, r: any) => `${r.name} (${r.code})` },
+            { title: '岗位', width: 140, render: (_: any, r: any) => r.name }, 
             ...objectTypes.map(ot => ({
               title: ot.label,
               width: 90,
