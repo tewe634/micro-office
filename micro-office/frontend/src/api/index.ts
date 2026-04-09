@@ -180,6 +180,17 @@ export const salesCollabApi = {
   saveOrgBinding: (orgId: string | number, data: any) => api.put(`/admin/sales-collab/org-binding/${orgId}`, data),
 };
 
+export const portalTemplateAdminApi = {
+  meta: () => api.get('/admin/portal-templates/meta'),
+  positions: () => api.get('/admin/portal-templates/positions'),
+  listTemplates: () => api.get('/admin/portal-templates/templates'),
+  getTemplate: (id: string | number) => api.get(`/admin/portal-templates/templates/${id}`),
+  generateByPosition: (data: { positionId: string | number }) => api.post('/admin/portal-templates/generate-by-position', data),
+  createTemplate: (data: any) => api.post('/admin/portal-templates/templates', data),
+  updateTemplate: (id: string | number, data: any) => api.put(`/admin/portal-templates/templates/${id}`, data),
+  deleteTemplate: (id: string | number) => api.delete(`/admin/portal-templates/templates/${id}`),
+};
+
 export const portalApi = {
   object: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/objects/${id}`, { params }),
   product: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/products/${id}`, { params }),

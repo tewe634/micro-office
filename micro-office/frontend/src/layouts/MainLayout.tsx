@@ -32,6 +32,7 @@ const pageTitles: Record<string, string> = {
   '/products': '产品与服务',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
+  '/admin/portal-templates': '门户模板',
 };
 
 const menuOrder = ['/org', '/users', '/objects', '/products'];
@@ -39,9 +40,11 @@ const menuOrder = ['/org', '/users', '/objects', '/products'];
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
+  { key: '/admin/portal-templates', label: '门户模板' },
 ];
 
 function resolveSelectedKey(pathname: string) {
+  if (pathname.startsWith('/admin/portal-templates')) return '/admin/portal-templates';
   if (pathname.startsWith('/admin/sales-collab')) return '/admin/sales-collab';
   if (pathname.startsWith('/admin/permissions')) return '/admin/permissions';
   if (pathname.startsWith('/admin')) return '/admin';

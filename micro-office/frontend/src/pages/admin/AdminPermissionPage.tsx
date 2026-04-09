@@ -30,6 +30,7 @@ const menus = [
   { key: '/admin', label: '系统管理' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
+  { key: '/admin/portal-templates', label: '门户模板' },
 ];
 
 const objectTypes = [
