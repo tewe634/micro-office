@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
-import { useNavigate } from 'react-router-dom';
 import { userApi, orgApi, positionApi } from '../../api';
 import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
@@ -8,7 +7,6 @@ import { useAuthStore } from '../../store/auth';
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
 export default function UserTab() {
-  const nav = useNavigate();
   const role = useAuthStore(s => s.role);
   const canManagePersonnel = role === 'ADMIN' || role === 'HR';
   const [users, setUsers] = useState<any[]>([]);
@@ -135,10 +133,9 @@ export default function UserTab() {
                 },
                 {
                   title: '操作',
-                  width: canManagePersonnel ? 210 : 110,
+                  width: canManagePersonnel ? 140 : 90,
                   render: (_: any, r: any) => (
                     <Space size={6} wrap>
-                      <Button size="small" onClick={() => nav(`/users/${r.id}/portal`)}>门户</Button>
                       {canManagePersonnel ? (
                         <>
                           <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
@@ -195,7 +192,7 @@ export default function UserTab() {
           <Form.Item
             name="extraPositionIds"
             label="辅助岗位（可多选）"
-            extra="辅助岗位会出现在人员门户的岗位切换中，可用于多岗位门户测试。"
+            extra="辅助岗位用于补充人员的岗位归属，便于后续按岗位定义门户模板。"
           >
             <Select mode="multiple" allowClear placeholder="选择辅助岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>

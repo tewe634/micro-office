@@ -117,7 +117,7 @@ npm run dev
 | 用户 | /api/users | 用户资料、自助信息、权限可见范围内查询 |
 | 外部对象 | /api/objects | 客户 / 供应商等对象 CRUD |
 | 产品 | /api/products | 产品服务 CRUD |
-| 门户 | /api/portal/users/:id / objects/:id / products/:id | 用户 / 对象 / 产品门户 |
+| 门户 | /api/portal/objects/:id / products/:id | 对象 / 产品门户 |
 | 管理权限 | /api/admin/permissions 等 | 角色菜单、用户菜单、对象类型配置 |
 | 销售协同配置 | /api/admin/sales-collab/* | 协同模板、规则、部门绑定 |
 

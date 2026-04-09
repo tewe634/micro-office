@@ -352,8 +352,6 @@ async function main() {
   assert(fetchedProduct?.name === `${RUN_ID} product updated`, 'product update not visible', fetchedProduct);
 
   log('checking portal endpoints');
-  const userPortal = await api('GET', `/portal/users/${crudUserId}`, { token: adminToken });
-  assert(userPortal?.header?.id === crudUserId, 'user portal header mismatch', userPortal);
   const objectPortal = await api('GET', `/portal/objects/${createdObject.id}`, { token: adminToken });
   assert(objectPortal?.header?.id === createdObject.id, 'object portal header mismatch', objectPortal);
   assert(objectPortal?.header?.customerRole === '系统集成商', 'object portal header missing customerRole', objectPortal);

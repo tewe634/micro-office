@@ -94,7 +94,7 @@ export default function UserPage() {
           <Form.Item
             name="extraPositionIds"
             label="辅助岗位（可多选）"
-            extra="辅助岗位会出现在人员门户的岗位切换中，可用于多岗位门户测试。"
+            extra="辅助岗位用于补充人员的岗位归属，便于后续按岗位定义门户模板。"
           >
             <Select mode="multiple" allowClear placeholder="选择辅助岗位"
               options={positions.map(p => ({ value: p.id, label: p.name }))} />

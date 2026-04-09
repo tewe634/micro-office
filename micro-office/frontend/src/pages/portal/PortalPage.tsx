@@ -377,7 +377,6 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const userDetailSection = isUserDetailRoute ? normalizeUserPortalDetailSection(detailSectionParam) : null;
 
   const loader = useMemo(() => {
-    if (entityType === 'users') return portalApi.user;
     if (entityType === 'objects') return portalApi.object;
     return portalApi.product;
   }, [entityType]);
@@ -424,14 +423,14 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
     };
   }, [id, loader, requestParams]);
 
-  const goPortal = (kind: PortalEntityType, targetId?: string | number | null) => {
-    if (!isRealEntityId(targetId)) return;
+  const goPortal = (kind: 'users' | PortalEntityType, targetId?: string | number | null) => {
+    if (kind === 'users' || !isRealEntityId(targetId)) return;
     navigate(`/${kind}/${targetId}/portal`);
   };
 
-  const renderPortalLink = (kind: PortalEntityType, targetId: unknown, label: unknown) => {
+  const renderPortalLink = (kind: 'users' | PortalEntityType, targetId: unknown, label: unknown) => {
     const menuKey = `/${kind}`;
-    if (!isRealEntityId(targetId as string | number | null | undefined) || !menus.includes(menuKey)) {
+    if (kind === 'users' || !isRealEntityId(targetId as string | number | null | undefined) || !menus.includes(menuKey)) {
       return <span>{normalizeText(label) || '-'}</span>;
     }
     return (
@@ -1097,7 +1096,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
           {
             title: '详情',
             width: 120,
-            render: (_: unknown, record: any) => renderPortalLink('users', record.salespersonId, '查看人员门户'),
+            render: () => '-',
           },
         ]}
       />
@@ -2068,7 +2067,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
 
     if (activePortalOption) {
       const portalDetail = buildHint([activePortalOption.badge, activePortalOption.hint]);
-      hints.push(portalDetail ? `岗位上下文：${portalDetail}` : `当前人员门户按“${activePortalOption.label}”岗位展示`);
+      hints.push(portalDetail ? `岗位上下文：${portalDetail}` : `当前视图按“${activePortalOption.label}”岗位展示`);
     }
 
     if (isPortalSwitchPending && pendingPortalOption) {
@@ -2230,7 +2229,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const refreshingMessage = entityType === 'users'
     ? isPortalSwitchPending && pendingPortalOption
       ? `正在切换到 ${pendingPortalOption.label}${pendingPortalOption.portalLabel ? ` · ${pendingPortalOption.portalLabel}` : ''} 并刷新数据...`
-      : '正在刷新人员门户数据...'
+      : '正在刷新数据...'
     : '正在刷新门户数据...';
 
   return (

@@ -326,10 +326,6 @@ USER_OBJECT_TYPES_CSV="$(printf '%s' "$USER_OBJECT_TYPES_JSON" | json_array_to_c
 log "users/me role=${USER_ROLE}"
 log "users/me objectTypes=${USER_OBJECT_TYPES_CSV:-<empty>}"
 
-api GET "/portal/users/${CREATED_USER_ID}" '' "$ADMIN_TOKEN"
-USER_PORTAL_VARIANT="$(printf '%s' "$REQUEST_BODY" | json_query 'data.variant')"
-log "user portal variant=${USER_PORTAL_VARIANT}"
-
 FIRST_OBJECT_ID=""
 if [[ -n "$USER_OBJECT_TYPES_CSV" ]]; then
   declare -a OBJECT_TYPES_TO_CREATE=()

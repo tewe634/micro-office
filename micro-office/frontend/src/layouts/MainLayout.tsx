@@ -53,7 +53,6 @@ function resolveSelectedKey(pathname: string) {
 }
 
 function resolvePageTitle(pathname: string) {
-  if (/^\/users\/[^/]+\/portal$/.test(pathname)) return '人员门户';
   if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '外部对象门户';
   if (/^\/products\/[^/]+\/portal$/.test(pathname)) return '产品门户';
   return pageTitles[pathname] || '东华微办公';

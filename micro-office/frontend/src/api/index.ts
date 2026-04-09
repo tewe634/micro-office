@@ -181,7 +181,6 @@ export const salesCollabApi = {
 };
 
 export const portalApi = {
-  user: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/users/${id}`, { params }),
   object: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/objects/${id}`, { params }),
   product: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/products/${id}`, { params }),
 };

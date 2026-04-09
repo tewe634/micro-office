@@ -70,25 +70,6 @@ public class PortalController {
         return ApiResponse.ok(buildObjectPortal(object));
     }
 
-    @GetMapping("/users/{id}")
-    public ApiResponse<Map<String, Object>> userPortal(@PathVariable String id,
-                                                       @RequestParam(required = false) String positionId,
-                                                       Authentication auth) {
-        String viewerId = (String) auth.getPrincipal();
-        menuPermissionService.requireMenu(viewerId, "/users");
-
-        SysUser user = userMapper.selectById(id);
-        if (user == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在");
-        }
-
-        List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(viewerId);
-        if (!dataScopeService.isGlobalAdmin(viewerId) && (user.getOrgId() == null || !visibleOrgIds.contains(user.getOrgId()))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该用户");
-        }
-        return ApiResponse.ok(buildUserPortal(user, positionId));
-    }
-
     private ExternalObject requireAccessibleObject(String id, String viewerId) {
         ExternalObject object = externalObjectService.getById(id);
         if (object == null) {
