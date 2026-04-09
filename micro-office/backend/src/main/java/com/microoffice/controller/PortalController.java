@@ -70,6 +70,22 @@ public class PortalController {
         return ApiResponse.ok(buildObjectPortal(object));
     }
 
+    Map<String, Object> resolveUserPortalRuntime(String viewerId, String userId, String requestedPositionId) {
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在");
+        }
+        if (!Objects.equals(viewerId, userId)) {
+            menuPermissionService.requireMenu(viewerId, "/users");
+            List<String> visibleOrgIds = dataScopeService.getVisibleOrgIds(viewerId);
+            if (!dataScopeService.isGlobalAdmin(viewerId)
+                && (user.getOrgId() == null || !visibleOrgIds.contains(user.getOrgId()))) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该用户");
+            }
+        }
+        return buildUserPortal(user, requestedPositionId);
+    }
+
     private ExternalObject requireAccessibleObject(String id, String viewerId) {
         ExternalObject object = externalObjectService.getById(id);
         if (object == null) {
