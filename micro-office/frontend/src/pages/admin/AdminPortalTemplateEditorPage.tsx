@@ -325,7 +325,14 @@ export default function AdminPortalTemplateEditorPage() {
             <Tag color={statusColor}>{detail.status}</Tag>
             <Button onClick={() => void refreshDetail()}>重新加载</Button>
             <Button type="primary" loading={saving} onClick={() => void handleSave()}>保存模板</Button>
-            <Popconfirm title="确认删除当前模板？" okText="删除" cancelText="取消" onConfirm={() => void handleDelete()}>
+            <Popconfirm
+              title={`确认删除模板「${detail.name}」？`}
+              description="删除后，模板下的分区、展示项和动作会一并删除，且不可恢复。"
+              okText="确认删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => void handleDelete()}
+            >
               <Button danger icon={<DeleteOutlined />}>删除</Button>
             </Popconfirm>
           </Space>
@@ -390,7 +397,14 @@ export default function AdminPortalTemplateEditorPage() {
                     title={`分区 ${sectionIndex + 1}`}
                     style={{ marginBottom: 16 }}
                     extra={
-                      <Popconfirm title="删除这个分区？" okText="删除" cancelText="取消" onConfirm={() => updateDetail(prev => ({ ...prev, sections: prev.sections.filter((_, index) => index !== sectionIndex) }))}>
+                      <Popconfirm
+                        title={`确认删除分区「${section.name || `分区 ${sectionIndex + 1}`}」？`}
+                        description="该分区下的展示项和动作也会一并移除。"
+                        okText="确认删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => updateDetail(prev => ({ ...prev, sections: prev.sections.filter((_, index) => index !== sectionIndex) }))}
+                      >
                         <Button danger size="small">删除分区</Button>
                       </Popconfirm>
                     }
@@ -433,7 +447,14 @@ export default function AdminPortalTemplateEditorPage() {
                         title={`展示项 ${sectionIndex + 1}.${itemIndex + 1}`}
                         style={{ marginBottom: 12 }}
                         extra={
-                          <Popconfirm title="删除这个展示项？" okText="删除" cancelText="取消" onConfirm={() => updateSection(sectionIndex, current => ({ ...current, items: current.items.filter((_, index) => index !== itemIndex) }))}>
+                          <Popconfirm
+                            title={`确认删除展示项「${item.label || item.itemKey || `${sectionIndex + 1}.${itemIndex + 1}`}」？`}
+                            description="该展示项下的动作也会一并移除。"
+                            okText="确认删除"
+                            cancelText="取消"
+                            okButtonProps={{ danger: true }}
+                            onConfirm={() => updateSection(sectionIndex, current => ({ ...current, items: current.items.filter((_, index) => index !== itemIndex) }))}
+                          >
                             <Button danger size="small">删除展示项</Button>
                           </Popconfirm>
                         }
@@ -481,7 +502,14 @@ export default function AdminPortalTemplateEditorPage() {
                             title={`动作 ${sectionIndex + 1}.${itemIndex + 1}.${actionIndex + 1}`}
                             style={{ marginBottom: 12 }}
                             extra={
-                              <Popconfirm title="删除这个动作？" okText="删除" cancelText="取消" onConfirm={() => updateItem(sectionIndex, itemIndex, current => ({ ...current, actions: current.actions.filter((_, index) => index !== actionIndex) }))}>
+                              <Popconfirm
+                                title={`确认删除动作「${action.actionType || `${sectionIndex + 1}.${itemIndex + 1}.${actionIndex + 1}`}」？`}
+                                description="删除后该展示项将不再触发这个动作配置。"
+                                okText="确认删除"
+                                cancelText="取消"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => updateItem(sectionIndex, itemIndex, current => ({ ...current, actions: current.actions.filter((_, index) => index !== actionIndex) }))}
+                              >
                                 <Button danger size="small">删除动作</Button>
                               </Popconfirm>
                             }
