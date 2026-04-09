@@ -233,7 +233,7 @@ export default function AdminPortalTemplatePage() {
 
   const selectedSummary = useMemo(() => templates.find(item => item.id === selectedTemplateId), [templates, selectedTemplateId]);
 
-  const loadLists = async (keepSelected = true) => {
+  const loadLists = async () => {
     setLoading(true);
     try {
       const [metaResp, positionResp, templateResp] = await Promise.all([
@@ -245,9 +245,6 @@ export default function AdminPortalTemplatePage() {
       setPositions(positionResp.data || []);
       const nextTemplates = templateResp.data || [];
       setTemplates(nextTemplates);
-      if (!keepSelected && nextTemplates.length) {
-        setSelectedTemplateId(nextTemplates[0].id);
-      }
       if (selectedTemplateId && !nextTemplates.some((item: any) => item.id === selectedTemplateId)) {
         setSelectedTemplateId(undefined);
         setDetail(null);
@@ -269,7 +266,7 @@ export default function AdminPortalTemplatePage() {
   };
 
   useEffect(() => {
-    loadLists(false);
+    loadLists();
   }, []);
 
   useEffect(() => {
@@ -279,7 +276,7 @@ export default function AdminPortalTemplatePage() {
   }, [selectedTemplateId]);
 
   const refreshAll = async () => {
-    await loadLists(true);
+    await loadLists();
     if (selectedTemplateId) {
       await loadDetail(selectedTemplateId);
     }
@@ -312,7 +309,7 @@ export default function AdminPortalTemplatePage() {
 
   const handleGenerate = async (positionId: string) => {
     const resp: any = await portalTemplateAdminApi.generateByPosition({ positionId });
-    await loadLists(true);
+    await loadLists();
     setSelectedTemplateId(resp.data?.id);
     setDetail(normalizeTemplate(resp.data));
     message.success('岗位模板已生成');
@@ -332,7 +329,7 @@ export default function AdminPortalTemplatePage() {
     });
     setCreateOpen(false);
     createForm.resetFields();
-    await loadLists(true);
+    await loadLists();
     setSelectedTemplateId(resp.data?.id);
     setDetail(normalizeTemplate(resp.data));
     message.success('模板已创建');
@@ -345,7 +342,7 @@ export default function AdminPortalTemplatePage() {
       const payload = buildPayload(detail);
       const resp: any = await portalTemplateAdminApi.updateTemplate(detail.id, payload);
       setDetail(normalizeTemplate(resp.data));
-      await loadLists(true);
+      await loadLists();
       message.success('模板已保存');
     } catch (error: any) {
       message.error(error?.message || error?.response?.data?.message || '保存失败');
@@ -360,22 +357,23 @@ export default function AdminPortalTemplatePage() {
     message.success('模板已删除');
     setDetail(null);
     setSelectedTemplateId(undefined);
-    await loadLists(true);
+    await loadLists();
   };
 
   return (
-    <div className="page-fill" style={{ gap: 16 }}>
+    <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Alert
         type="info"
         showIcon
         message="已按 mo_portal_templates / sections / items / item_actions 四层结构做成可编辑页。当前支持：按岗位生成模板、编辑模板基础信息、分区、展示项和动作。"
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, minHeight: 0, flex: 1 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, minHeight: 320, flex: '0 0 360px' }}>
         <Card
+          className="page-card"
           title="按岗位生成模板"
           extra={<Button icon={<ReloadOutlined />} onClick={refreshAll}>刷新</Button>}
-          bodyStyle={{ padding: 12 }}
+          bodyStyle={{ padding: 12, minHeight: 0, display: 'flex', flexDirection: 'column' }}
         >
           <Spin spinning={loading}>
             <Table
@@ -383,7 +381,7 @@ export default function AdminPortalTemplatePage() {
               size="small"
               pagination={{ pageSize: 8 }}
               dataSource={positions}
-              scroll={{ x: 760 }}
+              scroll={{ x: 760, y: 240 }}
               columns={[
                 {
                   title: '岗位',
@@ -430,9 +428,10 @@ export default function AdminPortalTemplatePage() {
         </Card>
 
         <Card
+          className="page-card"
           title="模板列表"
           extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建空模板</Button>}
-          bodyStyle={{ padding: 12 }}
+          bodyStyle={{ padding: 12, minHeight: 0, display: 'flex', flexDirection: 'column' }}
         >
           <Spin spinning={loading}>
             <Table
@@ -441,7 +440,7 @@ export default function AdminPortalTemplatePage() {
               pagination={{ pageSize: 8 }}
               dataSource={templates}
               rowClassName={record => record.id === selectedTemplateId ? 'ant-table-row-selected' : ''}
-              scroll={{ x: 860 }}
+              scroll={{ x: 860, y: 240 }}
               columns={[
                 {
                   title: '模板',
@@ -482,9 +481,12 @@ export default function AdminPortalTemplatePage() {
       </div>
 
       <Card
+        className="page-card"
+        style={{ flex: 1, minHeight: 0 }}
         title={selectedSummary ? `编辑模板：${selectedSummary.name}` : '模板编辑器'}
         extra={detail ? (
           <Space>
+            <Button onClick={() => { setSelectedTemplateId(undefined); setDetail(null); }}>返回列表</Button>
             <Button onClick={refreshAll}>重新加载</Button>
             <Button type="primary" loading={saving} onClick={handleSave}>保存模板</Button>
             <Popconfirm title="确认删除当前模板？" okText="删除" cancelText="取消" onConfirm={handleDelete}>
@@ -492,13 +494,15 @@ export default function AdminPortalTemplatePage() {
             </Popconfirm>
           </Space>
         ) : null}
-        bodyStyle={{ padding: 16 }}
+        bodyStyle={{ padding: 16, minHeight: 0, display: 'flex', flexDirection: 'column' }}
       >
-        <Spin spinning={detailLoading}>
+        <Spin spinning={detailLoading} style={{ flex: 1, minHeight: 0 }}>
           {!detail ? (
-            <Empty description="先从左上角按岗位生成模板，或在右上角新建空模板" />
+            <div className="page-fill" style={{ justifyContent: 'center' }}>
+              <Empty description="先查看上方模板列表，或从左上角按岗位生成模板" />
+            </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="page-fill" style={{ gap: 16, overflow: 'auto', paddingRight: 4 }}>
               <Card type="inner" title="模板基础信息">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
                   <div>
