@@ -118,7 +118,7 @@ public class UserController {
             Integer isRoot = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM organization WHERE id = ? AND parent_id IS NULL", Integer.class, orgId);
             if (isRoot != null && isRoot > 0) {
-                // 总经办：只查直属
+                // 顶级组织：只查直属
                 users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().eq(SysUser::getOrgId, orgId));
             } else {
                 // 递归查本节点及所有子组织的人员

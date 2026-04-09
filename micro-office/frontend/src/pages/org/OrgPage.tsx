@@ -27,20 +27,20 @@ type OrgUser = {
   leaderCandidate?: boolean;
 };
 
-const ROOT_NAME = '总经办';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
 const FIXED_LEADER_NAME = '杨筱辉';
-const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['总经办', '产品支持体系', '管理体系', '销售体系', '销售体系业务一部', '销售体系业务二部', '销售体系业务三部', '业务一部', '业务二部', '业务三部', '商务部']);
+const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['产品支持体系', '管理体系', '销售体系', '销售体系业务一部', '销售体系业务二部', '销售体系业务三部', '业务一部', '业务二部', '业务三部', '商务部']);
 const FIXED_LEADER_NODE_NAMES = new Set(['产品支持体系', '销售体系']);
 
 function isBusinessSpecialist(user: OrgUser) {
   return (user.primary_position_name || '').includes('商务专员') || (user.extra_position_names || '').includes('商务专员');
 }
 
-function shouldHideMemberSection(nodeName: string) {
-  return HIDE_MEMBER_SECTION_NODE_NAMES.has(nodeName)
+function shouldHideMemberSection(nodeName: string, isRoot = false) {
+  return isRoot
+    || HIDE_MEMBER_SECTION_NODE_NAMES.has(nodeName)
     || /^销售体系业务[一二三123]部$/.test(nodeName)
     || /^业务[一二三123]部$/.test(nodeName);
 }
@@ -425,9 +425,9 @@ function OrgChartNode({
       : defaultLeaderUsers;
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
-  const showMemberSection = !shouldHideMemberSection(node.name);
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
+  const showMemberSection = !shouldHideMemberSection(node.name, isRoot);
 
   return (
     <div className="org-node-wrap">
@@ -555,7 +555,7 @@ export default function OrgPage() {
   }, [orgUsers]);
 
   const rootOrg = useMemo(() => {
-    return orgs.find(item => item.name === ROOT_NAME) || orgs.find(item => !item.parentId) || null;
+    return orgs.find(item => !item.parentId) || null;
   }, [orgs]);
 
   const businessDepartmentId = useMemo(() => {
