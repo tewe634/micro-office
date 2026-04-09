@@ -332,13 +332,17 @@ export default function AdminPortalTemplateEditorPage() {
         ) : null}
         bodyStyle={{ padding: 16, minHeight: 0, display: 'flex', flexDirection: 'column' }}
       >
-        <Spin spinning={loading} style={{ flex: 1, minHeight: 0 }}>
-          {!detail ? (
-            <div className="page-fill" style={{ justifyContent: 'center' }}>
-              <Empty description="模板不存在或正在加载" />
-            </div>
-          ) : (
-            <div className="page-fill" style={{ gap: 16, overflow: 'auto', paddingRight: 4 }}>
+        {loading ? (
+          <div className="page-fill" style={{ justifyContent: 'center', alignItems: 'center' }}>
+            <Spin size="large" />
+          </div>
+        ) : !detail ? (
+          <div className="page-fill" style={{ justifyContent: 'center' }}>
+            <Empty description="模板不存在或正在加载" />
+          </div>
+        ) : (
+          <div className="page-card-scroll" style={{ paddingRight: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100%' }}>
               <Card type="inner" title="模板基础信息">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
                   <div>
@@ -512,8 +516,8 @@ export default function AdminPortalTemplateEditorPage() {
                 ))}
               </Card>
             </div>
-          )}
-        </Spin>
+          </div>
+        )}
       </Card>
     </div>
   );
