@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Divider,
@@ -308,13 +307,6 @@ export default function AdminPortalTemplateEditorPage() {
 
   return (
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
-      <Alert
-        type="info"
-        showIcon
-        message="模板编辑子页面"
-        description="当前页只负责编辑单个模板。返回上一页可查看岗位生成模板和模板列表。"
-      />
-
       <Card
         className="page-card"
         style={{ flex: 1, minHeight: 0 }}
