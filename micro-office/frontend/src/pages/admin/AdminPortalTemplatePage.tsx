@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { portalTemplateAdminApi } from '../../api';
@@ -69,13 +69,6 @@ export default function AdminPortalTemplatePage() {
 
   return (
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
-      <Alert
-        type="info"
-        showIcon
-        message="门户模板"
-        description="当前页只保留岗位生成和模板列表。模板编辑已拆到独立子页面，点击“编辑”或模板名称后通过路由跳转。"
-      />
-
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, flex: 1, minHeight: 0 }}>
         <Card
           className="page-card"
