@@ -42,6 +42,28 @@ const abbStructureLevel2Map: Record<string, { value: string; label: string }[]> 
     { value: 'AC500/AC500-eco/HMI', label: 'AC500/AC500-eco/HMI' },
     { value: 'External Options/DP Others', label: 'External Options/DP Others' },
   ],
+  HP: [
+    { value: 'ACS580MV', label: 'ACS580MV' },
+    { value: 'ACS800-67', label: 'ACS800-67' },
+    { value: 'ACS800-67 LC', label: 'ACS800-67 LC' },
+    { value: 'ACS800-77 LC', label: 'ACS800-77 LC' },
+    { value: 'ACS800-87 LC', label: 'ACS800-87 LC' },
+    { value: 'ACS800/860/880 MD(Module&Cabinet)', label: 'ACS800/860/880 MD(Module&Cabinet)' },
+    { value: 'ACS800/880-07/ACS880-07C/ACS880-07XT', label: 'ACS800/880-07/ACS880-07C/ACS880-07XT' },
+    { value: 'ACS800/880-14/04(n*R8i)/ACS880-04XT/HES880', label: 'ACS800/880-14/04(n*R8i)/ACS880-04XT/HES880' },
+    { value: 'ACS800/ACS880-17/37/SD-LC', label: 'ACS800/ACS880-17/37/SD-LC' },
+    { value: 'ACS880-87 LC', label: 'ACS880-87 LC' },
+    { value: 'ACS1000/ACS2000/5000A', label: 'ACS1000/ACS2000/5000A' },
+    { value: 'ACS1000Ex/ACS2000Ex', label: 'ACS1000Ex/ACS2000Ex' },
+    { value: 'ACS5000W/6080/LCI', label: 'ACS5000W/6080/LCI' },
+    { value: 'LCI', label: 'LCI' },
+    { value: 'DC Drive products', label: 'DC Drive products' },
+    { value: 'HPD Others(Options and Packages)', label: 'HPD Others(Options and Packages)' },
+    { value: 'Packaging', label: 'Packaging' },
+    { value: 'PCS6000 Wind', label: 'PCS6000 Wind' },
+    { value: 'Wind Service', label: 'Wind Service' },
+    { value: 'Windmill', label: 'Windmill' },
+  ],
   SE: [
     { value: '服务产品', label: '服务产品' },
     { value: '服务业务', label: '服务业务' },
@@ -65,7 +87,7 @@ function getStructureLevel2Options(level1?: string) {
 function getStructureLevel2Placeholder(level1?: string) {
   if (!level1) return '请先选择设计一级分类';
   if (noSecondLevelStructure.has(level1)) return '低压 / 成套不再继续拆分二级分类';
-  if (level1 === 'DP' || level1 === 'HP') return '请按你上传图片中的原始名称填写二级分类';
+  if (level1 === 'DP' || level1 === 'HP') return '请选择按你上传图片原字面固化的二级分类';
   return '请输入设计二级分类';
 }
 
@@ -209,7 +231,7 @@ export default function ProductPage() {
                       description={
                         <div style={{ lineHeight: 1.7 }}>
                           <div>一级分类：DP / HP / SE / 电机 / 低压 / 成套</div>
-                          <div>DP 二级名称已按你上传结构图原字面固化；HP 二级名称等你发图后再按原字面固化。</div>
+                          <div>DP / HP 二级名称都已按你上传结构图原字面固化。</div>
                           <div>SE 二级：服务产品 / 服务业务 / 电机服务 / 保内服务</div>
                           <div>电机二级：高压电机 / 低压电机</div>
                           <div>低压、成套不再继续拆二级；系列展示口径支持“多个产品合并一个系列”或“一个产品单独展示一个系列”。</div>
@@ -239,9 +261,7 @@ export default function ProductPage() {
                       ) : null}
                       {activeStructureLevel1Tab === 'DP' || activeStructureLevel1Tab === 'HP' ? (
                         <div style={{ padding: '0 4px 12px', color: '#6b7280', fontSize: 12 }}>
-                          {activeStructureLevel1Tab === 'DP'
-                            ? 'DP 二级名称已按你上传结构图原字面固化。'
-                            : 'HP 二级名称等你发图后，我按图上原字面固化成 Tab。'}
+                          {activeStructureLevel1Tab} 二级名称已按你上传结构图原字面固化。
                         </div>
                       ) : null}
                     </div>
@@ -387,9 +407,7 @@ export default function ProductPage() {
             name="structureLevel2"
             label="设计二级分类"
             extra={activeLine === 'ABB' && (structureLevel1 === 'DP' || structureLevel1 === 'HP')
-              ? (structureLevel1 === 'DP'
-                ? 'DP 二级名称已按你上传结构图原字面固化。'
-                : 'HP 二级名称等你发图后再按原字面固化。')
+              ? `${structureLevel1} 二级名称已按你上传结构图原字面固化。`
               : undefined}
           >
             {structureLevel2UsesSelect ? (
