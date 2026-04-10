@@ -42,6 +42,7 @@ public class PortalTemplateAdminController {
     private final JdbcTemplate jdbc;
     private final MenuPermissionService menuPermissionService;
     private final ObjectMapper objectMapper;
+    private final PortalRuntimeController portalRuntimeController;
 
     @GetMapping("/meta")
     public ApiResponse<Map<String, Object>> meta(Authentication auth) {
@@ -115,6 +116,40 @@ public class PortalTemplateAdminController {
     public ApiResponse<Map<String, Object>> template(@PathVariable String id, Authentication auth) {
         requireAdmin(auth);
         return ApiResponse.ok(loadTemplateDetail(id));
+    }
+
+    @GetMapping("/templates/{id}/preview")
+    public ApiResponse<Map<String, Object>> previewTemplate(@PathVariable String id, Authentication auth) {
+        String currentUserId = requireAdmin(auth);
+        Map<String, Object> template = loadTemplateDetail(id);
+        String templateType = asString(template.get("templateType"));
+        if (!"PERSON_ROLE".equals(templateType)) {
+            throw new IllegalArgumentException("当前仅支持人员岗位门户模板预览");
+        }
+
+        Map<String, Object> templateMeta = asMap(template.get("meta"));
+        String positionId = asNullableString(templateMeta.get("positionId"));
+        if (!hasText(positionId)) {
+            throw new IllegalArgumentException("当前模板未绑定岗位，无法自动选择预览用户");
+        }
+
+        Map<String, Object> previewUser = resolvePreviewUser(positionId, templateMeta);
+        Map<String, Object> response = portalRuntimeController.resolveUserRuntimeResponse(
+            currentUserId,
+            asString(previewUser.get("userId")),
+            positionId,
+            id,
+            Map.of("positionId", positionId, "scope", "personal", "previewMode", true),
+            List.of()
+        );
+        Map<String, Object> portalContext = asMap(response.get("portalContext"));
+        portalContext.put("previewMode", true);
+        portalContext.put("previewPositionId", positionId);
+        portalContext.put("previewPositionName", firstNonBlank(asNullableString(previewUser.get("positionName")), asNullableString(templateMeta.get("positionName"))));
+        portalContext.put("previewMatchedBy", asNullableString(previewUser.get("matchedBy")));
+        response.put("portalContext", portalContext);
+        response.put("previewUser", previewUser);
+        return ApiResponse.ok(response);
     }
 
     @PostMapping("/generate-by-position")
@@ -271,6 +306,40 @@ public class PortalTemplateAdminController {
         String currentUserId = (String) auth.getPrincipal();
         menuPermissionService.requireMenu(currentUserId, "/admin");
         return currentUserId;
+    }
+
+    private Map<String, Object> resolvePreviewUser(String positionId, Map<String, Object> templateMeta) {
+        List<Map<String, Object>> candidates = jdbc.queryForList(
+            "SELECT candidate.user_id, candidate.user_name, candidate.position_id, candidate.position_name, candidate.matched_by FROM (" +
+                "SELECT su.id AS user_id, su.name AS user_name, su.primary_position_id AS position_id, COALESCE(p.name, '') AS position_name, 'PRIMARY_POSITION' AS matched_by, 0 AS priority " +
+                "FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.primary_position_id = ? " +
+                "UNION ALL " +
+                "SELECT su.id AS user_id, su.name AS user_name, up.position_id AS position_id, COALESCE(p.name, '') AS position_name, 'USER_POSITION' AS matched_by, 1 AS priority " +
+                "FROM user_position up " +
+                "JOIN sys_user su ON su.id = up.user_id " +
+                "LEFT JOIN position p ON p.id = up.position_id " +
+                "WHERE up.position_id = ? AND COALESCE(su.primary_position_id, '') <> up.position_id" +
+                ") candidate ORDER BY candidate.priority, candidate.user_name, candidate.user_id LIMIT 1",
+            positionId,
+            positionId
+        );
+        if (candidates.isEmpty()) {
+            String positionName = asNullableString(templateMeta.get("positionName"));
+            throw new IllegalArgumentException(hasText(positionName)
+                ? "岗位「" + positionName + "」暂无可用预览用户"
+                : "当前岗位暂无可用预览用户");
+        }
+
+        Map<String, Object> row = candidates.get(0);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("userId", asString(row.get("user_id")));
+        result.put("userName", asString(row.get("user_name")));
+        result.put("positionId", asString(row.get("position_id")));
+        result.put("positionName", hasText(asNullableString(row.get("position_name"))) ? asString(row.get("position_name")) : asString(templateMeta.get("positionName")));
+        result.put("matchedBy", asString(row.get("matched_by")));
+        return result;
     }
 
     private List<Map<String, Object>> loadPositionTargets() {
@@ -787,6 +856,18 @@ public class PortalTemplateAdminController {
         }
         String trimmed = text.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (hasText(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String blankToNull(String value) {
