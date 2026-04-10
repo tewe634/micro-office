@@ -19,6 +19,22 @@ const abbStructureLevel1Options = [
 ];
 
 const abbStructureLevel2Map: Record<string, { value: string; label: string }[]> = {
+  DP: [
+    { value: '标准传动', label: '标准传动' },
+    { value: '行业传动', label: '行业传动' },
+    { value: '机械传动', label: '机械传动' },
+    { value: '伺服与运动控制', label: '伺服与运动控制' },
+    { value: 'PLC&HMI', label: 'PLC&HMI' },
+    { value: '软启动器', label: '软启动器' },
+    { value: '选件与其他', label: '选件与其他' },
+  ],
+  HP: [
+    { value: '工业传动', label: '工业传动' },
+    { value: '高性能机械传动', label: '高性能机械传动' },
+    { value: '柜体传动', label: '柜体传动' },
+    { value: '中压传动', label: '中压传动' },
+    { value: '直流传动', label: '直流传动' },
+  ],
   SE: [
     { value: '服务产品', label: '服务产品' },
     { value: '服务业务', label: '服务业务' },
@@ -42,7 +58,7 @@ function getStructureLevel2Options(level1?: string) {
 function getStructureLevel2Placeholder(level1?: string) {
   if (!level1) return '请先选择设计一级分类';
   if (noSecondLevelStructure.has(level1)) return '低压 / 成套不再继续拆分二级分类';
-  if (level1 === 'DP' || level1 === 'HP') return '按已确认的图片口径填写 DP / HP 二级分类';
+  if (level1 === 'DP' || level1 === 'HP') return '请选择固定的 DP / HP 二级分类';
   return '请输入设计二级分类';
 }
 
@@ -186,10 +202,11 @@ export default function ProductPage() {
                       description={
                         <div style={{ lineHeight: 1.7 }}>
                           <div>一级分类：DP / HP / SE / 电机 / 低压 / 成套</div>
+                          <div>DP 二级：标准传动 / 行业传动 / 机械传动 / 伺服与运动控制 / PLC&HMI / 软启动器 / 选件与其他</div>
+                          <div>HP 二级：工业传动 / 高性能机械传动 / 柜体传动 / 中压传动 / 直流传动</div>
                           <div>SE 二级：服务产品 / 服务业务 / 电机服务 / 保内服务</div>
                           <div>电机二级：高压电机 / 低压电机</div>
-                          <div>低压、成套不再继续拆二级；DP、HP 二级先按你确认的图片口径录入。</div>
-                          <div>系列展示口径支持“多个产品合并一个系列”或“一个产品单独展示一个系列”。</div>
+                          <div>低压、成套不再继续拆二级；系列展示口径支持“多个产品合并一个系列”或“一个产品单独展示一个系列”。</div>
                         </div>
                       }
                     />
@@ -216,7 +233,7 @@ export default function ProductPage() {
                       ) : null}
                       {activeStructureLevel1Tab === 'DP' || activeStructureLevel1Tab === 'HP' ? (
                         <div style={{ padding: '0 4px 12px', color: '#6b7280', fontSize: 12 }}>
-                          {activeStructureLevel1Tab} 二级分类先按你确认的图片口径录入，后续可以再固化成固定 Tab。
+                          {activeStructureLevel1Tab} 二级分类已固化为固定 Tab；如果你后面要改标签，我再统一替换。
                         </div>
                       ) : null}
                     </div>
@@ -362,7 +379,7 @@ export default function ProductPage() {
             name="structureLevel2"
             label="设计二级分类"
             extra={activeLine === 'ABB' && (structureLevel1 === 'DP' || structureLevel1 === 'HP')
-              ? 'DP / HP 这里先按你确认的图片口径填写，后续可再收敛成固定选项。'
+              ? 'DP / HP 二级分类已固化为固定选项；如需改名我再统一调整。'
               : undefined}
           >
             {structureLevel2UsesSelect ? (
