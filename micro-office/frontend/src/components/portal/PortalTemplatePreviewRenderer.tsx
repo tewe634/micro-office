@@ -1,4 +1,4 @@
-import { Card, Descriptions, Empty, List, Space, Statistic, Tag, Typography } from 'antd';
+import { Card, Descriptions, Empty, Input, List, Space, Statistic, Tag, Typography } from 'antd';
 import type { PortalTemplatePreviewPayload } from '../../api';
 
 const { Paragraph, Text, Title } = Typography;
@@ -331,6 +331,8 @@ function renderSection(section: PortalTemplateSection, datasets: Record<string, 
 
 export default function PortalTemplatePreviewRenderer({ preview }: { preview: PortalTemplatePreviewPayload | null }) {
   const template = asObject(preview?.template);
+  const templateMeta = asObject(template.meta);
+  const globalSearch = asObject(templateMeta.globalSearch);
   const datasets = asObject(preview?.datasets);
   const sections = asArray<PortalTemplateSection>(template.sections).slice().sort((left, right) => Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0));
 
@@ -340,6 +342,8 @@ export default function PortalTemplatePreviewRenderer({ preview }: { preview: Po
 
   const topSections = sections.filter(section => asText(asObject(asObject(section.meta).layout).region) === 'top');
   const mainSections = sections.filter(section => asText(asObject(asObject(section.meta).layout).region) !== 'top');
+  const globalSearchEnabled = globalSearch.enabled === true;
+  const globalSearchPlaceholder = asText(globalSearch.placeholder) || '搜索全局相关内容';
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -347,6 +351,11 @@ export default function PortalTemplatePreviewRenderer({ preview }: { preview: Po
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(24, minmax(0, 1fr))', gap: 16 }}>
           {topSections.map(section => renderSection(section, datasets))}
         </div>
+      ) : null}
+      {globalSearchEnabled ? (
+        <Card size="small" style={{ borderRadius: 18 }}>
+          <Input.Search disabled enterButton="搜索" placeholder={globalSearchPlaceholder} />
+        </Card>
       ) : null}
       {mainSections.length ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(24, minmax(0, 1fr))', gap: 16, alignItems: 'start' }}>

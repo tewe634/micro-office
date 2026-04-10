@@ -52,10 +52,37 @@ public class PortalRuntimeController {
         String entityId = requireText(body.get("entityId"), "entityId 不能为空");
         Map<String, Object> context = asMap(body.get("context"));
         String requestedPositionId = asNullableString(context.get("positionId"));
+        return ApiResponse.ok(resolveUserRuntimeResponse(
+            viewerId,
+            entityId,
+            requestedPositionId,
+            asNullableString(body.get("templateId")),
+            context,
+            asListOfMap(body.get("contracts"))
+        ));
+    }
+
+    Map<String, Object> resolveUserRuntimeResponse(String viewerId,
+                                                   String entityId,
+                                                   String requestedPositionId,
+                                                   String templateId,
+                                                   Map<String, Object> context,
+                                                   List<Map<String, Object>> contracts) {
+        Map<String, Object> safeContext = context == null ? new LinkedHashMap<>() : new LinkedHashMap<>(context);
+        if (hasText(requestedPositionId)) {
+            safeContext.put("positionId", requestedPositionId);
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("entityType", "user");
+        body.put("entityId", entityId);
+        body.put("templateId", templateId);
+        body.put("context", safeContext);
+        body.put("contracts", contracts == null ? List.of() : contracts);
 
         Map<String, Object> runtimePayload = portalController.resolveUserPortalRuntime(viewerId, entityId, requestedPositionId);
-        Map<String, Object> template = resolveUserTemplate(body, context, runtimePayload);
-        Map<String, Object> datasets = buildUserDatasets(runtimePayload, template, asListOfMap(body.get("contracts")));
+        Map<String, Object> template = resolveUserTemplate(body, safeContext, runtimePayload);
+        Map<String, Object> datasets = buildUserDatasets(runtimePayload, template, contracts == null ? List.of() : contracts);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("templateId", asString(template.get("id")));
@@ -64,11 +91,11 @@ public class PortalRuntimeController {
         response.put("templateVersion", String.valueOf(template.get("version") == null ? 1 : template.get("version")));
         response.put("entityType", "user");
         response.put("entityId", entityId);
-        response.put("portalContext", buildPortalContext(context, runtimePayload, template));
+        response.put("portalContext", buildPortalContext(safeContext, runtimePayload, template));
         response.put("template", template);
         response.put("datasets", datasets);
         response.put("errors", List.of());
-        return ApiResponse.ok(response);
+        return response;
     }
 
     @GetMapping("/capabilities")
@@ -92,8 +119,11 @@ public class PortalRuntimeController {
             "ceo.kpi_metrics",
             "ceo.meeting_list",
             "ceo.todo_list",
+            "ceo.internal_objects",
+            "ceo.event_list",
             "ceo.exception_alerts",
             "ceo.ai_summary",
+            "ceo.ai_followups",
             "ceo.participated_meetings",
             "ceo.collab_notifications"
         ));
@@ -256,8 +286,11 @@ public class PortalRuntimeController {
             case "ceo.kpi_metrics" -> buildCeoKpiMetrics();
             case "ceo.meeting_list" -> buildCeoMeetingList(runtimePayload);
             case "ceo.todo_list" -> buildCeoTodoList(runtimePayload);
+            case "ceo.internal_objects" -> buildCeoInternalObjects(runtimePayload);
+            case "ceo.event_list" -> buildCeoEventList(runtimePayload);
             case "ceo.exception_alerts" -> buildCeoExceptionAlerts();
             case "ceo.ai_summary" -> buildCeoAiSummary(runtimePayload);
+            case "ceo.ai_followups" -> buildCeoAiFollowups(runtimePayload);
             case "ceo.participated_meetings" -> buildCeoParticipatedMeetings(runtimePayload);
             case "ceo.collab_notifications" -> buildCeoCollabNotifications(runtimePayload);
             default -> null;
@@ -369,6 +402,182 @@ public class PortalRuntimeController {
         return result;
     }
 
+    private List<Map<String, Object>> buildCeoInternalObjects(Map<String, Object> runtimePayload) {
+        String runtimeUserId = runtimeUserId(runtimePayload);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT su.id, su.name, COALESCE(o.name, '未分配组织') AS org_name, COALESCE(p.name, '未分配岗位') AS position_name, " +
+                "COALESCE((SELECT COUNT(*) FROM mo_todos t WHERE t.assignee_user_id = su.id AND t.status IN ('PENDING', 'PROCESSING')), 0) AS open_tasks, " +
+                "COALESCE((SELECT COUNT(*) FROM mo_conversation_members cm WHERE cm.user_id = su.id), 0) AS meeting_count, " +
+                "COALESCE((SELECT MAX(c.updated_at) FROM mo_conversation_members cm JOIN mo_conversations c ON c.id = cm.conversation_id WHERE cm.user_id = su.id), su.created_at) AS last_activity " +
+                "FROM sys_user su " +
+                "LEFT JOIN organization o ON o.id = su.org_id " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "ORDER BY CASE WHEN su.id = ? THEN 0 ELSE 1 END, open_tasks DESC, meeting_count DESC, su.name ASC LIMIT 8",
+            runtimeUserId == null ? "" : runtimeUserId
+        );
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            int openTasks = asInt(row.get("open_tasks"), 0);
+            int meetings = asInt(row.get("meeting_count"), 0);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("person_id", asString(row.get("id")));
+            item.put("name", asString(row.get("name")));
+            item.put("position", asString(row.get("position_name")));
+            item.put("orgName", asString(row.get("org_name")));
+            item.put("openTasks", openTasks);
+            item.put("meetings", meetings);
+            item.put("recentActivity", formatDateTime(row.get("last_activity")));
+            item.put("relationHint", buildInternalRelationHint(openTasks, meetings));
+            result.add(item);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> buildCeoEventList(Map<String, Object> runtimePayload) {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Map<String, Object> todo : buildCeoTodoList(runtimePayload)) {
+            String priority = asString(todo.get("priority"));
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("entry_id", asString(todo.get("entry_id")));
+            item.put("title", asString(todo.get("title")));
+            item.put("eventType", "HIGH".equalsIgnoreCase(priority) ? "紧急工作" : "关注事项");
+            item.put("severity", firstNonBlank(priority, "MEDIUM"));
+            item.put("owner", asString(todo.get("assignee")));
+            item.put("deadline", asString(todo.get("deadline")));
+            item.put("status", asString(todo.get("status")));
+            item.put("reason", "来自工作任务 / 协同待办");
+            result.add(item);
+            if (result.size() >= 4) {
+                break;
+            }
+        }
+
+        for (Map<String, Object> meeting : buildCeoMeetingList(runtimePayload)) {
+            if (!Boolean.TRUE.equals(meeting.get("needDecision"))) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("entry_id", asString(meeting.get("entry_id")));
+            item.put("title", asString(meeting.get("title")));
+            item.put("eventType", "关注事项");
+            item.put("severity", "HIGH");
+            item.put("owner", asString(meeting.get("participants")));
+            item.put("deadline", asString(meeting.get("time")));
+            item.put("status", "待决策");
+            item.put("reason", firstNonBlank(asNullableString(meeting.get("latestMessage")), "会议中存在待决策事项"));
+            result.add(item);
+            if (result.size() >= 6) {
+                break;
+            }
+        }
+
+        for (Map<String, Object> alert : buildCeoExceptionAlerts()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("entry_id", asString(alert.get("entry_id")));
+            item.put("title", asString(alert.get("title")));
+            item.put("eventType", "异常事件");
+            item.put("severity", firstNonBlank(asNullableString(alert.get("severity")), "HIGH"));
+            item.put("owner", asString(alert.get("owner")));
+            item.put("deadline", asString(alert.get("createdAt")));
+            item.put("status", "待处理");
+            item.put("reason", firstNonBlank(asNullableString(alert.get("note")), "存在异常信号，需要跟进"));
+            result.add(item);
+        }
+
+        result.sort((left, right) -> {
+            int severityCompare = Integer.compare(severityWeight(asString(right.get("severity"))), severityWeight(asString(left.get("severity"))));
+            if (severityCompare != 0) {
+                return severityCompare;
+            }
+            return firstNonBlank(asNullableString(left.get("title")), "").compareToIgnoreCase(firstNonBlank(asNullableString(right.get("title")), ""));
+        });
+        if (result.size() > 8) {
+            return new ArrayList<>(result.subList(0, 8));
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> buildCeoAiFollowups(Map<String, Object> runtimePayload) {
+        List<Map<String, Object>> events = buildCeoEventList(runtimePayload);
+        List<Map<String, Object>> internalObjects = buildCeoInternalObjects(runtimePayload);
+        List<Map<String, Object>> meetings = buildCeoMeetingList(runtimePayload);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (!events.isEmpty()) {
+            Map<String, Object> topEvent = events.get(0);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("entry_id", asString(topEvent.get("entry_id")));
+            item.put("title", "优先处理事件：" + asString(topEvent.get("title")));
+            item.put("action", "确认责任人、截止时间与升级路径");
+            item.put("reason", firstNonBlank(asNullableString(topEvent.get("reason")), "当前事件优先级最高"));
+            item.put("priority", firstNonBlank(asNullableString(topEvent.get("severity")), "HIGH"));
+            result.add(item);
+        }
+
+        for (Map<String, Object> meeting : meetings) {
+            if (!Boolean.TRUE.equals(meeting.get("needDecision"))) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("entry_id", asString(meeting.get("entry_id")));
+            item.put("title", "建议优先参加会议：" + asString(meeting.get("title")));
+            item.put("action", "确认会议目标、分工与会后闭环");
+            item.put("reason", "该会议包含待决策信息，适合CEO直接介入");
+            item.put("priority", "HIGH");
+            result.add(item);
+            break;
+        }
+
+        for (Map<String, Object> person : internalObjects) {
+            if (asInt(person.get("openTasks"), 0) <= 0) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("entry_id", asString(person.get("person_id")));
+            item.put("title", "建议跟进内部对象：" + asString(person.get("name")));
+            item.put("action", "核对任务承接、会议参与和协同支持是否清晰");
+            item.put("reason", firstNonBlank(asNullableString(person.get("relationHint")), "该对象当前有待推进任务"));
+            item.put("priority", asInt(person.get("openTasks"), 0) >= 3 ? "HIGH" : "MEDIUM");
+            result.add(item);
+            if (result.size() >= 4) {
+                break;
+            }
+        }
+
+        if (result.size() > 4) {
+            return new ArrayList<>(result.subList(0, 4));
+        }
+        return result;
+    }
+
+    private String buildInternalRelationHint(int openTasks, int meetings) {
+        if (openTasks >= 3) {
+            return "当前承接任务较多，建议重点关注协同与资源支持";
+        }
+        if (meetings >= 3) {
+            return "会议参与活跃，适合作为跨部门协同连接点";
+        }
+        if (openTasks > 0) {
+            return "存在待推进任务，建议结合会议明确分工与节奏";
+        }
+        return "当前更多体现为组织关系对象，可持续观察协同变化";
+    }
+
+    private int severityWeight(String severity) {
+        if ("HIGH".equalsIgnoreCase(severity)) {
+            return 3;
+        }
+        if ("MEDIUM".equalsIgnoreCase(severity)) {
+            return 2;
+        }
+        if ("LOW".equalsIgnoreCase(severity)) {
+            return 1;
+        }
+        return 0;
+    }
+
     private List<Map<String, Object>> buildCeoExceptionAlerts() {
         List<Map<String, Object>> alerts = new ArrayList<>();
 
@@ -452,26 +661,24 @@ public class PortalRuntimeController {
     }
 
     private Map<String, Object> buildCeoAiSummary(Map<String, Object> runtimePayload) {
-        Map<String, Object> metrics = buildCeoKpiMetrics();
-        List<Map<String, Object>> alerts = buildCeoExceptionAlerts();
         List<Map<String, Object>> todos = buildCeoTodoList(runtimePayload);
-        List<Map<String, Object>> meetings = buildCeoParticipatedMeetings(runtimePayload);
-        List<Map<String, Object>> notifications = buildCeoCollabNotifications(runtimePayload);
+        List<Map<String, Object>> meetings = buildCeoMeetingList(runtimePayload);
+        List<Map<String, Object>> internalObjects = buildCeoInternalObjects(runtimePayload);
+        List<Map<String, Object>> events = buildCeoEventList(runtimePayload);
+        List<Map<String, Object>> followups = buildCeoAiFollowups(runtimePayload);
 
-        double revenue = asDouble(asMap(metrics.get("revenue")).get("value"), 0d);
-        double cashFlow = asDouble(asMap(metrics.get("cash_flow")).get("value"), 0d);
-        double revenuePerCapita = asDouble(asMap(metrics.get("revenue_per_capita")).get("value"), 0d);
-
-        String topAlert = alerts.isEmpty() ? "暂无重大异常" : asString(alerts.get(0).get("title"));
-        String summary = "当前经营驾驶舱代理指标显示：营收约 " + formatAmountWan(revenue)
-            + "，现金流约 " + formatAmountWan(cashFlow)
-            + "，人效约 " + formatAmountWan(revenuePerCapita)
-            + "。当前待办 " + todos.size() + " 项、重大异常 " + alerts.size() + " 项，建议优先关注「" + topAlert + "」。";
+        String topEvent = events.isEmpty() ? "暂无重点事件" : asString(events.get(0).get("title"));
+        String summary = "当前 CEO 门户建议优先从工作与会议、内部对象、事件三条线同步推进：待跟进工作 "
+            + todos.size() + " 项、需要重点留意的会议 " + meetings.size() + " 场、重点内部对象 " + internalObjects.size()
+            + " 个、待关注事件 " + events.size() + " 项。当前最值得先处理的是「" + topEvent + "」。";
 
         List<String> highlights = new ArrayList<>();
-        highlights.add("今日会议 / 会话关注点 " + meetings.size() + " 项");
-        highlights.add("协作通知 " + notifications.size() + " 条");
-        highlights.add("需CEO优先关注的重大异常为「" + topAlert + "」");
+        highlights.add("工作与会议：优先核对任务承接、会议目标和分工是否已经明确");
+        highlights.add("内部对象：重点留意负责人、销售与跨部门协同关系是否顺畅");
+        highlights.add("事件：持续关注关注事项、紧急工作和异常事件是否需要升级");
+        if (!followups.isEmpty()) {
+            highlights.add("AI建议：" + asString(followups.get(0).get("title")));
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("summary", summary);
