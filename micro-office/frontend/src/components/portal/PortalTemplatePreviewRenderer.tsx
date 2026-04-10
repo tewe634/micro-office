@@ -22,9 +22,56 @@ function asText(value: unknown) {
   return text || undefined;
 }
 
+const fieldLabelMap: Record<string, string> = {
+  title: '标题',
+  assignee: '负责人',
+  priority: '优先级',
+  deadline: '截止时间',
+  status: '状态',
+  source: '来源',
+  time: '时间',
+  participants: '参与人',
+  needDecision: '是否需决策',
+  latestMessage: '最新提示',
+  name: '名称',
+  position: '岗位',
+  orgName: '所属组织',
+  openTasks: '未完成任务数',
+  meetings: '关联会议数',
+  relationHint: '关系提示',
+  eventType: '事件类型',
+  severity: '严重程度',
+  owner: '责任人',
+  summary: '总结',
+  highlights: '重点提示',
+  action: '建议动作',
+  reason: '原因',
+  recentActivity: '最近活动',
+  generatedAt: '生成时间',
+};
+
+const valueLabelMap: Record<string, string> = {
+  HIGH: '高',
+  MEDIUM: '中',
+  LOW: '低',
+  PENDING: '待处理',
+  PROCESSING: '处理中',
+  DONE: '已完成',
+  ACTIVE: '进行中',
+  WARNING: '预警',
+  DAILY_ENTRY: '工作条目',
+  CONVERSATION: '会议/会话',
+  TODO: '待办',
+  TRUE: '是',
+  FALSE: '否',
+};
+
 function formatLabel(value: string | undefined) {
   if (!value) {
     return '字段';
+  }
+  if (fieldLabelMap[value]) {
+    return fieldLabelMap[value];
   }
   return value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -37,6 +84,9 @@ function formatLabel(value: string | undefined) {
 function formatValue(value: unknown, unit?: string): string {
   if (value === null || value === undefined || value === '') {
     return '-';
+  }
+  if (typeof value === 'boolean') {
+    return value ? '是' : '否';
   }
   if (typeof value === 'number') {
     if (unit === '%' || unit === '％') {
@@ -57,7 +107,9 @@ function formatValue(value: unknown, unit?: string): string {
   if (typeof value === 'object') {
     return JSON.stringify(value, null, 2);
   }
-  return unit ? `${String(value)}${unit}` : String(value);
+  const normalized = String(value);
+  const translated = valueLabelMap[normalized.toUpperCase()] || normalized;
+  return unit ? `${translated}${unit}` : translated;
 }
 
 function resolveGridSpan(meta: Record<string, any>, fallback: number) {
