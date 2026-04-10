@@ -21,6 +21,9 @@ public class Product {
     private String categoryLevel1;
     private String categoryLevel2;
     private String categoryLevel3;
+    private String structureLevel1;
+    private String structureLevel2;
+    private String seriesDisplayName;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

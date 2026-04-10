@@ -858,6 +858,9 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       <>
         {header.productLine ? <Tag color="blue">{header.productLine}</Tag> : null}
         {header.categoryCode ? <Tag>{header.categoryCode}</Tag> : null}
+        {header.structureLevel1 ? <Tag color="geekblue">{header.structureLevel1}</Tag> : null}
+        {header.structureLevel2 ? <Tag color="purple">{header.structureLevel2}</Tag> : null}
+        {header.seriesDisplayName ? <Tag color="cyan">{header.seriesDisplayName}</Tag> : null}
         <Tag color="processing">{header.year} 门户</Tag>
       </>
     );
@@ -912,9 +915,12 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
       ['规格尺寸', header.spec],
       ['产品线', header.productLine],
       ['物料类别', header.categoryCode],
-      ['一级类别', header.categoryLevel1],
-      ['二级类别', header.categoryLevel2],
-      ['三级类别', header.categoryLevel3],
+      ['原一级类别', header.categoryLevel1],
+      ['原二级类别', header.categoryLevel2],
+      ['原三级类别', header.categoryLevel3],
+      ['设计一级分类', header.structureLevel1],
+      ['设计二级分类', header.structureLevel2],
+      ['系列展示口径', header.seriesDisplayName],
     ];
   };
 

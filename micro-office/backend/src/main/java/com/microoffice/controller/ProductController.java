@@ -19,8 +19,11 @@ public class ProductController {
                                            @RequestParam(required = false) String categoryCode,
                                            @RequestParam(required = false) String code,
                                            @RequestParam(required = false) String name,
-                                           @RequestParam(required = false) String productLine) {
-        return ApiResponse.ok(service.list(current, size, categoryCode, code, name, productLine));
+                                           @RequestParam(required = false) String productLine,
+                                           @RequestParam(required = false) String structureLevel1,
+                                           @RequestParam(required = false) String structureLevel2,
+                                           @RequestParam(required = false) String seriesDisplayName) {
+        return ApiResponse.ok(service.list(current, size, categoryCode, code, name, productLine, structureLevel1, structureLevel2, seriesDisplayName));
     }
 
     @GetMapping("/{id}")

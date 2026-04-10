@@ -1142,6 +1142,9 @@ public class PortalController {
         header.put("categoryLevel1", product.getCategoryLevel1());
         header.put("categoryLevel2", product.getCategoryLevel2());
         header.put("categoryLevel3", product.getCategoryLevel3());
+        header.put("structureLevel1", product.getStructureLevel1());
+        header.put("structureLevel2", product.getStructureLevel2());
+        header.put("seriesDisplayName", product.getSeriesDisplayName());
         header.put("year", year);
         return header;
     }

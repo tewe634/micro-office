@@ -8,19 +8,33 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.Set;
+
 @Service
 @RequiredArgsConstructor
 public class ProductService {
     private static final String DEFAULT_PRODUCT_LINE = "ABB";
+    private static final Set<String> NO_SECOND_LEVEL_STRUCTURE = Set.of("低压", "成套");
 
     private final ProductMapper mapper;
 
-    public Page<Product> list(long current, long size, String categoryCode, String code, String name, String productLine) {
+    public Page<Product> list(long current,
+                              long size,
+                              String categoryCode,
+                              String code,
+                              String name,
+                              String productLine,
+                              String structureLevel1,
+                              String structureLevel2,
+                              String seriesDisplayName) {
         LambdaQueryWrapper<Product> q = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(productLine)) q.eq(Product::getProductLine, productLine);
         if (StringUtils.hasText(categoryCode)) q.eq(Product::getCategoryCode, categoryCode);
         if (StringUtils.hasText(code)) q.like(Product::getCode, code);
         if (StringUtils.hasText(name)) q.like(Product::getName, name);
+        if (StringUtils.hasText(structureLevel1)) q.eq(Product::getStructureLevel1, structureLevel1.trim());
+        if (StringUtils.hasText(structureLevel2)) q.like(Product::getStructureLevel2, structureLevel2.trim());
+        if (StringUtils.hasText(seriesDisplayName)) q.like(Product::getSeriesDisplayName, seriesDisplayName.trim());
         q.orderByAsc(Product::getCode);
         return mapper.selectPage(new Page<>(current, size), q);
     }
@@ -33,6 +47,7 @@ public class ProductService {
         if (!StringUtils.hasText(p.getProductLine())) {
             p.setProductLine(DEFAULT_PRODUCT_LINE);
         }
+        normalizeStructure(p);
         mapper.insert(p);
         return p;
     }
@@ -44,6 +59,7 @@ public class ProductService {
                 ? existing.getProductLine()
                 : DEFAULT_PRODUCT_LINE);
         }
+        normalizeStructure(p);
         mapper.updateById(p);
     }
 
@@ -55,5 +71,20 @@ public class ProductService {
         }
 
         mapper.deleteById(id);
+    }
+
+    private void normalizeStructure(Product product) {
+        product.setStructureLevel1(normalizeText(product.getStructureLevel1()));
+        product.setStructureLevel2(normalizeText(product.getStructureLevel2()));
+        product.setSeriesDisplayName(normalizeText(product.getSeriesDisplayName()));
+
+        if (!StringUtils.hasText(product.getStructureLevel1())
+            || NO_SECOND_LEVEL_STRUCTURE.contains(product.getStructureLevel1())) {
+            product.setStructureLevel2(null);
+        }
+    }
+
+    private String normalizeText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 }
