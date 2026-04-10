@@ -19,6 +19,29 @@ const abbStructureLevel1Options = [
 ];
 
 const abbStructureLevel2Map: Record<string, { value: string; label: string }[]> = {
+  DP: [
+    { value: 'ACS55/150/310/355', label: 'ACS55/150/310/355' },
+    { value: 'ACS180', label: 'ACS180' },
+    { value: 'ACS280', label: 'ACS280' },
+    { value: 'ACS380', label: 'ACS380' },
+    { value: 'ACS380E', label: 'ACS380E' },
+    { value: 'ACS510', label: 'ACS510' },
+    { value: 'ACP510', label: 'ACP510' },
+    { value: 'ACM510', label: 'ACM510' },
+    { value: 'ACS530', label: 'ACS530' },
+    { value: 'ACH531', label: 'ACH531' },
+    { value: 'ACQ531', label: 'ACQ531' },
+    { value: 'ACS550', label: 'ACS550' },
+    { value: 'ACH550/ACH580/ACQ580', label: 'ACH550/ACH580/ACQ580' },
+    { value: 'ACS580-01/04 (R0-R11)', label: 'ACS580-01/04 (R0-R11)' },
+    { value: 'ACS580-07', label: 'ACS580-07' },
+    { value: 'ACS800-11/31', label: 'ACS800-11/31' },
+    { value: 'ACS880-01/04(R1-R11)', label: 'ACS880-01/04(R1-R11)' },
+    { value: 'ACS880-11/31/14/34', label: 'ACS880-11/31/14/34' },
+    { value: 'Servo (Controller+Driver+Motor)', label: 'Servo (Controller+Driver+Motor)' },
+    { value: 'AC500/AC500-eco/HMI', label: 'AC500/AC500-eco/HMI' },
+    { value: 'External Options/DP Others', label: 'External Options/DP Others' },
+  ],
   SE: [
     { value: '服务产品', label: '服务产品' },
     { value: '服务业务', label: '服务业务' },
@@ -186,7 +209,7 @@ export default function ProductPage() {
                       description={
                         <div style={{ lineHeight: 1.7 }}>
                           <div>一级分类：DP / HP / SE / 电机 / 低压 / 成套</div>
-                          <div>DP / HP 二级名称不做主观定义，后续按你上传结构图中的原始名称逐字固化。</div>
+                          <div>DP 二级名称已按你上传结构图原字面固化；HP 二级名称等你发图后再按原字面固化。</div>
                           <div>SE 二级：服务产品 / 服务业务 / 电机服务 / 保内服务</div>
                           <div>电机二级：高压电机 / 低压电机</div>
                           <div>低压、成套不再继续拆二级；系列展示口径支持“多个产品合并一个系列”或“一个产品单独展示一个系列”。</div>
@@ -216,7 +239,9 @@ export default function ProductPage() {
                       ) : null}
                       {activeStructureLevel1Tab === 'DP' || activeStructureLevel1Tab === 'HP' ? (
                         <div style={{ padding: '0 4px 12px', color: '#6b7280', fontSize: 12 }}>
-                          {activeStructureLevel1Tab} 二级名称不再由我定义；你把正确结构图发来后，我按图上原字面固化成 Tab。
+                          {activeStructureLevel1Tab === 'DP'
+                            ? 'DP 二级名称已按你上传结构图原字面固化。'
+                            : 'HP 二级名称等你发图后，我按图上原字面固化成 Tab。'}
                         </div>
                       ) : null}
                     </div>
@@ -362,7 +387,9 @@ export default function ProductPage() {
             name="structureLevel2"
             label="设计二级分类"
             extra={activeLine === 'ABB' && (structureLevel1 === 'DP' || structureLevel1 === 'HP')
-              ? 'DP / HP 二级名称必须以你上传的结构图为准；当前先不做主观固化。'
+              ? (structureLevel1 === 'DP'
+                ? 'DP 二级名称已按你上传结构图原字面固化。'
+                : 'HP 二级名称等你发图后再按原字面固化。')
               : undefined}
           >
             {structureLevel2UsesSelect ? (
