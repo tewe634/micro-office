@@ -32,6 +32,7 @@ const abbStructureLevel2Map: Record<string, { value: string; label: string }[]> 
 };
 
 const noSecondLevelStructure = new Set(['低压', '成套']);
+const ALL_STRUCTURE_TAB_KEY = '__ALL__';
 
 function getStructureLevel2Options(level1?: string) {
   if (!level1) return [];
@@ -55,6 +56,8 @@ export default function ProductPage() {
   const [filters, setFilters] = useState<any>({});
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+  const [activeStructureLevel1Tab, setActiveStructureLevel1Tab] = useState(ALL_STRUCTURE_TAB_KEY);
+  const [activeStructureLevel2Tab, setActiveStructureLevel2Tab] = useState(ALL_STRUCTURE_TAB_KEY);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
   const structureLevel1 = Form.useWatch('structureLevel1', form);
@@ -62,13 +65,32 @@ export default function ProductPage() {
   const structureLevel2Options = useMemo(() => getStructureLevel2Options(structureLevel1), [structureLevel1]);
   const structureLevel2UsesSelect = structureLevel2Options.length > 0;
   const structureLevel2Disabled = !structureLevel1 || noSecondLevelStructure.has(structureLevel1);
+  const activeStructureLevel2Options = useMemo(
+    () => getStructureLevel2Options(activeStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : activeStructureLevel1Tab),
+    [activeStructureLevel1Tab],
+  );
 
-  const load = async (options?: { current?: number; size?: number; filters?: any; productLine?: string }) => {
+  const load = async (options?: {
+    current?: number;
+    size?: number;
+    filters?: any;
+    productLine?: string;
+    structureLevel1Tab?: string;
+    structureLevel2Tab?: string;
+  }) => {
     const nextCurrent = options?.current ?? current;
     const nextSize = options?.size ?? size;
     const nextFilters = options?.filters ?? filters;
     const nextLine = options?.productLine ?? activeLine;
-    const r: any = await productApi.list({ current: nextCurrent, size: nextSize, productLine: nextLine, ...nextFilters });
+    const nextStructureLevel1Tab = options?.structureLevel1Tab ?? activeStructureLevel1Tab;
+    const nextStructureLevel2Tab = options?.structureLevel2Tab ?? activeStructureLevel2Tab;
+    const structureParams = nextLine === 'ABB'
+      ? {
+          structureLevel1: nextStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel1Tab,
+          structureLevel2: nextStructureLevel2Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel2Tab,
+        }
+      : {};
+    const r: any = await productApi.list({ current: nextCurrent, size: nextSize, productLine: nextLine, ...nextFilters, ...structureParams });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
     setCurrent(nextCurrent);
@@ -77,7 +99,11 @@ export default function ProductPage() {
   };
 
   useEffect(() => {
-    load({ current: 1, size, filters: {}, productLine: activeLine });
+    const resetStructureLevel1Tab = ALL_STRUCTURE_TAB_KEY;
+    const resetStructureLevel2Tab = ALL_STRUCTURE_TAB_KEY;
+    setActiveStructureLevel1Tab(resetStructureLevel1Tab);
+    setActiveStructureLevel2Tab(resetStructureLevel2Tab);
+    load({ current: 1, size, filters: {}, productLine: activeLine, structureLevel1Tab: resetStructureLevel1Tab, structureLevel2Tab: resetStructureLevel2Tab });
   }, [activeLine]);
 
   const onSearch = async () => {
@@ -88,7 +114,21 @@ export default function ProductPage() {
   const onTabChange = (key: string) => {
     setActiveLine(key);
     setFilters({});
+    setActiveStructureLevel1Tab(ALL_STRUCTURE_TAB_KEY);
+    setActiveStructureLevel2Tab(ALL_STRUCTURE_TAB_KEY);
     searchForm.resetFields();
+  };
+
+  const onStructureLevel1TabChange = async (key: string) => {
+    const nextStructureLevel2Tab = ALL_STRUCTURE_TAB_KEY;
+    setActiveStructureLevel1Tab(key);
+    setActiveStructureLevel2Tab(nextStructureLevel2Tab);
+    await load({ current: 1, size, filters, productLine: activeLine, structureLevel1Tab: key, structureLevel2Tab: nextStructureLevel2Tab });
+  };
+
+  const onStructureLevel2TabChange = async (key: string) => {
+    setActiveStructureLevel2Tab(key);
+    await load({ current: 1, size, filters, productLine: activeLine, structureLevel1Tab: activeStructureLevel1Tab, structureLevel2Tab: key });
   };
 
   const save = async (values: any) => {
@@ -138,20 +178,49 @@ export default function ProductPage() {
             children: (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {option.key === 'ABB' ? (
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="ABB 产品结构已按新口径预留分类字段，原始导入分类保留不动"
-                    description={
-                      <div style={{ lineHeight: 1.7 }}>
-                        <div>一级分类：DP / HP / SE / 电机 / 低压 / 成套</div>
-                        <div>SE 二级：服务产品 / 服务业务 / 电机服务 / 保内服务</div>
-                        <div>电机二级：高压电机 / 低压电机</div>
-                        <div>低压、成套不再继续拆二级；DP、HP 二级先按你确认的图片口径录入。</div>
-                        <div>系列展示口径支持“多个产品合并一个系列”或“一个产品单独展示一个系列”。</div>
-                      </div>
-                    }
-                  />
+                  <>
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="ABB 产品结构改为上方 Tab 切换，数据表只保留原始导入字段"
+                      description={
+                        <div style={{ lineHeight: 1.7 }}>
+                          <div>一级分类：DP / HP / SE / 电机 / 低压 / 成套</div>
+                          <div>SE 二级：服务产品 / 服务业务 / 电机服务 / 保内服务</div>
+                          <div>电机二级：高压电机 / 低压电机</div>
+                          <div>低压、成套不再继续拆二级；DP、HP 二级先按你确认的图片口径录入。</div>
+                          <div>系列展示口径支持“多个产品合并一个系列”或“一个产品单独展示一个系列”。</div>
+                        </div>
+                      }
+                    />
+
+                    <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: 12, padding: '0 12px' }}>
+                      <Tabs
+                        activeKey={activeStructureLevel1Tab}
+                        onChange={onStructureLevel1TabChange}
+                        items={[
+                          { key: ALL_STRUCTURE_TAB_KEY, label: '全部' },
+                          ...abbStructureLevel1Options.map(item => ({ key: item.value, label: item.label })),
+                        ]}
+                      />
+                      {activeStructureLevel2Options.length > 0 ? (
+                        <Tabs
+                          size="small"
+                          activeKey={activeStructureLevel2Tab}
+                          onChange={onStructureLevel2TabChange}
+                          items={[
+                            { key: ALL_STRUCTURE_TAB_KEY, label: '全部' },
+                            ...activeStructureLevel2Options.map(item => ({ key: item.value, label: item.label })),
+                          ]}
+                        />
+                      ) : null}
+                      {activeStructureLevel1Tab === 'DP' || activeStructureLevel1Tab === 'HP' ? (
+                        <div style={{ padding: '0 4px 12px', color: '#6b7280', fontSize: 12 }}>
+                          {activeStructureLevel1Tab} 二级分类先按你确认的图片口径录入，后续可以再固化成固定 Tab。
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
                 ) : null}
 
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
@@ -163,13 +232,6 @@ export default function ProductPage() {
                     <Form.Item name="categoryCode" label="物料类别"><Input placeholder="请输入物料类别" allowClear /></Form.Item>
                     <Form.Item name="code" label="物料号"><Input placeholder="请输入物料号" allowClear /></Form.Item>
                     <Form.Item name="name" label="物料名称"><Input placeholder="请输入物料名称" allowClear /></Form.Item>
-                    <Form.Item name="structureLevel1" label="设计一级分类">
-                      {option.key === 'ABB' ? (
-                        <Select placeholder="请选择" allowClear style={{ width: 180 }} options={abbStructureLevel1Options} />
-                      ) : (
-                        <Input placeholder="请输入设计一级分类" allowClear />
-                      )}
-                    </Form.Item>
                     <Form.Item name="seriesDisplayName" label="系列展示口径"><Input placeholder="请输入系列展示口径" allowClear /></Form.Item>
                     <Form.Item>
                       <Button type="primary" onClick={onSearch}>搜索</Button>
@@ -198,7 +260,7 @@ export default function ProductPage() {
                       rowKey="id"
                       pagination={false}
                       tableLayout="fixed"
-                      scroll={{ x: 2300, y: 'calc(100dvh - 540px)' }}
+                      scroll={{ x: 1700, y: 'calc(100dvh - 560px)' }}
                       columns={[
                         { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                         { title: '物料号', dataIndex: 'code', width: 180, ellipsis: true },
@@ -208,9 +270,6 @@ export default function ProductPage() {
                         { title: '原一级类别', dataIndex: 'categoryLevel1', width: 180, ellipsis: true },
                         { title: '原二级类别', dataIndex: 'categoryLevel2', width: 220, ellipsis: true },
                         { title: '原三级类别', dataIndex: 'categoryLevel3', width: 220, ellipsis: true },
-                        { title: '设计一级分类', dataIndex: 'structureLevel1', width: 160, ellipsis: true },
-                        { title: '设计二级分类', dataIndex: 'structureLevel2', width: 180, ellipsis: true },
-                        { title: '系列展示口径', dataIndex: 'seriesDisplayName', width: 240, ellipsis: true },
                         {
                           title: '操作',
                           width: 200,
