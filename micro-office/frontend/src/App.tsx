@@ -16,6 +16,7 @@ const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage
 const AdminSalesCollabPage = lazy(() => import('./pages/admin/AdminSalesCollabPage'));
 const AdminPortalTemplatePage = lazy(() => import('./pages/admin/AdminPortalTemplatePage'));
 const AdminPortalTemplateEditorPage = lazy(() => import('./pages/admin/AdminPortalTemplateEditorPage'));
+const AdminPortalTemplatePreviewPage = lazy(() => import('./pages/admin/AdminPortalTemplatePreviewPage'));
 const PortalPage = lazy(() => import('./pages/portal/PortalPage'));
 
 const appLocale = {
@@ -172,6 +173,7 @@ export default function App() {
               <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
               <Route path="admin/sales-collab" element={<MenuRouteGuard menuKey="/admin/sales-collab"><AdminSalesCollabPage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplatePage /></MenuRouteGuard>} />
+              <Route path="admin/portal-templates/:id/preview" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplatePreviewPage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates/:id" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplateEditorPage /></MenuRouteGuard>} />
             </Route>
           </Routes>

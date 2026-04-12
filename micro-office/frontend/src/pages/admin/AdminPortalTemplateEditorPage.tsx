@@ -13,7 +13,7 @@ import {
   Tag,
   message,
 } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { portalTemplateAdminApi } from '../../api';
 
@@ -315,6 +315,7 @@ export default function AdminPortalTemplateEditorPage() {
           <Space wrap>
             <Button onClick={() => nav('/admin/portal-templates')}>返回模板列表</Button>
             <Tag color={statusColor}>{detail.status}</Tag>
+            <Button icon={<EyeOutlined />} onClick={() => nav(`/admin/portal-templates/${detail.id}/preview`)}>预览门户</Button>
             <Button onClick={() => void refreshDetail()}>重新加载</Button>
             <Button type="primary" loading={saving} onClick={() => void handleSave()}>保存模板</Button>
             <Popconfirm

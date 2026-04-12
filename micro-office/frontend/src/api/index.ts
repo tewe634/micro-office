@@ -46,6 +46,21 @@ export interface PortalPayload {
   [key: string]: any;
 }
 
+export interface PortalTemplatePreviewPayload {
+  templateId?: string;
+  templateCode?: string;
+  templateName?: string;
+  templateVersion?: string;
+  entityType?: string;
+  entityId?: string;
+  portalContext?: Record<string, any>;
+  template?: Record<string, any>;
+  datasets?: Record<string, any>;
+  previewUser?: Record<string, any>;
+  errors?: any[];
+  [key: string]: any;
+}
+
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
   register: (data: any) => api.post('/auth/register', data),
@@ -195,6 +210,7 @@ export const portalTemplateAdminApi = {
   positions: () => api.get('/admin/portal-templates/positions'),
   listTemplates: () => api.get('/admin/portal-templates/templates'),
   getTemplate: (id: string | number) => api.get(`/admin/portal-templates/templates/${id}`),
+  previewTemplate: (id: string | number) => api.get(`/admin/portal-templates/templates/${id}/preview`),
   generateByPosition: (data: { positionId: string | number }) => api.post('/admin/portal-templates/generate-by-position', data),
   createTemplate: (data: any) => api.post('/admin/portal-templates/templates', data),
   updateTemplate: (id: string | number, data: any) => api.put(`/admin/portal-templates/templates/${id}`, data),
