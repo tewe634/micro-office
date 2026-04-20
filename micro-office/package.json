@@ -5,7 +5,8 @@
     "smoke:api": "node scripts/api-smoke.mjs",
     "import:employees": "node import_employees.js",
     "import:customers": "node import_customers.js",
-    "import:banks": "node import_banks.js"
+    "import:banks": "node import_banks.js",
+    "import:products:lpda": "node import_products_lpda.js"
   },
   "dependencies": {
     "pg": "^8.20.0",
