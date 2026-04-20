@@ -1,8 +1,10 @@
 package com.microoffice.controller;
 
 import com.microoffice.dto.response.ApiResponse;
+import com.microoffice.service.MenuPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -12,9 +14,11 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AdminController {
     private final JdbcTemplate jdbc;
+    private final MenuPermissionService menuPermissionService;
 
     @GetMapping("/permissions")
-    public ApiResponse<Map<String, List<String>>> listPermissions() {
+    public ApiResponse<Map<String, List<String>>> listPermissions(Authentication auth) {
+        requireAdmin(auth);
         List<Map<String, Object>> rows = jdbc.queryForList(
             "SELECT r.code AS role, p.menu_key " +
             "FROM sys_role r " +
@@ -35,7 +39,8 @@ public class AdminController {
     }
 
     @PutMapping("/permissions")
-    public ApiResponse<Void> savePermissions(@RequestBody Map<String, List<String>> perms) {
+    public ApiResponse<Void> savePermissions(@RequestBody Map<String, List<String>> perms, Authentication auth) {
+        requireAdmin(auth);
         jdbc.update("DELETE FROM role_menu_permission");
         for (Map.Entry<String, List<String>> entry : perms.entrySet()) {
             for (String menuKey : entry.getValue()) {
@@ -46,13 +51,15 @@ public class AdminController {
     }
 
     @GetMapping("/user-permissions/{userId}")
-    public ApiResponse<List<String>> getUserMenus(@PathVariable String userId) {
+    public ApiResponse<List<String>> getUserMenus(@PathVariable String userId, Authentication auth) {
+        requireAdmin(auth);
         return ApiResponse.ok(jdbc.queryForList(
             "SELECT menu_key FROM user_menu_permission WHERE user_id = ? ORDER BY menu_key", String.class, userId));
     }
 
     @PutMapping("/user-permissions/{userId}")
-    public ApiResponse<Void> saveUserMenus(@PathVariable String userId, @RequestBody List<String> menuKeys) {
+    public ApiResponse<Void> saveUserMenus(@PathVariable String userId, @RequestBody List<String> menuKeys, Authentication auth) {
+        requireAdmin(auth);
         jdbc.update("DELETE FROM user_menu_permission WHERE user_id = ?", userId);
         for (String key : menuKeys) {
             jdbc.update("INSERT INTO user_menu_permission (user_id, menu_key) VALUES (?, ?)", userId, key);
@@ -61,19 +68,22 @@ public class AdminController {
     }
 
     @DeleteMapping("/user-permissions/{userId}")
-    public ApiResponse<Void> resetUserMenus(@PathVariable String userId) {
+    public ApiResponse<Void> resetUserMenus(@PathVariable String userId, Authentication auth) {
+        requireAdmin(auth);
         jdbc.update("DELETE FROM user_menu_permission WHERE user_id = ?", userId);
         return ApiResponse.ok(null);
     }
 
     @GetMapping("/user-object-types/{userId}")
-    public ApiResponse<List<String>> getUserObjectTypes(@PathVariable String userId) {
+    public ApiResponse<List<String>> getUserObjectTypes(@PathVariable String userId, Authentication auth) {
+        requireAdmin(auth);
         return ApiResponse.ok(jdbc.queryForList(
             "SELECT object_type FROM user_object_type WHERE user_id = ? ORDER BY object_type", String.class, userId));
     }
 
     @PutMapping("/user-object-types/{userId}")
-    public ApiResponse<Void> saveUserObjectTypes(@PathVariable String userId, @RequestBody List<String> types) {
+    public ApiResponse<Void> saveUserObjectTypes(@PathVariable String userId, @RequestBody List<String> types, Authentication auth) {
+        requireAdmin(auth);
         jdbc.update("DELETE FROM user_object_type WHERE user_id = ?", userId);
         for (String t : types) {
             jdbc.update("INSERT INTO user_object_type (user_id, object_type) VALUES (?, ?)", userId, t);
@@ -82,13 +92,15 @@ public class AdminController {
     }
 
     @DeleteMapping("/user-object-types/{userId}")
-    public ApiResponse<Void> resetUserObjectTypes(@PathVariable String userId) {
+    public ApiResponse<Void> resetUserObjectTypes(@PathVariable String userId, Authentication auth) {
+        requireAdmin(auth);
         jdbc.update("DELETE FROM user_object_type WHERE user_id = ?", userId);
         return ApiResponse.ok(null);
     }
 
     @GetMapping("/position-object-types")
-    public ApiResponse<Map<String, List<String>>> listPositionObjectTypes() {
+    public ApiResponse<Map<String, List<String>>> listPositionObjectTypes(Authentication auth) {
+        requireAdmin(auth);
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT position_id, object_type FROM position_object_type ORDER BY position_id");
         Map<String, List<String>> result = new LinkedHashMap<>();
         for (Map<String, Object> row : rows) {
@@ -99,7 +111,8 @@ public class AdminController {
     }
 
     @PutMapping("/position-object-types")
-    public ApiResponse<Void> savePositionObjectTypes(@RequestBody Map<String, List<String>> data) {
+    public ApiResponse<Void> savePositionObjectTypes(@RequestBody Map<String, List<String>> data, Authentication auth) {
+        requireAdmin(auth);
         jdbc.update("DELETE FROM position_object_type");
         for (Map.Entry<String, List<String>> entry : data.entrySet()) {
             for (String type : entry.getValue()) {
@@ -107,5 +120,10 @@ public class AdminController {
             }
         }
         return ApiResponse.ok(null);
+    }
+
+    private void requireAdmin(Authentication auth) {
+        String currentUserId = (String) auth.getPrincipal();
+        menuPermissionService.requireMenu(currentUserId, "/admin");
     }
 }

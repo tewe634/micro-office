@@ -61,6 +61,95 @@ export interface PortalTemplatePreviewPayload {
   [key: string]: any;
 }
 
+export interface PortalTemplatePreviewParams {
+  entityType?: string;
+  entityId?: string;
+}
+
+export type PortalBlockTemplateStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
+
+export interface PortalBlockTemplateActionPayload {
+  id?: string;
+  actionType: string;
+  targetSubjectType?: string | null;
+  targetIdPath?: string | null;
+  sessionType?: string | null;
+  meta?: Record<string, any>;
+}
+
+export interface PortalBlockTemplatePayload {
+  code: string;
+  name: string;
+  status: PortalBlockTemplateStatus;
+  displayType: string;
+  dataKey: string;
+  label: string;
+  meta?: Record<string, any>;
+  actions?: PortalBlockTemplateActionPayload[];
+}
+
+export type DailyEntryStatus = 'ACTIVE' | 'INACTIVE';
+export type DailyEntryTargetType = 'ORG' | 'USER';
+export type DailyEntrySessionResolveStrategy = 'BY_ENTRY_ONLY' | 'BY_ENTRY_AND_USER';
+export type DailyEntryBindingScope = 'SHARED' | 'PERSONAL';
+
+export interface DailyEntryPayload {
+  code: string;
+  name: string;
+  sortOrder?: number;
+  status: DailyEntryStatus;
+  meta?: Record<string, any>;
+}
+
+export interface DailyEntryTargetPayload {
+  id?: string;
+  targetType: DailyEntryTargetType;
+  targetId: string;
+  status: DailyEntryStatus;
+  sortOrder?: number;
+}
+
+export interface DailyEntryChatPolicyPayload {
+  dailyEntryId?: string;
+  entryCode?: string;
+  entryName?: string;
+  sessionResolveStrategy: DailyEntrySessionResolveStrategy;
+  providerKey?: string;
+  status: DailyEntryStatus;
+  meta?: Record<string, any>;
+}
+
+export interface DailyEntrySessionBindingPayload {
+  id?: string;
+  dailyEntryId?: string;
+  userId?: string | null;
+  sessionId: string;
+  bindingScope: DailyEntryBindingScope;
+  status: DailyEntryStatus;
+  meta?: Record<string, any>;
+}
+
+export type WorkflowTemplateStatus = 'ACTIVE' | 'DISABLED';
+
+export type WorkflowRelationType = 'SEQUENCE' | 'PARALLEL';
+
+export type WorkflowNodeFeatureStatus = 'ACTIVE' | 'DISABLED';
+
+export interface WorkflowTemplatePackageNodePayload {
+  id: string;
+  package_id?: string;
+  module_definition_id: string;
+  parent_package_node_id: string | null;
+  sort_order: number;
+  display_name: string;
+  hierarchy_level: number;
+  relation_type: WorkflowRelationType;
+  branch_group_key: string | null;
+  branch_order: number | null;
+  meta: Record<string, any>;
+  version?: number;
+}
+
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
   register: (data: any) => api.post('/auth/register', data),
@@ -112,47 +201,6 @@ export const productApi = {
   delete: (id: string | number) => api.delete(`/products/${id}`),
 };
 
-export const threadApi = {
-  list: (status?: string, objectId?: number) => api.get('/threads', { params: { status, objectId } }),
-  create: (data: any) => api.post('/threads', data),
-  get: (id: number) => api.get(`/threads/${id}`),
-  update: (id: number, data: any) => api.put(`/threads/${id}`, data),
-  delete: (id: number) => api.delete(`/threads/${id}`),
-};
-
-export const nodeApi = {
-  list: (threadId: number) => api.get(`/threads/${threadId}/nodes`),
-  create: (threadId: number, data: any) => api.post(`/threads/${threadId}/nodes`, data),
-  get: (id: number) => api.get(`/nodes/${id}`),
-  assign: (id: number, assigneeId: number) => api.put(`/nodes/${id}/assign`, { assigneeId }),
-  complete: (id: number, data: any) => api.put(`/nodes/${id}/complete`, data),
-  cancel: (id: number) => api.put(`/nodes/${id}/cancel`),
-  transfer: (id: number, targetUserId: number) => api.put(`/nodes/${id}/transfer`, { targetUserId }),
-  spawnThread: (id: number, data: any) => api.post(`/nodes/${id}/spawn-thread`, data),
-  rollback: (id: number, targetNodeId: number) => api.put(`/nodes/${id}/rollback`, null, { params: { targetNodeId } }),
-  messages: (id: number) => api.get(`/nodes/${id}/messages`),
-  addMessage: (id: number, data: any) => api.post(`/nodes/${id}/messages`, data),
-  addReference: (id: number, data: any) => api.post(`/nodes/${id}/references`, data),
-  removeReference: (id: number, refId: number) => api.delete(`/nodes/${id}/references/${refId}`),
-};
-
-export const commentApi = {
-  list: (threadId: number) => api.get(`/threads/${threadId}/comments`),
-  create: (threadId: number, content: string) => api.post(`/threads/${threadId}/comments`, { content }),
-  update: (id: number, content: string) => api.put(`/comments/${id}`, { content }),
-  delete: (id: number) => api.delete(`/comments/${id}`),
-};
-
-export const workbenchApi = {
-  get: (view: string) => api.get('/workbench', { params: { view } }),
-};
-
-export const clockApi = {
-  punch: (type: string) => api.post('/clock/punch', { type }),
-  today: () => api.get('/clock/today'),
-  history: (userId?: number, days?: number) => api.get('/clock/history', { params: { userId, days } }),
-};
-
 export const userApi = {
   me: () => api.get('/users/me'),
   lookups: () => api.get('/users/me/lookups'),
@@ -165,20 +213,7 @@ export const userApi = {
   delete: (id: number) => api.delete(`/users/${id}`),
 };
 
-export const templateApi = {
-  list: () => api.get('/templates'),
-};
-
 export const adminApi = {
-  listModules: () => api.get('/admin/modules'),
-  createModule: (data: any) => api.post('/admin/modules', data),
-  updateModule: (id: number, data: any) => api.put(`/admin/modules/${id}`, data),
-  deleteModule: (id: number) => api.delete(`/admin/modules/${id}`),
-  listTemplates: () => api.get('/admin/templates'),
-  createTemplate: (data: any) => api.post('/admin/templates', data),
-  templateNodes: (id: number) => api.get(`/admin/templates/${id}/nodes`),
-  addTemplateNode: (id: number, data: any) => api.post(`/admin/templates/${id}/nodes`, data),
-  deleteTemplate: (id: number) => api.delete(`/admin/templates/${id}`),
   getPermissions: () => api.get('/admin/permissions'),
   savePermissions: (data: Record<string, string[]>) => api.put('/admin/permissions', data),
   getUserMenus: (userId: number) => api.get(`/admin/user-permissions/${userId}`),
@@ -210,20 +245,113 @@ export const portalTemplateAdminApi = {
   positions: () => api.get('/admin/portal-templates/positions'),
   listTemplates: () => api.get('/admin/portal-templates/templates'),
   getTemplate: (id: string | number) => api.get(`/admin/portal-templates/templates/${id}`),
-  previewTemplate: (id: string | number) => api.get(`/admin/portal-templates/templates/${id}/preview`),
+  previewTemplate: (id: string | number, params?: PortalTemplatePreviewParams) => api.get(`/admin/portal-templates/templates/${id}/preview`, { params }),
   generateByPosition: (data: { positionId: string | number }) => api.post('/admin/portal-templates/generate-by-position', data),
   createTemplate: (data: any) => api.post('/admin/portal-templates/templates', data),
   updateTemplate: (id: string | number, data: any) => api.put(`/admin/portal-templates/templates/${id}`, data),
   deleteTemplate: (id: string | number) => api.delete(`/admin/portal-templates/templates/${id}`),
 };
 
+export const portalBlockTemplateAdminApi = {
+  listTemplates: (params?: { status?: PortalBlockTemplateStatus; keyword?: string }) => api.get('/admin/portal-block-templates', { params }),
+  getTemplate: (id: string | number) => api.get(`/admin/portal-block-templates/${id}`),
+  createTemplate: (data: PortalBlockTemplatePayload) => api.post('/admin/portal-block-templates', data),
+  updateTemplate: (id: string | number, data: PortalBlockTemplatePayload) => api.put(`/admin/portal-block-templates/${id}`, data),
+  updateStatus: (id: string | number, status: PortalBlockTemplateStatus) => api.put(`/admin/portal-block-templates/${id}/status`, { status }),
+  copyTemplate: (id: string | number) => api.post(`/admin/portal-block-templates/${id}/copy`),
+  references: (id: string | number) => api.get(`/admin/portal-block-templates/${id}/references`),
+};
+
+export const dailyEntryAdminApi = {
+  listEntries: (params?: { status?: DailyEntryStatus }) => api.get('/admin/daily-entries', { params }),
+  getEntry: (id: string | number) => api.get(`/admin/daily-entries/${id}`),
+  createEntry: (data: DailyEntryPayload) => api.post('/admin/daily-entries', data),
+  updateEntry: (id: string | number, data: DailyEntryPayload) => api.put(`/admin/daily-entries/${id}`, data),
+  updateEntryStatus: (id: string | number, status: DailyEntryStatus) => api.put(`/admin/daily-entries/${id}/status`, { status }),
+  listTargets: (id: string | number) => api.get(`/admin/daily-entries/${id}/targets`),
+  saveTargets: (id: string | number, targets: DailyEntryTargetPayload[]) => api.put(`/admin/daily-entries/${id}/targets`, targets),
+  getChatPolicy: (id: string | number) => api.get(`/admin/daily-entry-chat-policies/${id}`),
+  saveChatPolicy: (id: string | number, data: DailyEntryChatPolicyPayload) => api.put(`/admin/daily-entry-chat-policies/${id}`, data),
+  listSessionBindings: (id: string | number) => api.get(`/admin/daily-entry-chat-policies/${id}/session-bindings`),
+  saveSessionBindings: (id: string | number, bindings: DailyEntrySessionBindingPayload[]) => api.put(`/admin/daily-entry-chat-policies/${id}/session-bindings`, bindings),
+};
+
 export const portalApi = {
+  user: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/users/${id}`, { params }),
   object: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/objects/${id}`, { params }),
   product: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/products/${id}`, { params }),
 };
 
-export const dashboardApi = {
-  time: (period: string) => api.get('/dashboard/time', { params: { period } }),
-  scopes: () => api.get('/dashboard/scopes'),
-  org: (scope: string, orgId?: number, period?: string) => api.get('/dashboard/org', { params: { scope, orgId, period } }),
+export const workflowTemplateApi = {
+  listPackages: (params?: { sceneCategory?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  createPackage: (data: {
+    name: string;
+    scene_category: string;
+    description?: string;
+    status: WorkflowTemplateStatus;
+    sort_order?: number;
+    tags?: string[];
+    meta?: Record<string, any>;
+  }) => api.post('/admin/workflow-templates/packages', data),
+  updatePackage: (id: string | number, data: {
+    name: string;
+    scene_category: string;
+    description?: string;
+    sort_order?: number;
+    tags?: string[];
+    meta?: Record<string, any>;
+  }) => api.put(`/admin/workflow-templates/packages/${id}`, data),
+  updatePackageStatus: (id: string | number, status: WorkflowTemplateStatus) => api.put(`/admin/workflow-templates/packages/${id}/status`, { status }),
+  copyPackage: (id: string | number, data?: { name?: string }) => api.post(`/admin/workflow-templates/packages/${id}/copy`, data),
+  listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),
+  saveNodes: (id: string | number, nodes: WorkflowTemplatePackageNodePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
+  listModuleDefinitions: (params?: { nodeType?: string; roleKey?: string; positionKey?: string }) => api.get('/admin/workflow-templates/module-definitions', { params }),
+  listModuleFields: (id: string | number) => api.get(`/admin/workflow-templates/module-definitions/${id}/fields`),
+  listRecommendations: (params?: { sceneCategory?: string; currentModuleDefinitionId?: string; currentNodeType?: string }) => api.get('/admin/workflow-templates/recommendations', { params }),
+};
+
+export const workflowNodeFeatureApi = {
+  list: (params?: {
+    status?: WorkflowNodeFeatureStatus;
+    nodeType?: string;
+    keyword?: string;
+    positionKey?: string;
+    roleKey?: string;
+  }) => api.get('/admin/workflow-node-features', { params }),
+  detail: (id: string | number) => api.get(`/admin/workflow-node-features/${id}`),
+  create: (data: {
+    code: string;
+    name: string;
+    sourceModuleId?: string;
+    sourceSystem?: string;
+    nodeType: string;
+    version?: number;
+    sortOrder?: number;
+    positionKey?: string;
+    roleKey?: string;
+  }) => api.post('/admin/workflow-node-features', data),
+  update: (id: string | number, data: {
+    code: string;
+    name: string;
+    sourceModuleId?: string;
+    sourceSystem?: string;
+    nodeType: string;
+    version?: number;
+    sortOrder?: number;
+    positionKey?: string;
+    roleKey?: string;
+  }) => api.put(`/admin/workflow-node-features/${id}`, data),
+  updateStatus: (id: string | number, status: WorkflowNodeFeatureStatus) => api.put(`/admin/workflow-node-features/${id}/status`, { status }),
+  copy: (id: string | number) => api.post(`/admin/workflow-node-features/${id}/copy`),
+  listFields: (id: string | number) => api.get(`/admin/workflow-node-features/${id}/fields`),
+  saveFields: (id: string | number, fields: any[]) => api.put(`/admin/workflow-node-features/${id}/fields`, { fields }),
+  getBehaviors: (id: string | number, params?: { positionKey?: string; roleKey?: string }) => api.get(`/admin/workflow-node-features/${id}/behaviors`, { params }),
+  saveBehaviors: (id: string | number, data: {
+    assignment?: Record<string, any>;
+    sla?: Record<string, any>;
+    actionPermissions?: string[];
+    triggers?: Record<string, any>;
+  }) => api.put(`/admin/workflow-node-features/${id}/behaviors`, data),
+  references: (id: string | number) => api.get(`/admin/workflow-node-features/${id}/references`),
+  validateBindings: (moduleDefinitionIds: string[]) => api.post('/admin/workflow-node-features/validate-bindings', { moduleDefinitionIds }),
 };

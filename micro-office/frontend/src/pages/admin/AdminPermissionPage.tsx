@@ -30,7 +30,11 @@ const menus = [
   { key: '/admin', label: '系统管理' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
-  { key: '/admin/portal-templates', label: '门户模板' },
+  { key: '/admin/workflow-node-features', label: '工作节点模版管理' },
+  { key: '/admin/workflow-templates', label: '工作流模版管理' },
+  { key: '/admin/daily-entries', label: '日常条目管理' },
+  { key: '/admin/portal-block-templates', label: '门户卡片管理' },
+  { key: '/admin/portal-templates', label: '门户管理' },
 ];
 
 const objectTypes = [

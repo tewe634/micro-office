@@ -377,6 +377,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   const userDetailSection = isUserDetailRoute ? normalizeUserPortalDetailSection(detailSectionParam) : null;
 
   const loader = useMemo(() => {
+    if (entityType === 'users') return portalApi.user;
     if (entityType === 'objects') return portalApi.object;
     return portalApi.product;
   }, [entityType]);

@@ -83,20 +83,20 @@ export default function UserPage() {
           {!edit && <Form.Item name="password" label="密码" extra="不填默认123456"><Input.Password /></Form.Item>}
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="role" label="角色">
-            <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
+            <Select style={{ width: '100%' }} allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
           </Form.Item>
           <Form.Item name="orgId" label="所属组织">
-            <Select allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+            <Select style={{ width: '100%' }} allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
           <Form.Item name="primaryPositionId" label="主岗位">
-            <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
+            <Select style={{ width: '100%' }} allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>
           <Form.Item
             name="extraPositionIds"
             label="辅助岗位（可多选）"
             extra="辅助岗位用于补充人员的岗位归属，便于后续按岗位定义门户模板。"
           >
-            <Select mode="multiple" allowClear placeholder="选择辅助岗位"
+            <Select style={{ width: '100%' }} mode="multiple" allowClear placeholder="选择辅助岗位"
               options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>
           <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>

@@ -53,7 +53,7 @@ export default function PositionTab() {
             background: '#fff',
             border: '1px solid #f0f0f0',
             borderRadius: 12,
-            overflow: 'hidden',
+            /*overflow: 'hidden',*/
           }}
         >
           <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>

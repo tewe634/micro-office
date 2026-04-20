@@ -70,6 +70,14 @@ public class PortalController {
         return ApiResponse.ok(buildObjectPortal(object));
     }
 
+    @GetMapping("/users/{id}")
+    public ApiResponse<Map<String, Object>> userPortal(@PathVariable String id,
+                                                       @RequestParam(required = false) String positionId,
+                                                       Authentication auth) {
+        String viewerId = (String) auth.getPrincipal();
+        return ApiResponse.ok(resolveUserPortalRuntime(viewerId, id, positionId));
+    }
+
     Map<String, Object> resolveUserPortalRuntime(String viewerId, String userId, String requestedPositionId) {
         SysUser user = userMapper.selectById(userId);
         if (user == null) {
@@ -96,7 +104,7 @@ public class PortalController {
         }
 
         List<String> allowedTypes = getAllowedTypes(viewerId);
-        boolean typeAllowed = object.getType() != null && (allowedTypes.isEmpty() || allowedTypes.contains(object.getType().name()));
+        boolean typeAllowed = object.getType() != null && !allowedTypes.isEmpty() && allowedTypes.contains(object.getType().name());
         if (!typeAllowed) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该对象");
         }

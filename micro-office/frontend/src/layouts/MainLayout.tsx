@@ -9,11 +9,13 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LockOutlined,
+  AppstoreOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
 import { authApi, userApi } from '../api';
 import { useAuthStore } from '../store/auth';
 import { useMemo, useState } from 'react';
+import { buildAllowedMenus, canAccessMenu } from '../constants/routes';
 
 const { Header, Sider, Content } = Layout;
 
@@ -32,7 +34,11 @@ const pageTitles: Record<string, string> = {
   '/products': '产品与服务',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
-  '/admin/portal-templates': '门户模板',
+  '/admin/workflow-node-features': '工作节点模版管理',
+  '/admin/workflow-templates': '工作流模版管理',
+  '/admin/daily-entries': '日常条目管理',
+  '/admin/portal-block-templates': '门户卡片管理',
+  '/admin/portal-templates': '门户管理',
 };
 
 const menuOrder = ['/org', '/users', '/objects', '/products'];
@@ -40,11 +46,19 @@ const menuOrder = ['/org', '/users', '/objects', '/products'];
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
-  { key: '/admin/portal-templates', label: '门户模板' },
+  { key: '/admin/workflow-node-features', label: '工作节点模版管理' },
+  { key: '/admin/workflow-templates', label: '工作流模版管理' },
+  { key: '/admin/daily-entries', label: '日常条目管理' },
+  { key: '/admin/portal-block-templates', label: '门户卡片管理' },
+  { key: '/admin/portal-templates', label: '门户管理' },
 ];
 
 function resolveSelectedKey(pathname: string) {
+  if (pathname.startsWith('/admin/daily-entries')) return '/admin/daily-entries';
+  if (pathname.startsWith('/admin/portal-block-templates')) return '/admin/portal-block-templates';
   if (pathname.startsWith('/admin/portal-templates')) return '/admin/portal-templates';
+  if (pathname.startsWith('/admin/workflow-templates')) return '/admin/workflow-templates';
+  if (pathname.startsWith('/admin/workflow-node-features')) return '/admin/workflow-node-features';
   if (pathname.startsWith('/admin/sales-collab')) return '/admin/sales-collab';
   if (pathname.startsWith('/admin/permissions')) return '/admin/permissions';
   if (pathname.startsWith('/admin')) return '/admin';
@@ -56,10 +70,16 @@ function resolveSelectedKey(pathname: string) {
 }
 
 function resolvePageTitle(pathname: string) {
+  if (/^\/users\/[^/]+\/portal\/details\/[^/]+$/.test(pathname)) return '人员门户详情';
+  if (/^\/users\/[^/]+\/portal$/.test(pathname)) return '人员门户';
   if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '外部对象门户';
   if (/^\/products\/[^/]+\/portal$/.test(pathname)) return '产品门户';
   if (/^\/admin\/portal-templates\/[^/]+\/preview$/.test(pathname)) return '预览门户模板';
-  if (/^\/admin\/portal-templates\/[^/]+$/.test(pathname)) return '编辑门户模板';
+  if (/^\/admin\/portal-templates\/[^/]+$/.test(pathname)) return '门户管理';
+  if (/^\/admin\/portal-block-templates\/[^/]+$/.test(pathname)) return '门户卡片管理';
+  if (/^\/admin\/daily-entries\/[^/]+$/.test(pathname)) return '日常条目管理';
+  if (/^\/admin\/workflow-templates\/[^/]+$/.test(pathname)) return '工作流模版管理';
+  if (/^\/admin\/workflow-node-features\/[^/]+$/.test(pathname)) return '工作节点模版管理';
   return pageTitles[pathname] || '东华微办公';
 }
 
@@ -73,20 +93,19 @@ export default function MainLayout() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordForm] = Form.useForm();
 
-  const baseMenus: string[] = ['/org'];
-
-  const allowedMenus = useMemo(() => [...new Set([...baseMenus, ...userMenus])], [userMenus]);
+  const allowedMenus = useMemo(() => buildAllowedMenus(userMenus), [userMenus]);
 
   const menuItems = menuOrder
-    .filter(key => allowedMenus.includes(key) && menuDefs[key])
+    .filter(key => canAccessMenu(key, allowedMenus) && menuDefs[key])
     .map(key => ({ key, icon: menuDefs[key].icon, label: menuDefs[key].label }));
 
-  if (allowedMenus.includes('/admin')) {
+  const allowedAdminChildren = adminChildren.filter(item => canAccessMenu(item.key, allowedMenus));
+  if (allowedAdminChildren.length > 0 || canAccessMenu('/admin', allowedMenus)) {
     menuItems.push({
       key: '/admin',
-      icon: <SettingOutlined />,
+      icon: <AppstoreOutlined />,
       label: '系统管理',
-      children: adminChildren,
+      children: allowedAdminChildren,
     } as any);
   }
 
@@ -136,7 +155,7 @@ export default function MainLayout() {
         collapsible
         trigger={null}
         width={220}
-        style={{ overflow: 'hidden', background: '#f5f6f8', borderRight: '1px solid #e5e7eb' }}
+        style={{ background: '#f5f6f8', borderRight: '1px solid #e5e7eb' }}
       >
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
           <Button
@@ -240,7 +259,7 @@ export default function MainLayout() {
         </Header>
 
         <Content style={{ flex: 1, minHeight: 0, margin: 24, overflow: 'hidden', display: 'flex' }}>
-          <div className="page-fill" style={{ flex: 1, minHeight: 0 }}>
+          <div className="page-fill" style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
             <Outlet />
           </div>
         </Content>

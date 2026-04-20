@@ -433,6 +433,7 @@ function ObjectTable({
                     extra="用于维护母子公司、集团与子公司等上下级关系。"
                   >
                     <Select
+                      style={{ width: '100%' }}
                       allowClear
                       showSearch
                       optionFilterProp="label"
@@ -455,6 +456,7 @@ function ObjectTable({
             <Col xs={24} sm={12}>
               <Form.Item name="orgId" label="所属组织">
                 <Select
+                  style={{ width: '100%' }}
                   allowClear
                   showSearch
                   optionFilterProp="label"
@@ -471,6 +473,7 @@ function ObjectTable({
                 extra="请选择对应组织后再选部门；负责人留空时，可按组织/部门共享。"
               >
                 <Select
+                  style={{ width: '100%' }}
                   allowClear
                   showSearch
                   optionFilterProp="label"
@@ -486,7 +489,7 @@ function ObjectTable({
                 label="负责人"
                 extra="设置负责人后，仅负责人本人或其领导可见；清空负责人后，按组织/部门共享。"
               >
-                <Select allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
+                <Select style={{ width: '100%' }} allowClear showSearch placeholder="选择负责人" optionFilterProp="label" options={userOptions} />
               </Form.Item>
             </Col>
             <Col xs={24}>

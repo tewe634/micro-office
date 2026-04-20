@@ -5,6 +5,7 @@ import zhCN from 'antd/locale/zh_CN';
 import { userApi } from './api';
 import { isTokenExpired, useAuthStore } from './store/auth';
 import { uiText } from './constants/ui';
+import { buildAllowedMenus, canAccessMenu, resolveAdminHomePath, resolveHomePath } from './constants/routes';
 
 const MainLayout = lazy(() => import('./layouts/MainLayout'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
@@ -14,9 +15,16 @@ const ObjectPage = lazy(() => import('./pages/object/ObjectPage'));
 const ProductPage = lazy(() => import('./pages/product/ProductPage'));
 const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage'));
 const AdminSalesCollabPage = lazy(() => import('./pages/admin/AdminSalesCollabPage'));
+const AdminWorkflowNodeFeaturePage = lazy(() => import('./pages/admin/AdminWorkflowNodeFeaturePage'));
+const AdminWorkflowNodeFeatureEditorPage = lazy(() => import('./pages/admin/AdminWorkflowNodeFeatureEditorPage'));
+const AdminPortalBlockTemplatePage = lazy(() => import('./pages/admin/AdminPortalBlockTemplatePage'));
+const AdminPortalBlockTemplateEditorPage = lazy(() => import('./pages/admin/AdminPortalBlockTemplateEditorPage'));
 const AdminPortalTemplatePage = lazy(() => import('./pages/admin/AdminPortalTemplatePage'));
 const AdminPortalTemplateEditorPage = lazy(() => import('./pages/admin/AdminPortalTemplateEditorPage'));
 const AdminPortalTemplatePreviewPage = lazy(() => import('./pages/admin/AdminPortalTemplatePreviewPage'));
+const AdminWorkflowTemplatePage = lazy(() => import('./pages/admin/AdminWorkflowTemplatePage'));
+const AdminWorkflowTemplateEditorPage = lazy(() => import('./pages/admin/AdminWorkflowTemplateEditorPage'));
+const AdminDailyEntryPage = lazy(() => import('./pages/admin/AdminDailyEntryPage'));
 const PortalPage = lazy(() => import('./pages/portal/PortalPage'));
 
 const appLocale = {
@@ -57,7 +65,13 @@ function PageFallback() {
 }
 
 function HomeRedirect() {
-  return <Navigate to="/org" replace />;
+  const menus = useAuthStore(s => s.menus);
+  return <Navigate to={resolveHomePath(menus)} replace />;
+}
+
+function AdminRouteRedirect() {
+  const menus = useAuthStore(s => s.menus);
+  return <Navigate to={resolveAdminHomePath(menus)} replace />;
 }
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -69,7 +83,8 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function MenuRouteGuard({ menuKey, children }: { menuKey: string; children: React.ReactNode }) {
   const menus = useAuthStore(s => s.menus);
-  const allowed = menuKey === '/org' || menus.includes(menuKey) || (menuKey.startsWith('/admin') && menus.includes('/admin'));
+  const allowedMenus = buildAllowedMenus(menus);
+  const allowed = canAccessMenu(menuKey, allowedMenus);
   if (!allowed) return <HomeRedirect />;
   return <>{children}</>;
 }
@@ -165,13 +180,22 @@ export default function App() {
               <Route index element={<HomeRedirect />} />
               <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
               <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserAndPositionPage /></MenuRouteGuard>} />
+              <Route path="users/:id/portal" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
+              <Route path="users/:id/portal/details/:detailSection" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
               <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
               <Route path="objects/:id/portal" element={<MenuRouteGuard menuKey="/objects"><PortalPage entityType="objects" /></MenuRouteGuard>} />
               <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
               <Route path="products/:id/portal" element={<MenuRouteGuard menuKey="/products"><PortalPage entityType="products" /></MenuRouteGuard>} />
-              <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><Navigate to="/admin/permissions" replace /></MenuRouteGuard>} />
+              <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><AdminRouteRedirect /></MenuRouteGuard>} />
               <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
               <Route path="admin/sales-collab" element={<MenuRouteGuard menuKey="/admin/sales-collab"><AdminSalesCollabPage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-node-features" element={<MenuRouteGuard menuKey="/admin/workflow-node-features"><AdminWorkflowNodeFeaturePage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-node-features/:id" element={<MenuRouteGuard menuKey="/admin/workflow-node-features"><AdminWorkflowNodeFeatureEditorPage /></MenuRouteGuard>} />
+              <Route path="admin/portal-block-templates" element={<MenuRouteGuard menuKey="/admin/portal-block-templates"><AdminPortalBlockTemplatePage /></MenuRouteGuard>} />
+              <Route path="admin/portal-block-templates/:id" element={<MenuRouteGuard menuKey="/admin/portal-block-templates"><AdminPortalBlockTemplateEditorPage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-templates" element={<MenuRouteGuard menuKey="/admin/workflow-templates"><AdminWorkflowTemplatePage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-templates/:id" element={<MenuRouteGuard menuKey="/admin/workflow-templates"><AdminWorkflowTemplateEditorPage /></MenuRouteGuard>} />
+              <Route path="admin/daily-entries" element={<MenuRouteGuard menuKey="/admin/daily-entries"><AdminDailyEntryPage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplatePage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates/:id/preview" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplatePreviewPage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates/:id" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplateEditorPage /></MenuRouteGuard>} />

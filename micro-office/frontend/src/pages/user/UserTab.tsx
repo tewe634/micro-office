@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { userApi, orgApi, positionApi } from '../../api';
 import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
+import { canAccessMenu } from '../../constants/routes';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
 export default function UserTab() {
+  const nav = useNavigate();
   const role = useAuthStore(s => s.role);
+  const menus = useAuthStore(s => s.menus);
   const canManagePersonnel = role === 'ADMIN' || role === 'HR';
+  const canViewUserPortal = canAccessMenu('/users', menus);
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
@@ -133,9 +138,10 @@ export default function UserTab() {
                 },
                 {
                   title: '操作',
-                  width: canManagePersonnel ? 140 : 90,
+                  width: canManagePersonnel ? 210 : 140,
                   render: (_: any, r: any) => (
                     <Space size={6} wrap>
+                      {canViewUserPortal ? <Button size="small" onClick={() => nav(`/users/${r.id}/portal`)}>门户</Button> : null}
                       {canManagePersonnel ? (
                         <>
                           <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
@@ -181,20 +187,20 @@ export default function UserTab() {
           {!edit && <Form.Item name="password" label="密码" extra="不填默认123456"><Input.Password /></Form.Item>}
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="role" label="角色">
-            <Select allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
+            <Select style={{ width: '100%' }} allowClear placeholder="不选则根据岗位自动推导" options={roles.map((r: any) => ({ value: r.code, label: formatRoleLabel(r.code, r.name) }))} />
           </Form.Item>
           <Form.Item name="orgId" label="所属组织">
-            <Select allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
+            <Select style={{ width: '100%' }} allowClear showSearch optionFilterProp="label" placeholder="选择组织" options={orgs.map(o => ({ value: o.id, label: o.name }))} />
           </Form.Item>
           <Form.Item name="primaryPositionId" label="主岗位">
-            <Select allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
+            <Select style={{ width: '100%' }} allowClear placeholder="选择岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>
           <Form.Item
             name="extraPositionIds"
             label="辅助岗位（可多选）"
             extra="辅助岗位用于补充人员的岗位归属，便于后续按岗位定义门户模板。"
           >
-            <Select mode="multiple" allowClear placeholder="选择辅助岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
+            <Select style={{ width: '100%' }} mode="multiple" allowClear placeholder="选择辅助岗位" options={positions.map(p => ({ value: p.id, label: p.name }))} />
           </Form.Item>
           <Form.Item name="hiredAt" label="入职日期"><Input placeholder="2026-01-01" /></Form.Item>
         </Form>

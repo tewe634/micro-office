@@ -78,7 +78,7 @@ public class ObjectController {
         if (obj == null || obj.getType() == null) {
             return false;
         }
-        return allowedTypes == null || allowedTypes.isEmpty() || allowedTypes.contains(obj.getType().name());
+        return allowedTypes != null && !allowedTypes.isEmpty() && allowedTypes.contains(obj.getType().name());
     }
 
     private ExternalObject requireAccessibleObject(String id, RequestAccessContext ctx) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Descriptions, Empty, Space, Spin, Tag, Typography, message } from 'antd';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Alert, Button, Card, Collapse, Descriptions, Empty, Space, Spin, Tag, Typography, message } from 'antd';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { portalTemplateAdminApi } from '../../api';
 import type { PortalTemplatePreviewPayload } from '../../api';
 import PortalTemplatePreviewRenderer from '../../components/portal/PortalTemplatePreviewRenderer';
@@ -23,13 +23,19 @@ function asRecord(value: unknown): Record<string, any> {
 export default function AdminPortalTemplatePreviewPage() {
   const nav = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryEntityType = searchParams.get('entityType') || undefined;
+  const queryEntityId = searchParams.get('entityId') || undefined;
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<PortalTemplatePreviewPayload | null>(null);
 
   const loadPreview = async (templateId: string) => {
     setLoading(true);
     try {
-      const resp: any = await portalTemplateAdminApi.previewTemplate(templateId);
+      const resp: any = await portalTemplateAdminApi.previewTemplate(templateId, {
+        entityType: queryEntityType,
+        entityId: queryEntityId,
+      });
       setPreview((resp?.data || null) as PortalTemplatePreviewPayload | null);
     } catch (error: any) {
       message.error(error?.response?.data?.message || '预览加载失败');
@@ -43,12 +49,10 @@ export default function AdminPortalTemplatePreviewPage() {
     if (id) {
       void loadPreview(id);
     }
-  }, [id]);
+  }, [id, queryEntityId, queryEntityType]);
 
-  const template = asRecord(preview?.template);
   const portalContext = asRecord(preview?.portalContext);
   const previewUser = asRecord(preview?.previewUser);
-  const sections = Array.isArray(template.sections) ? template.sections : [];
   const datasets = asRecord(preview?.datasets);
   const datasetKeys = Object.keys(datasets);
   const errors = Array.isArray(preview?.errors) ? preview.errors : [];
@@ -69,6 +73,7 @@ export default function AdminPortalTemplatePreviewPage() {
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
         className="page-card"
+        classNames={{ body: 'portal-preview-shell' }}
         style={{ flex: 1, minHeight: 0 }}
         title={preview?.templateName ? `门户预览：${preview.templateName}` : '门户预览'}
         extra={(
@@ -94,41 +99,6 @@ export default function AdminPortalTemplatePreviewPage() {
         ) : (
           <div className="page-card-scroll" style={{ paddingRight: 4 }}>
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              <Card size="small" style={{ borderRadius: 16 }}>
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  <Descriptions size="small" column={3} bordered>
-                    <Descriptions.Item label="模板名称">{asText(preview.templateName) || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="模板编码">{asText(preview.templateCode) || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="模板版本">{asText(preview.templateVersion) || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="预览用户">{asText(previewUser.userName) || asText(previewUser.name) || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="预览岗位">{asText(previewUser.positionName) || asText(portalContext.previewPositionName) || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="匹配方式">{asText(previewUser.matchedBy) || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="分区数量">{sections.length}</Descriptions.Item>
-                    <Descriptions.Item label="数据集数量">{datasetKeys.length}</Descriptions.Item>
-                    <Descriptions.Item label="实体">{asText(preview.entityType) || '-'} / {asText(preview.entityId) || '-'}</Descriptions.Item>
-                  </Descriptions>
-
-                  {contextTags.length ? (
-                    <Space wrap>
-                      {contextTags.map(tag => (
-                        <Tag key={tag.key} color={tag.color}>{tag.label}</Tag>
-                      ))}
-                    </Space>
-                  ) : null}
-
-                  {datasetKeys.length ? (
-                    <div>
-                      <Text type="secondary">已加载数据集</Text>
-                      <div style={{ marginTop: 8 }}>
-                        <Space wrap>
-                          {datasetKeys.map(key => <Tag key={key}>{key}</Tag>)}
-                        </Space>
-                      </div>
-                    </div>
-                  ) : null}
-                </Space>
-              </Card>
-
               {errors.length ? (
                 <Alert
                   type="warning"
@@ -140,7 +110,48 @@ export default function AdminPortalTemplatePreviewPage() {
                 />
               ) : null}
 
-              <PortalTemplatePreviewRenderer preview={preview} />
+              <div className="portal-preview-stage">
+                <PortalTemplatePreviewRenderer preview={preview} />
+              </div>
+
+              <Collapse
+                className="portal-preview-debug"
+                items={[{
+                  key: 'debug',
+                  label: '调试面板（模板/上下文/数据集）',
+                  children: (
+                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                      <Descriptions size="small" column={3} bordered>
+                        <Descriptions.Item label="模板名称">{asText(preview.templateName) || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="模板编码">{asText(preview.templateCode) || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="模板版本">{asText(preview.templateVersion) || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="预览用户">{asText(previewUser.userName) || asText(previewUser.name) || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="预览岗位">{asText(previewUser.positionName) || asText(portalContext.previewPositionName) || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="匹配方式">{asText(previewUser.matchedBy) || '-'}</Descriptions.Item>
+                      </Descriptions>
+
+                      {contextTags.length ? (
+                        <Space wrap>
+                          {contextTags.map(tag => (
+                            <Tag key={tag.key} color={tag.color}>{tag.label}</Tag>
+                          ))}
+                        </Space>
+                      ) : null}
+
+                      {datasetKeys.length ? (
+                        <div>
+                          <Text type="secondary">已加载数据集</Text>
+                          <div style={{ marginTop: 8 }}>
+                            <Space wrap>
+                              {datasetKeys.map(key => <Tag key={key}>{key}</Tag>)}
+                            </Space>
+                          </div>
+                        </div>
+                      ) : null}
+                    </Space>
+                  ),
+                }]}
+              />
             </Space>
           </div>
         )}

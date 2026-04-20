@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
-  Divider,
   Empty,
   Input,
   InputNumber,
@@ -10,38 +10,48 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Tag,
+  Typography,
   message,
 } from 'antd';
-import { DeleteOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  EyeOutlined,
+  PlusOutlined,
+  SortAscendingOutlined,
+  UpOutlined,
+  DownOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { portalTemplateAdminApi } from '../../api';
+import { objectApi, orgApi, portalBlockTemplateAdminApi, portalTemplateAdminApi, productApi, userApi } from '../../api';
 
-const { TextArea } = Input;
+const { Text } = Typography;
 
 type OptionItem = {
   value: string;
   label: string;
 };
 
-type EditorAction = {
+type BlockTemplateSummary = {
   id: string;
-  actionType: string;
-  targetSubjectType?: string;
-  targetIdPath?: string;
-  sessionType?: string;
-  metaText: string;
+  code: string;
+  name: string;
+  status: string;
+  displayType: string;
+  dataKey: string;
+  label: string;
+  meta?: Record<string, any>;
+  actions?: Array<Record<string, any>>;
 };
 
-type EditorItem = {
+type EditorBlockRef = {
   id: string;
-  itemKey: string;
-  label: string;
-  dataKey: string;
-  displayType: string;
+  blockTemplateId: string;
   sortOrder: number;
-  metaText: string;
-  actions: EditorAction[];
+  enabled: boolean;
+  overrideMeta: Record<string, any>;
+  blockTemplate?: BlockTemplateSummary;
 };
 
 type EditorSection = {
@@ -50,8 +60,8 @@ type EditorSection = {
   name: string;
   sectionType: string;
   sortOrder: number;
-  metaText: string;
-  items: EditorItem[];
+  meta: Record<string, any>;
+  blockRefs: EditorBlockRef[];
 };
 
 type EditorTemplate = {
@@ -62,149 +72,171 @@ type EditorTemplate = {
   roleKey?: string;
   status: string;
   version: number;
-  metaText: string;
+  meta: Record<string, any>;
   sections: EditorSection[];
+};
+
+type PreviewEntityType = 'PERSON' | 'PRODUCT' | 'CUSTOMER_COMPANY' | 'SUPPLIER' | 'CARRIER' | 'BANK' | 'ORGANIZATION';
+
+type PreviewSubjectOption = {
+  value: string;
+  label: string;
+};
+
+const previewEntityTypeOptions: OptionItem[] = [
+  { value: 'PERSON', label: '人员' },
+  { value: 'PRODUCT', label: '产品' },
+  { value: 'CUSTOMER_COMPANY', label: '客户公司' },
+  { value: 'SUPPLIER', label: '供应商' },
+  { value: 'CARRIER', label: '承运商' },
+  { value: 'BANK', label: '银行' },
+  { value: 'ORGANIZATION', label: '组织' },
+];
+
+const previewEntityByTemplateType: Record<string, PreviewEntityType> = {
+  PERSON_ROLE: 'PERSON',
+  PRODUCT: 'PRODUCT',
+  CUSTOMER_COMPANY: 'CUSTOMER_COMPANY',
+  SUPPLIER: 'SUPPLIER',
+  CARRIER: 'CARRIER',
+  BANK: 'BANK',
+  ORGANIZATION: 'ORGANIZATION',
 };
 
 function localId(prefix: string) {
   return `tmp-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function prettyJson(value: any) {
-  return JSON.stringify(value || {}, null, 2);
+function asObject(value: any) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-function normalizeAction(action: any): EditorAction {
+function normalizeBlockTemplate(item: any): BlockTemplateSummary {
   return {
-    id: action?.id || localId('action'),
-    actionType: action?.actionType || 'switch_subject',
-    targetSubjectType: action?.targetSubjectType || undefined,
-    targetIdPath: action?.targetIdPath || undefined,
-    sessionType: action?.sessionType || undefined,
-    metaText: prettyJson(action?.meta),
+    id: String(item?.id || ''),
+    code: String(item?.code || ''),
+    name: String(item?.name || ''),
+    status: String(item?.status || 'DRAFT'),
+    displayType: String(item?.displayType || ''),
+    dataKey: String(item?.dataKey || ''),
+    label: String(item?.label || ''),
+    meta: asObject(item?.meta),
+    actions: Array.isArray(item?.actions) ? item.actions : [],
   };
 }
 
-function normalizeItem(item: any): EditorItem {
+function normalizeBlockRef(item: any): EditorBlockRef {
   return {
-    id: item?.id || localId('item'),
-    itemKey: item?.itemKey || '',
-    label: item?.label || '',
-    dataKey: item?.dataKey || '',
-    displayType: item?.displayType || 'CARD',
+    id: String(item?.id || localId('block-ref')),
+    blockTemplateId: String(item?.blockTemplateId || item?.blockTemplate?.id || ''),
     sortOrder: typeof item?.sortOrder === 'number' ? item.sortOrder : Number(item?.sortOrder || 0),
-    metaText: prettyJson(item?.meta),
-    actions: (item?.actions || []).map(normalizeAction),
+    enabled: item?.enabled !== false,
+    overrideMeta: asObject(item?.overrideMeta),
+    blockTemplate: item?.blockTemplate ? normalizeBlockTemplate(item.blockTemplate) : undefined,
   };
 }
 
-function normalizeSection(section: any): EditorSection {
+function normalizeSection(item: any): EditorSection {
   return {
-    id: section?.id || localId('section'),
-    code: section?.code || '',
-    name: section?.name || '',
-    sectionType: section?.sectionType || 'BLOCK',
-    sortOrder: typeof section?.sortOrder === 'number' ? section.sortOrder : Number(section?.sortOrder || 0),
-    metaText: prettyJson(section?.meta),
-    items: (section?.items || []).map(normalizeItem),
+    id: String(item?.id || localId('section')),
+    code: String(item?.code || ''),
+    name: String(item?.name || ''),
+    sectionType: String(item?.sectionType || 'BLOCK'),
+    sortOrder: typeof item?.sortOrder === 'number' ? item.sortOrder : Number(item?.sortOrder || 0),
+    meta: asObject(item?.meta),
+    blockRefs: Array.isArray(item?.blockRefs) ? item.blockRefs.map(normalizeBlockRef) : [],
   };
 }
 
 function normalizeTemplate(detail: any): EditorTemplate {
   return {
-    id: detail?.id,
-    code: detail?.code || '',
-    name: detail?.name || '',
-    templateType: detail?.templateType || 'PERSON_ROLE',
+    id: String(detail?.id || ''),
+    code: String(detail?.code || ''),
+    name: String(detail?.name || ''),
+    templateType: String(detail?.templateType || 'PERSON_ROLE'),
     roleKey: detail?.roleKey || undefined,
-    status: detail?.status || 'DRAFT',
+    status: String(detail?.status || 'DRAFT'),
     version: typeof detail?.version === 'number' ? detail.version : Number(detail?.version || 1),
-    metaText: prettyJson(detail?.meta),
-    sections: (detail?.sections || []).map(normalizeSection),
+    meta: asObject(detail?.meta),
+    sections: Array.isArray(detail?.sections) ? detail.sections.map(normalizeSection) : [],
   };
 }
 
-function parseJson(text: string, label: string) {
-  const raw = (text || '').trim();
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    throw new Error(`${label} 不是合法 JSON`);
-  }
+function readPreviewEntity(meta: Record<string, any>) {
+  const previewEntity = asObject(meta?.previewEntity);
+  return {
+    entityType: typeof previewEntity.entityType === 'string' ? previewEntity.entityType : undefined,
+    entityId: typeof previewEntity.entityId === 'string' ? previewEntity.entityId : undefined,
+  };
+}
+
+function createEmptySection(index: number): EditorSection {
+  const order = (index + 1) * 10;
+  return {
+    id: localId('section'),
+    code: `SECTION_${index + 1}`,
+    name: `分区 ${index + 1}`,
+    sectionType: 'BLOCK',
+    sortOrder: order,
+    meta: {},
+    blockRefs: [],
+  };
 }
 
 function buildPayload(detail: EditorTemplate) {
   return {
-    code: detail.code,
-    name: detail.name,
+    code: detail.code.trim().toUpperCase(),
+    name: detail.name.trim(),
     templateType: detail.templateType,
-    roleKey: detail.roleKey || null,
+    roleKey: detail.templateType === 'PERSON_ROLE' ? detail.roleKey || null : null,
     status: detail.status,
     version: detail.version,
-    meta: parseJson(detail.metaText, '模板 meta'),
-    sections: detail.sections.map((section, sectionIndex) => ({
-      id: section.id,
-      code: section.code,
-      name: section.name,
-      sectionType: section.sectionType,
+    meta: detail.meta,
+    sections: detail.sections.map(section => ({
+      id: section.id.startsWith('tmp-') ? undefined : section.id,
+      code: section.code.trim().toUpperCase(),
+      name: section.name.trim(),
+      sectionType: section.sectionType || 'BLOCK',
       sortOrder: section.sortOrder,
-      meta: parseJson(section.metaText, `分区 ${sectionIndex + 1} meta`),
-      items: section.items.map((item, itemIndex) => ({
-        id: item.id,
-        itemKey: item.itemKey,
-        label: item.label,
-        dataKey: item.dataKey,
-        displayType: item.displayType,
-        sortOrder: item.sortOrder,
-        meta: parseJson(item.metaText, `展示项 ${sectionIndex + 1}-${itemIndex + 1} meta`),
-        actions: item.actions.map((action, actionIndex) => ({
-          id: action.id,
-          actionType: action.actionType,
-          targetSubjectType: action.targetSubjectType || null,
-          targetIdPath: action.targetIdPath || null,
-          sessionType: action.sessionType || null,
-          meta: parseJson(action.metaText, `动作 ${sectionIndex + 1}-${itemIndex + 1}-${actionIndex + 1} meta`),
-        })),
+      meta: section.meta,
+      blockRefs: section.blockRefs.map(blockRef => ({
+        id: blockRef.id.startsWith('tmp-') ? undefined : blockRef.id,
+        blockTemplateId: blockRef.blockTemplateId,
+        sortOrder: blockRef.sortOrder,
+        enabled: blockRef.enabled,
+        overrideMeta: blockRef.overrideMeta,
       })),
     })),
   };
 }
 
-function createEmptySection(): EditorSection {
-  return {
-    id: localId('section'),
-    code: '',
-    name: '',
-    sectionType: 'BLOCK',
-    sortOrder: 10,
-    metaText: prettyJson({}),
-    items: [],
-  };
+function moveItem<T>(items: T[], index: number, direction: -1 | 1) {
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= items.length) return items;
+  const next = [...items];
+  const [current] = next.splice(index, 1);
+  next.splice(nextIndex, 0, current);
+  return next;
 }
 
-function createEmptyItem(): EditorItem {
-  return {
-    id: localId('item'),
-    itemKey: '',
-    label: '',
-    dataKey: '',
-    displayType: 'CARD',
-    sortOrder: 10,
-    metaText: prettyJson({}),
-    actions: [],
-  };
+function resequenceSections(sections: EditorSection[]) {
+  return sections.map((section, index) => ({
+    ...section,
+    sortOrder: (index + 1) * 10,
+    blockRefs: resequenceBlockRefs(section.blockRefs),
+  }));
 }
 
-function createEmptyAction(): EditorAction {
-  return {
-    id: localId('action'),
-    actionType: 'switch_subject',
-    targetSubjectType: undefined,
-    targetIdPath: undefined,
-    sessionType: undefined,
-    metaText: prettyJson({}),
-  };
+function resequenceBlockRefs(blockRefs: EditorBlockRef[]) {
+  return blockRefs.map((item, index) => ({
+    ...item,
+    sortOrder: (index + 1) * 10,
+  }));
+}
+
+function blockTemplateLabel(blockTemplate?: BlockTemplateSummary) {
+  if (!blockTemplate) return '未关联块模板';
+  return blockTemplate.label || blockTemplate.name || blockTemplate.code || '未命名块模板';
 }
 
 export default function AdminPortalTemplateEditorPage() {
@@ -212,27 +244,89 @@ export default function AdminPortalTemplateEditorPage() {
   const { id } = useParams();
   const [meta, setMeta] = useState<any>({});
   const [detail, setDetail] = useState<EditorTemplate | null>(null);
+  const [availableBlockTemplates, setAvailableBlockTemplates] = useState<BlockTemplateSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [subjectOptions, setSubjectOptions] = useState<PreviewSubjectOption[]>([]);
+  const [subjectLoading, setSubjectLoading] = useState(false);
+  const [blockPickerBySection, setBlockPickerBySection] = useState<Record<string, string | undefined>>({});
+  const [contractIssues, setContractIssues] = useState<string[]>([]);
 
   const templateTypeOptions: OptionItem[] = meta.templateTypes || [];
   const roleOptions: OptionItem[] = meta.roleKeys || [];
   const statusOptions: OptionItem[] = meta.statusOptions || [];
-  const sectionTypeOptions: OptionItem[] = meta.sectionTypes || [];
-  const displayTypeOptions: OptionItem[] = meta.displayTypes || [];
-  const actionTypeOptions: OptionItem[] = meta.actionTypes || [];
-  const subjectTypeOptions: OptionItem[] = meta.subjectTypes || [];
-  const sessionTypeOptions: OptionItem[] = meta.sessionTypes || [];
+  const previewEntity = useMemo(() => readPreviewEntity(detail?.meta || {}), [detail?.meta]);
+  const expectedPreviewEntityType = detail ? previewEntityByTemplateType[detail.templateType] : undefined;
+
+  const validatePreviewEntityConsistency = (template: EditorTemplate) => {
+    const preview = readPreviewEntity(template.meta);
+    if (!preview.entityType) return null;
+    const expectedType = previewEntityByTemplateType[template.templateType];
+    if (!expectedType) return null;
+    if (preview.entityType !== expectedType) {
+      return `模板类型 ${template.templateType} 仅允许预览主体类型 ${expectedType}`;
+    }
+    return null;
+  };
+
+  const loadSubjectOptions = async (entityType?: string) => {
+    if (!entityType) {
+      setSubjectOptions([]);
+      return;
+    }
+    setSubjectLoading(true);
+    try {
+      if (entityType === 'PERSON') {
+        const response: any = await userApi.list();
+        setSubjectOptions((response.data || []).map((item: any) => ({ value: String(item.id), label: `${item.name}${item.empNo ? ` (${item.empNo})` : ''}` })));
+        return;
+      }
+      if (entityType === 'PRODUCT') {
+        const response: any = await productApi.list({ current: 1, size: 200 });
+        const records = response.data?.records || response.data || [];
+        setSubjectOptions((records || []).map((item: any) => ({ value: String(item.id), label: `${item.name}${item.code ? ` (${item.code})` : ''}` })));
+        return;
+      }
+      if (entityType === 'ORGANIZATION') {
+        const response: any = await orgApi.list();
+        setSubjectOptions((response.data || []).map((item: any) => ({ value: String(item.id), label: item.name })));
+        return;
+      }
+
+      const objectType = entityType === 'CUSTOMER_COMPANY' ? 'CUSTOMER' : entityType;
+      const response: any = await objectApi.page({ current: 1, size: 200, type: objectType });
+      const records = response.data?.records || [];
+      setSubjectOptions((records || []).map((item: any) => ({ value: String(item.id), label: item.name })));
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '预览主体加载失败');
+      setSubjectOptions([]);
+    } finally {
+      setSubjectLoading(false);
+    }
+  };
 
   const loadPage = async (templateId: string) => {
     setLoading(true);
     try {
-      const [metaResp, detailResp] = await Promise.all([
+      const [metaResp, detailResp, blockResp] = await Promise.all([
         portalTemplateAdminApi.meta(),
         portalTemplateAdminApi.getTemplate(templateId),
+        portalBlockTemplateAdminApi.listTemplates({ status: 'ACTIVE' }),
       ]);
+      const rawDetail = detailResp.data || {};
+      const normalized = normalizeTemplate(rawDetail);
+      const issues: string[] = [];
+      if (Array.isArray(rawDetail?.sections)) {
+        rawDetail.sections.forEach((section: any, index: number) => {
+          if (Array.isArray(section?.items) && section.items.length > 0) {
+            issues.push(`分区 ${index + 1} 仍返回旧 items 结构；当前编辑器不会兼容展示，请由数据库/后端清理为 blockRefs。`);
+          }
+        });
+      }
       setMeta(metaResp.data || {});
-      setDetail(normalizeTemplate(detailResp.data));
+      setDetail(normalized);
+      setAvailableBlockTemplates((blockResp.data || []).map(normalizeBlockTemplate));
+      setContractIssues(issues);
     } catch (error: any) {
       message.error(error?.response?.data?.message || '模板加载失败');
       nav('/admin/portal-templates');
@@ -247,6 +341,10 @@ export default function AdminPortalTemplateEditorPage() {
     }
   }, [id]);
 
+  useEffect(() => {
+    void loadSubjectOptions(previewEntity.entityType);
+  }, [previewEntity.entityType]);
+
   const refreshDetail = async () => {
     if (id) {
       await loadPage(id);
@@ -257,37 +355,20 @@ export default function AdminPortalTemplateEditorPage() {
     setDetail(prev => (prev ? updater(prev) : prev));
   };
 
-  const updateSection = (sectionIndex: number, updater: (section: EditorSection) => EditorSection) => {
-    updateDetail(prev => ({
-      ...prev,
-      sections: prev.sections.map((section, index) => (index === sectionIndex ? updater(section) : section)),
-    }));
-  };
-
-  const updateItem = (sectionIndex: number, itemIndex: number, updater: (item: EditorItem) => EditorItem) => {
-    updateSection(sectionIndex, section => ({
-      ...section,
-      items: section.items.map((item, index) => (index === itemIndex ? updater(item) : item)),
-    }));
-  };
-
-  const updateAction = (sectionIndex: number, itemIndex: number, actionIndex: number, updater: (action: EditorAction) => EditorAction) => {
-    updateItem(sectionIndex, itemIndex, item => ({
-      ...item,
-      actions: item.actions.map((action, index) => (index === actionIndex ? updater(action) : action)),
-    }));
-  };
-
-  const handleSave = async () => {
+  const saveTemplate = async () => {
     if (!detail?.id) return;
+    const consistencyError = validatePreviewEntityConsistency(detail);
+    if (consistencyError) {
+      message.error(consistencyError);
+      return;
+    }
     try {
       setSaving(true);
-      const payload = buildPayload(detail);
-      const resp: any = await portalTemplateAdminApi.updateTemplate(detail.id, payload);
+      const resp: any = await portalTemplateAdminApi.updateTemplate(detail.id, buildPayload(detail));
       setDetail(normalizeTemplate(resp.data));
       message.success('模板已保存');
     } catch (error: any) {
-      message.error(error?.message || error?.response?.data?.message || '保存失败');
+      message.error(error?.response?.data?.message || error?.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -300,6 +381,55 @@ export default function AdminPortalTemplateEditorPage() {
     nav('/admin/portal-templates');
   };
 
+  const handleGoPreview = () => {
+    if (!detail?.id) return;
+    const consistencyError = validatePreviewEntityConsistency(detail);
+    if (consistencyError) {
+      message.error(consistencyError);
+      return;
+    }
+    if (!previewEntity.entityType || !previewEntity.entityId) {
+      message.warning('请先配置预览主体类型和预览主体');
+      return;
+    }
+    const query = new URLSearchParams();
+    query.set('entityType', previewEntity.entityType);
+    query.set('entityId', previewEntity.entityId);
+    nav(`/admin/portal-templates/${detail.id}/preview?${query.toString()}`);
+  };
+
+  const setPreviewMeta = (updates: { entityType?: string; entityId?: string }) => {
+    updateDetail(prev => {
+      const nextPreview = { ...asObject(prev.meta.previewEntity) };
+      if (Object.prototype.hasOwnProperty.call(updates, 'entityType')) {
+        if (updates.entityType) {
+          nextPreview.entityType = updates.entityType;
+        } else {
+          delete nextPreview.entityType;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'entityId')) {
+        if (updates.entityId) {
+          nextPreview.entityId = updates.entityId;
+        } else {
+          delete nextPreview.entityId;
+        }
+      }
+      const nextMeta = { ...prev.meta };
+      if (nextPreview.entityType || nextPreview.entityId) {
+        nextMeta.previewEntity = nextPreview;
+      } else {
+        delete nextMeta.previewEntity;
+      }
+      return { ...prev, meta: nextMeta };
+    });
+  };
+
+  const availableBlockOptions = useMemo(() => availableBlockTemplates.map(item => ({
+    value: item.id,
+    label: `${blockTemplateLabel(item)} · ${item.code || item.dataKey}`,
+  })), [availableBlockTemplates]);
+
   const statusColor = useMemo(() => {
     if (!detail) return 'default';
     return detail.status === 'ACTIVE' ? 'green' : detail.status === 'DRAFT' ? 'gold' : 'default';
@@ -310,17 +440,17 @@ export default function AdminPortalTemplateEditorPage() {
       <Card
         className="page-card"
         style={{ flex: 1, minHeight: 0 }}
-        title={detail ? `编辑模板：${detail.name}` : '模板编辑'}
+        title={detail ? `模板装配：${detail.name}` : '模板装配'}
         extra={detail ? (
           <Space wrap>
             <Button onClick={() => nav('/admin/portal-templates')}>返回模板列表</Button>
             <Tag color={statusColor}>{detail.status}</Tag>
-            <Button icon={<EyeOutlined />} onClick={() => nav(`/admin/portal-templates/${detail.id}/preview`)}>预览门户</Button>
+            <Button icon={<EyeOutlined />} onClick={handleGoPreview}>预览门户</Button>
             <Button onClick={() => void refreshDetail()}>重新加载</Button>
-            <Button type="primary" loading={saving} onClick={() => void handleSave()}>保存模板</Button>
+            <Button type="primary" loading={saving} onClick={() => void saveTemplate()}>保存模板</Button>
             <Popconfirm
               title={`确认删除模板「${detail.name}」？`}
-              description="删除后，模板下的分区、展示项和动作会一并删除，且不可恢复。"
+              description="删除后模板下的分区与块引用会一并删除，且不可恢复。"
               okText="确认删除"
               cancelText="取消"
               okButtonProps={{ danger: true }}
@@ -343,8 +473,20 @@ export default function AdminPortalTemplateEditorPage() {
         ) : (
           <div className="page-card-scroll" style={{ paddingRight: 4 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100%' }}>
+              {contractIssues.map(issue => (
+                <Alert key={issue} type="warning" showIcon message="检测到旧结构残留" description={issue} />
+              ))}
+
+              <Alert
+                type="info"
+                showIcon
+                message="当前页面只负责装配块引用"
+                description="主路径为：新增分区、选择 ACTIVE 卡片块、排序、启停、分区装配。块的 dataKey、displayType、actions 请到“卡片块定义”维护。"
+                action={<Button size="small" onClick={() => nav('/admin/portal-block-templates')}>进入卡片块定义</Button>}
+              />
+
               <Card type="inner" title="模板基础信息">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
                   <div>
                     <div style={{ marginBottom: 6 }}>模板名称</div>
                     <Input value={detail.name} onChange={e => updateDetail(prev => ({ ...prev, name: e.target.value }))} />
@@ -355,186 +497,275 @@ export default function AdminPortalTemplateEditorPage() {
                   </div>
                   <div>
                     <div style={{ marginBottom: 6 }}>模板类型</div>
-                    <Select value={detail.templateType} options={templateTypeOptions} onChange={value => updateDetail(prev => ({ ...prev, templateType: value, roleKey: value === 'PERSON_ROLE' ? prev.roleKey : undefined }))} />
+                    <Select style={{ width: '100%' }} value={detail.templateType} options={templateTypeOptions} onChange={value => updateDetail(prev => ({ ...prev, templateType: value, roleKey: value === 'PERSON_ROLE' ? prev.roleKey : undefined }))} />
                   </div>
                   <div>
                     <div style={{ marginBottom: 6 }}>状态</div>
-                    <Select value={detail.status} options={statusOptions} onChange={value => updateDetail(prev => ({ ...prev, status: value }))} />
+                    <Select style={{ width: '100%' }} value={detail.status} options={statusOptions} onChange={value => updateDetail(prev => ({ ...prev, status: value }))} />
                   </div>
                   <div>
                     <div style={{ marginBottom: 6 }}>角色标识</div>
-                    <Select allowClear value={detail.roleKey} options={roleOptions} disabled={detail.templateType !== 'PERSON_ROLE'} onChange={value => updateDetail(prev => ({ ...prev, roleKey: value }))} />
+                    <Select style={{ width: '100%' }} allowClear value={detail.roleKey} options={roleOptions} disabled={detail.templateType !== 'PERSON_ROLE'} onChange={value => updateDetail(prev => ({ ...prev, roleKey: value }))} />
                   </div>
                   <div>
                     <div style={{ marginBottom: 6 }}>版本</div>
                     <InputNumber min={1} style={{ width: '100%' }} value={detail.version} onChange={value => updateDetail(prev => ({ ...prev, version: Number(value || 1) }))} />
                   </div>
-                  <div style={{ gridColumn: '1 / span 4' }}>
-                    <div style={{ marginBottom: 6 }}>模板 Meta(JSON)</div>
-                    <TextArea rows={6} value={detail.metaText} onChange={e => updateDetail(prev => ({ ...prev, metaText: e.target.value }))} />
+                  <div>
+                    <div style={{ marginBottom: 6 }}>预览主体类型</div>
+                    <Select
+                      style={{ width: '100%' }}
+                      allowClear
+                      value={previewEntity.entityType}
+                      options={previewEntityTypeOptions}
+                      onChange={value => setPreviewMeta({ entityType: value, entityId: undefined })}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: 6 }}>预览主体</div>
+                    <Select
+                      style={{ width: '100%' }}
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      loading={subjectLoading}
+                      disabled={!previewEntity.entityType}
+                      value={previewEntity.entityId}
+                      options={subjectOptions}
+                      placeholder={previewEntity.entityType ? '选择真实业务主体' : '先选择主体类型'}
+                      onChange={value => setPreviewMeta({ entityId: value })}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
+                    {expectedPreviewEntityType ? `当前模板类型仅允许预览主体类型：${expectedPreviewEntityType}` : '当前模板类型未配置预览主体映射'}
                   </div>
                 </div>
               </Card>
 
               <Card
                 type="inner"
-                title="模板结构"
-                extra={<Button icon={<PlusOutlined />} onClick={() => updateDetail(prev => ({ ...prev, sections: [...prev.sections, createEmptySection()] }))}>新增分区</Button>}
+                title="分区装配"
+                extra={<Button icon={<PlusOutlined />} onClick={() => updateDetail(prev => ({ ...prev, sections: resequenceSections([...prev.sections, createEmptySection(prev.sections.length)]) }))}>新增分区</Button>}
               >
                 {!detail.sections.length ? (
-                  <Empty description="当前模板还没有分区" />
-                ) : detail.sections.map((section, sectionIndex) => (
-                  <Card
-                    key={section.id}
-                    type="inner"
-                    title={`分区 ${sectionIndex + 1}`}
-                    style={{ marginBottom: 16 }}
-                    extra={
-                      <Popconfirm
-                        title={`确认删除分区「${section.name || `分区 ${sectionIndex + 1}`}」？`}
-                        description="该分区下的展示项和动作也会一并移除。"
-                        okText="确认删除"
-                        cancelText="取消"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => updateDetail(prev => ({ ...prev, sections: prev.sections.filter((_, index) => index !== sectionIndex) }))}
-                      >
-                        <Button danger size="small">删除分区</Button>
-                      </Popconfirm>
-                    }
-                  >
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                      <div>
-                        <div style={{ marginBottom: 6 }}>分区编码</div>
-                        <Input value={section.code} onChange={e => updateSection(sectionIndex, current => ({ ...current, code: e.target.value.toUpperCase() }))} />
-                      </div>
-                      <div>
-                        <div style={{ marginBottom: 6 }}>分区名称</div>
-                        <Input value={section.name} onChange={e => updateSection(sectionIndex, current => ({ ...current, name: e.target.value }))} />
-                      </div>
-                      <div>
-                        <div style={{ marginBottom: 6 }}>分区类型</div>
-                        <Select value={section.sectionType} options={sectionTypeOptions} onChange={value => updateSection(sectionIndex, current => ({ ...current, sectionType: value }))} />
-                      </div>
-                      <div>
-                        <div style={{ marginBottom: 6 }}>排序</div>
-                        <InputNumber min={0} style={{ width: '100%' }} value={section.sortOrder} onChange={value => updateSection(sectionIndex, current => ({ ...current, sortOrder: Number(value || 0) }))} />
-                      </div>
-                      <div style={{ gridColumn: '1 / span 4' }}>
-                        <div style={{ marginBottom: 6 }}>分区 Meta(JSON)</div>
-                        <TextArea rows={4} value={section.metaText} onChange={e => updateSection(sectionIndex, current => ({ ...current, metaText: e.target.value }))} />
-                      </div>
-                    </div>
-
-                    <Divider style={{ margin: '16px 0' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <strong>展示项</strong>
-                      <Button size="small" icon={<PlusOutlined />} onClick={() => updateSection(sectionIndex, current => ({ ...current, items: [...current.items, createEmptyItem()] }))}>新增展示项</Button>
-                    </div>
-
-                    {!section.items.length ? (
-                      <Empty description="该分区暂无展示项" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                    ) : section.items.map((item, itemIndex) => (
-                      <Card
-                        key={item.id}
-                        type="inner"
-                        title={`展示项 ${sectionIndex + 1}.${itemIndex + 1}`}
-                        style={{ marginBottom: 12 }}
-                        extra={
+                  <Empty description="当前模板还没有分区，请先新增分区并引用卡片块" />
+                ) : detail.sections.map((section, sectionIndex) => {
+                  const blockPickerValue = blockPickerBySection[section.id];
+                  return (
+                    <Card
+                      key={section.id}
+                      type="inner"
+                      title={`分区 ${sectionIndex + 1}`}
+                      style={{ marginBottom: 16 }}
+                      extra={(
+                        <Space wrap>
+                          <Button
+                            size="small"
+                            icon={<UpOutlined />}
+                            disabled={sectionIndex === 0}
+                            onClick={() => updateDetail(prev => ({
+                              ...prev,
+                              sections: resequenceSections(moveItem(prev.sections, sectionIndex, -1)),
+                            }))}
+                          >
+                            上移
+                          </Button>
+                          <Button
+                            size="small"
+                            icon={<DownOutlined />}
+                            disabled={sectionIndex === detail.sections.length - 1}
+                            onClick={() => updateDetail(prev => ({
+                              ...prev,
+                              sections: resequenceSections(moveItem(prev.sections, sectionIndex, 1)),
+                            }))}
+                          >
+                            下移
+                          </Button>
                           <Popconfirm
-                            title={`确认删除展示项「${item.label || item.itemKey || `${sectionIndex + 1}.${itemIndex + 1}`}」？`}
-                            description="该展示项下的动作也会一并移除。"
+                            title={`确认删除分区「${section.name || `分区 ${sectionIndex + 1}`}」？`}
+                            description="该分区下的块引用也会一并移除。"
                             okText="确认删除"
                             cancelText="取消"
                             okButtonProps={{ danger: true }}
-                            onConfirm={() => updateSection(sectionIndex, current => ({ ...current, items: current.items.filter((_, index) => index !== itemIndex) }))}
+                            onConfirm={() => updateDetail(prev => ({
+                              ...prev,
+                              sections: resequenceSections(prev.sections.filter((_, index) => index !== sectionIndex)),
+                            }))}
                           >
-                            <Button danger size="small">删除展示项</Button>
+                            <Button danger size="small">删除分区</Button>
                           </Popconfirm>
-                        }
-                      >
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>itemKey</div>
-                            <Input value={item.itemKey} onChange={e => updateItem(sectionIndex, itemIndex, current => ({ ...current, itemKey: e.target.value }))} />
-                          </div>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>名称</div>
-                            <Input value={item.label} onChange={e => updateItem(sectionIndex, itemIndex, current => ({ ...current, label: e.target.value }))} />
-                          </div>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>dataKey</div>
-                            <Input value={item.dataKey} onChange={e => updateItem(sectionIndex, itemIndex, current => ({ ...current, dataKey: e.target.value }))} />
-                          </div>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>展示类型</div>
-                            <Select value={item.displayType} options={displayTypeOptions} onChange={value => updateItem(sectionIndex, itemIndex, current => ({ ...current, displayType: value }))} />
-                          </div>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>排序</div>
-                            <InputNumber min={0} style={{ width: '100%' }} value={item.sortOrder} onChange={value => updateItem(sectionIndex, itemIndex, current => ({ ...current, sortOrder: Number(value || 0) }))} />
-                          </div>
-                          <div style={{ gridColumn: '1 / span 5' }}>
-                            <div style={{ marginBottom: 6 }}>展示项 Meta(JSON)</div>
-                            <TextArea rows={4} value={item.metaText} onChange={e => updateItem(sectionIndex, itemIndex, current => ({ ...current, metaText: e.target.value }))} />
-                          </div>
+                        </Space>
+                      )}
+                    >
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+                        <div>
+                          <div style={{ marginBottom: 6 }}>分区编码</div>
+                          <Input value={section.code} onChange={e => updateDetail(prev => ({
+                            ...prev,
+                            sections: prev.sections.map((item, index) => index === sectionIndex ? { ...item, code: e.target.value.toUpperCase() } : item),
+                          }))} />
                         </div>
-
-                        <Divider style={{ margin: '16px 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                          <strong>动作</strong>
-                          <Button size="small" icon={<PlusOutlined />} onClick={() => updateItem(sectionIndex, itemIndex, current => ({ ...current, actions: [...current.actions, createEmptyAction()] }))}>新增动作</Button>
+                        <div>
+                          <div style={{ marginBottom: 6 }}>分区名称</div>
+                          <Input value={section.name} onChange={e => updateDetail(prev => ({
+                            ...prev,
+                            sections: prev.sections.map((item, index) => index === sectionIndex ? { ...item, name: e.target.value } : item),
+                          }))} />
                         </div>
+                        <div>
+                          <div style={{ marginBottom: 6 }}>分区类型</div>
+                          <Input value="BLOCK" disabled />
+                        </div>
+                        <div>
+                          <div style={{ marginBottom: 6 }}>排序</div>
+                          <InputNumber min={0} style={{ width: '100%' }} value={section.sortOrder} onChange={value => updateDetail(prev => ({
+                            ...prev,
+                            sections: prev.sections.map((item, index) => index === sectionIndex ? { ...item, sortOrder: Number(value || 0) } : item),
+                          }))} />
+                        </div>
+                      </div>
 
-                        {!item.actions.length ? (
-                          <Empty description="该展示项暂无动作" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                        ) : item.actions.map((action, actionIndex) => (
-                          <Card
-                            key={action.id}
-                            type="inner"
-                            size="small"
-                            title={`动作 ${sectionIndex + 1}.${itemIndex + 1}.${actionIndex + 1}`}
-                            style={{ marginBottom: 12 }}
-                            extra={
-                              <Popconfirm
-                                title={`确认删除动作「${action.actionType || `${sectionIndex + 1}.${itemIndex + 1}.${actionIndex + 1}`}」？`}
-                                description="删除后该展示项将不再触发这个动作配置。"
-                                okText="确认删除"
-                                cancelText="取消"
-                                okButtonProps={{ danger: true }}
-                                onConfirm={() => updateItem(sectionIndex, itemIndex, current => ({ ...current, actions: current.actions.filter((_, index) => index !== actionIndex) }))}
-                              >
-                                <Button danger size="small">删除动作</Button>
-                              </Popconfirm>
-                            }
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                        <Space>
+                          <SortAscendingOutlined />
+                          <Text strong>块引用装配</Text>
+                          <Text type="secondary">选择 ACTIVE 卡片块加入当前分区</Text>
+                        </Space>
+                        <Space wrap>
+                          <Select
+                            style={{ minWidth: 320 }}
+                            showSearch
+                            optionFilterProp="label"
+                            value={blockPickerValue}
+                            placeholder="选择一个 ACTIVE 卡片块"
+                            options={availableBlockOptions.filter(option => !section.blockRefs.some(ref => ref.blockTemplateId === option.value))}
+                            onChange={value => setBlockPickerBySection(prev => ({ ...prev, [section.id]: value }))}
+                          />
+                          <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            disabled={!blockPickerValue}
+                            onClick={() => {
+                              const chosen = availableBlockTemplates.find(item => item.id === blockPickerValue);
+                              if (!chosen) return;
+                              updateDetail(prev => ({
+                                ...prev,
+                                sections: prev.sections.map((item, index) => index === sectionIndex ? {
+                                  ...item,
+                                  blockRefs: resequenceBlockRefs([
+                                    ...item.blockRefs,
+                                    {
+                                      id: localId('block-ref'),
+                                      blockTemplateId: chosen.id,
+                                      sortOrder: (item.blockRefs.length + 1) * 10,
+                                      enabled: true,
+                                      overrideMeta: {},
+                                      blockTemplate: chosen,
+                                    },
+                                  ]),
+                                } : item),
+                              }));
+                              setBlockPickerBySection(prev => ({ ...prev, [section.id]: undefined }));
+                            }}
                           >
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                              <div>
-                                <div style={{ marginBottom: 6 }}>动作类型</div>
-                                <Select value={action.actionType} options={actionTypeOptions} onChange={value => updateAction(sectionIndex, itemIndex, actionIndex, current => ({ ...current, actionType: value }))} />
-                              </div>
-                              <div>
-                                <div style={{ marginBottom: 6 }}>目标主体类型</div>
-                                <Select allowClear value={action.targetSubjectType} options={subjectTypeOptions} onChange={value => updateAction(sectionIndex, itemIndex, actionIndex, current => ({ ...current, targetSubjectType: value }))} />
-                              </div>
-                              <div>
-                                <div style={{ marginBottom: 6 }}>targetIdPath</div>
-                                <Input value={action.targetIdPath} onChange={e => updateAction(sectionIndex, itemIndex, actionIndex, current => ({ ...current, targetIdPath: e.target.value }))} />
-                              </div>
-                              <div>
-                                <div style={{ marginBottom: 6 }}>sessionType</div>
-                                <Select allowClear value={action.sessionType} options={sessionTypeOptions} onChange={value => updateAction(sectionIndex, itemIndex, actionIndex, current => ({ ...current, sessionType: value }))} />
-                              </div>
-                              <div style={{ gridColumn: '1 / span 4' }}>
-                                <div style={{ marginBottom: 6 }}>动作 Meta(JSON)</div>
-                                <TextArea rows={4} value={action.metaText} onChange={e => updateAction(sectionIndex, itemIndex, actionIndex, current => ({ ...current, metaText: e.target.value }))} />
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </Card>
-                    ))}
-                  </Card>
-                ))}
+                            引用到本分区
+                          </Button>
+                        </Space>
+                      </div>
+
+                      {!section.blockRefs.length ? (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该分区还没有引用块" />
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {section.blockRefs.map((blockRef, blockIndex) => {
+                            const blockTemplate = blockRef.blockTemplate || availableBlockTemplates.find(item => item.id === blockRef.blockTemplateId);
+                            return (
+                              <Card key={blockRef.id} size="small" className="portal-block-ref-card">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flex: 1 }}>
+                                    <Space wrap>
+                                      <Tag color={blockRef.enabled ? 'green' : 'default'}>{blockRef.enabled ? '启用中' : '已停用'}</Tag>
+                                      <Tag>{blockTemplate?.displayType || 'UNKNOWN'}</Tag>
+                                      <Tag>{blockTemplate?.dataKey || blockRef.blockTemplateId}</Tag>
+                                    </Space>
+                                    <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>
+                                      {blockTemplateLabel(blockTemplate)}
+                                    </div>
+                                    <div style={{ color: '#64748b', fontSize: 12 }}>
+                                      {blockTemplate?.code || blockRef.blockTemplateId}
+                                    </div>
+                                    <div style={{ color: '#475569', fontSize: 12 }}>
+                                      该引用会沿用卡片块定义中的展示类型、数据键和动作配置，不在模板页内直接改写。
+                                    </div>
+                                  </div>
+
+                                  <Space wrap align="center">
+                                    <span style={{ color: '#64748b', fontSize: 12 }}>启用</span>
+                                    <Switch
+                                      size="small"
+                                      checked={blockRef.enabled}
+                                      onChange={checked => updateDetail(prev => ({
+                                        ...prev,
+                                        sections: prev.sections.map((item, index) => index === sectionIndex ? {
+                                          ...item,
+                                          blockRefs: item.blockRefs.map((ref, refIndex) => refIndex === blockIndex ? { ...ref, enabled: checked } : ref),
+                                        } : item),
+                                      }))}
+                                    />
+                                    <Button
+                                      size="small"
+                                      icon={<UpOutlined />}
+                                      disabled={blockIndex === 0}
+                                      onClick={() => updateDetail(prev => ({
+                                        ...prev,
+                                        sections: prev.sections.map((item, index) => index === sectionIndex ? {
+                                          ...item,
+                                          blockRefs: resequenceBlockRefs(moveItem(item.blockRefs, blockIndex, -1)),
+                                        } : item),
+                                      }))}
+                                    >
+                                      上移
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      icon={<DownOutlined />}
+                                      disabled={blockIndex === section.blockRefs.length - 1}
+                                      onClick={() => updateDetail(prev => ({
+                                        ...prev,
+                                        sections: prev.sections.map((item, index) => index === sectionIndex ? {
+                                          ...item,
+                                          blockRefs: resequenceBlockRefs(moveItem(item.blockRefs, blockIndex, 1)),
+                                        } : item),
+                                      }))}
+                                    >
+                                      下移
+                                    </Button>
+                                    <Popconfirm
+                                      title={`确认移除块「${blockTemplateLabel(blockTemplate)}」？`}
+                                      description="移除后该模板分区将不再引用这个卡片块。"
+                                      okText="确认移除"
+                                      cancelText="取消"
+                                      okButtonProps={{ danger: true }}
+                                      onConfirm={() => updateDetail(prev => ({
+                                        ...prev,
+                                        sections: prev.sections.map((item, index) => index === sectionIndex ? {
+                                          ...item,
+                                          blockRefs: resequenceBlockRefs(item.blockRefs.filter((_, refIndex) => refIndex !== blockIndex)),
+                                        } : item),
+                                      }))}
+                                    >
+                                      <Button danger size="small" icon={<DeleteOutlined />}>移除</Button>
+                                    </Popconfirm>
+                                  </Space>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
               </Card>
             </div>
           </div>

@@ -395,6 +395,7 @@ export default function ProductPage() {
           <Form.Item name="structureLevel1" label="设计一级分类">
             {activeLine === 'ABB' ? (
               <Select
+                style={{ width: '100%' }}
                 allowClear
                 placeholder="请选择 ABB 设计一级分类"
                 options={abbStructureLevel1Options}
@@ -411,7 +412,7 @@ export default function ProductPage() {
               : undefined}
           >
             {structureLevel2UsesSelect ? (
-              <Select allowClear placeholder="请选择设计二级分类" options={structureLevel2Options} />
+              <Select style={{ width: '100%' }} allowClear placeholder="请选择设计二级分类" options={structureLevel2Options} />
             ) : (
               <Input disabled={structureLevel2Disabled} placeholder={getStructureLevel2Placeholder(structureLevel1)} />
             )}

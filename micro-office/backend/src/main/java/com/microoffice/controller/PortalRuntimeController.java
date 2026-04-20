@@ -3,6 +3,8 @@ package com.microoffice.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microoffice.dto.response.ApiResponse;
+import com.microoffice.service.PortalRuntimeProviderRegistry;
+import com.microoffice.service.PortalRuntimeSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,6 +42,8 @@ public class PortalRuntimeController {
     private final PortalController portalController;
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final PortalRuntimeProviderRegistry portalRuntimeProviderRegistry;
+    private final PortalRuntimeSessionService portalRuntimeSessionService;
 
     @PostMapping("/resolve")
     public ApiResponse<Map<String, Object>> resolve(@RequestBody Map<String, Object> body, Authentication auth) {
@@ -60,6 +64,12 @@ public class PortalRuntimeController {
             context,
             asListOfMap(body.get("contracts"))
         ));
+    }
+
+    @PostMapping("/open-workbench-session")
+    public ApiResponse<Map<String, Object>> openWorkbenchSession(@RequestBody Map<String, Object> body, Authentication auth) {
+        String viewerId = (String) auth.getPrincipal();
+        return ApiResponse.ok(portalRuntimeSessionService.openWorkbenchSession(viewerId, body));
     }
 
     Map<String, Object> resolveUserRuntimeResponse(String viewerId,
@@ -103,34 +113,13 @@ public class PortalRuntimeController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("entityTypes", List.of("user"));
         result.put("templateTypes", List.of("PERSON_ROLE"));
-        result.put("datasetAliases", List.of(
-            "basic_info",
-            "todo_list",
-            "customer_list",
-            "daily_list",
-            "relation_graph",
-            "aiwarn_list",
-            "user.base",
-            "user.workflow",
-            "sales.summary",
-            "sales.customers",
-            "sales.products",
-            "sales.ranking",
-            "ceo.kpi_metrics",
-            "ceo.meeting_list",
-            "ceo.todo_list",
-            "ceo.internal_objects",
-            "ceo.event_list",
-            "ceo.exception_alerts",
-            "ceo.ai_summary",
-            "ceo.ai_followups",
-            "ceo.participated_meetings",
-            "ceo.collab_notifications"
-        ));
+        result.put("datasetAliases", portalRuntimeProviderRegistry.registeredDataKeys());
         result.put("notes", List.of(
             "V1 仅支持人员岗位门户运行时解析",
             "模板解析优先按岗位，其次回退到角色种子模板",
-            "当模板 layout_mode=ceo-dashboard-v1 时，可解析 ceo.* 数据集"
+            "当模板 layout_mode=ceo-dashboard-v1 时，可解析 ceo.* 数据集",
+            "V1.1.10 起运行时数据集采用 dataKey -> provider 白名单注册，未注册 dataKey 直接报错",
+            "V1.1.10 起 DAILY_ENTRY 统一走 /api/portal-runtime/open-workbench-session"
         ));
         return ApiResponse.ok(result);
     }
@@ -155,7 +144,7 @@ public class PortalRuntimeController {
         );
         if (hasText(positionId)) {
             Map<String, Object> template = loadFirstTemplate(
-                "SELECT id FROM mo_portal_templates WHERE template_type = 'PERSON_ROLE' AND status = 'ACTIVE' AND COALESCE(meta ->> 'positionId', '') = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1",
+                "SELECT id FROM mo_portal_templates WHERE template_type = 'PERSON_ROLE' AND status = 'ACTIVE' AND position_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1",
                 positionId
             );
             if (template != null) {
@@ -171,7 +160,7 @@ public class PortalRuntimeController {
         );
         if (hasText(roleKey)) {
             Map<String, Object> template = loadFirstTemplate(
-                "SELECT id FROM mo_portal_templates WHERE template_type = 'PERSON_ROLE' AND status = 'ACTIVE' AND role_key = ? AND COALESCE(meta ->> 'positionId', '') = '' ORDER BY updated_at DESC, created_at DESC LIMIT 1",
+                "SELECT id FROM mo_portal_templates WHERE template_type = 'PERSON_ROLE' AND status = 'ACTIVE' AND role_key = ? AND position_id IS NULL ORDER BY updated_at DESC, created_at DESC LIMIT 1",
                 roleKey.toUpperCase(Locale.ROOT)
             );
             if (template != null) {
@@ -223,57 +212,28 @@ public class PortalRuntimeController {
                 if (!hasText(alias) || !hasText(datasetName)) {
                     continue;
                 }
-                datasets.put(alias, resolveUserDataset(datasetName, runtimePayload, template));
+                datasets.put(alias, portalRuntimeProviderRegistry.resolveUserDataset(datasetName, runtimePayload, template));
             }
             return datasets;
         }
 
         Set<String> dataKeys = new LinkedHashSet<>();
         for (Map<String, Object> section : asListOfMap(template.get("sections"))) {
-            for (Map<String, Object> item : asListOfMap(section.get("items"))) {
-                String dataKey = asNullableString(item.get("dataKey"));
+            for (Map<String, Object> blockRef : asListOfMap(readField(section, "blockRefs", "block_refs"))) {
+                if (!asBoolean(readField(blockRef, "enabled", "enabled"), true)) {
+                    continue;
+                }
+                Map<String, Object> blockTemplate = asMap(readField(blockRef, "blockTemplate", "block_template"));
+                String dataKey = asNullableString(readField(blockTemplate, "dataKey", "data_key"));
                 if (hasText(dataKey)) {
                     dataKeys.add(dataKey);
                 }
             }
         }
-        if (dataKeys.isEmpty()) {
-            dataKeys.addAll(List.of("basic_info", "todo_list", "customer_list", "daily_list", "relation_graph", "aiwarn_list"));
-        }
         for (String dataKey : dataKeys) {
-            datasets.put(dataKey, resolveUserDataset(dataKey, runtimePayload, template));
+            datasets.put(dataKey, portalRuntimeProviderRegistry.resolveUserDataset(dataKey, runtimePayload, template));
         }
-        datasets.putIfAbsent("user.base", resolveUserDataset("user.base", runtimePayload, template));
-        datasets.putIfAbsent("user.workflow", resolveUserDataset("user.workflow", runtimePayload, template));
         return datasets;
-    }
-
-    private Object resolveUserDataset(String datasetName,
-                                      Map<String, Object> runtimePayload,
-                                      Map<String, Object> template) {
-        String normalized = datasetName == null ? "" : datasetName.trim().toLowerCase(Locale.ROOT);
-        Object ceoDataset = resolveCeoDataset(normalized, runtimePayload, template);
-        if (ceoDataset != null) {
-            return ceoDataset;
-        }
-        return switch (normalized) {
-            case "basic_info", "user.base" -> asMap(runtimePayload.get("header"));
-            case "todo_list", "user.workflow" -> asListOfMap(runtimePayload.get("workItems"));
-            case "customer_list", "sales.customers" -> {
-                List<Map<String, Object>> customers = asListOfMap(runtimePayload.get("customerPerformance"));
-                if (customers.isEmpty()) {
-                    customers = asListOfMap(runtimePayload.get("relatedCustomers"));
-                }
-                yield customers;
-            }
-            case "daily_list" -> buildDailyEntries(runtimePayload);
-            case "relation_graph" -> buildRelationGraph(runtimePayload);
-            case "aiwarn_list" -> buildAiWarnings(runtimePayload);
-            case "sales.summary" -> buildSummaryDataset(runtimePayload);
-            case "sales.products" -> asListOfMap(runtimePayload.get("relatedProducts"));
-            case "sales.ranking" -> asListOfMap(runtimePayload.get("salesRanking"));
-            default -> null;
-        };
     }
 
     private Object resolveCeoDataset(String datasetName,
@@ -761,29 +721,6 @@ public class PortalRuntimeController {
         return result;
     }
 
-    private List<Map<String, Object>> buildDailyEntries(Map<String, Object> runtimePayload) {
-        List<Map<String, Object>> source = asListOfMap(runtimePayload.get("salesActionCards"));
-        if (source.isEmpty()) {
-            source = asListOfMap(runtimePayload.get("summaryCards"));
-        }
-        List<Map<String, Object>> result = new ArrayList<>();
-        int index = 0;
-        for (Map<String, Object> item : source) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            String entryId = firstNonBlank(asNullableString(item.get("id")), asNullableString(item.get("key")), "daily-entry-" + index);
-            row.put("daily_entry_id", entryId);
-            row.put("id", entryId);
-            row.put("title", firstNonBlank(asNullableString(item.get("label")), asNullableString(item.get("title")), "快捷入口"));
-            row.put("label", firstNonBlank(asNullableString(item.get("label")), asNullableString(item.get("title")), "快捷入口"));
-            row.put("value", item.get("value"));
-            row.put("suffix", item.get("suffix"));
-            row.put("hint", firstNonBlank(asNullableString(item.get("description")), asNullableString(item.get("tone"))));
-            result.add(row);
-            index += 1;
-        }
-        return result;
-    }
-
     private Map<String, Object> buildRelationGraph(Map<String, Object> runtimePayload) {
         Map<String, Object> header = asMap(runtimePayload.get("header"));
         List<Map<String, Object>> ranking = asListOfMap(runtimePayload.get("salesRanking"));
@@ -919,33 +856,29 @@ public class PortalRuntimeController {
             "SELECT id, template_id, code, name, section_type, sort_order, meta FROM mo_portal_template_sections WHERE template_id = ? ORDER BY sort_order, code, id",
             id
         );
-        List<Map<String, Object>> itemRows = jdbc.queryForList(
-            "SELECT id, template_id, section_id, item_key, label, data_key, display_type, sort_order, meta FROM mo_portal_template_items WHERE template_id = ? ORDER BY section_id, sort_order, item_key, id",
-            id
-        );
-        List<Map<String, Object>> actionRows = jdbc.queryForList(
-            "SELECT id, template_id, item_id, action_type, target_subject_type, target_id_path, session_type, meta FROM mo_portal_template_item_actions WHERE template_id = ? ORDER BY item_id, action_type, id",
+        List<Map<String, Object>> blockRefRows = jdbc.queryForList(
+            "SELECT br.id, br.template_id, br.section_id, br.block_template_id, br.sort_order, br.enabled, br.override_meta, " +
+                "bt.code AS block_template_code, bt.name AS block_template_name, bt.status AS block_template_status, bt.display_type AS block_template_display_type, " +
+                "bt.data_key AS block_template_data_key, bt.label AS block_template_label, bt.meta AS block_template_meta, bt.version AS block_template_version " +
+                "FROM mo_portal_template_block_refs br " +
+                "JOIN mo_portal_block_templates bt ON bt.id = br.block_template_id " +
+                "WHERE br.template_id = ? ORDER BY br.section_id, br.sort_order, br.id",
             id
         );
 
-        Map<String, List<Map<String, Object>>> actionsByItemId = new LinkedHashMap<>();
-        for (Map<String, Object> row : actionRows) {
-            String itemId = asString(row.get("item_id"));
-            actionsByItemId.computeIfAbsent(itemId, key -> new ArrayList<>()).add(toActionMap(row));
-        }
-
-        Map<String, List<Map<String, Object>>> itemsBySectionId = new LinkedHashMap<>();
-        for (Map<String, Object> row : itemRows) {
+        Map<String, List<Map<String, Object>>> blockTemplateActionsByTemplateId = loadBlockTemplateActionsByTemplateId(blockRefRows);
+        Map<String, List<Map<String, Object>>> blockRefsBySectionId = new LinkedHashMap<>();
+        for (Map<String, Object> row : blockRefRows) {
             String sectionId = asString(row.get("section_id"));
-            Map<String, Object> item = toItemMap(row);
-            item.put("actions", actionsByItemId.getOrDefault(asString(row.get("id")), List.of()));
-            itemsBySectionId.computeIfAbsent(sectionId, key -> new ArrayList<>()).add(item);
+            blockRefsBySectionId.computeIfAbsent(sectionId, key -> new ArrayList<>()).add(
+                toBlockRefMap(row, blockTemplateActionsByTemplateId.getOrDefault(asString(row.get("block_template_id")), List.of()))
+            );
         }
 
         List<Map<String, Object>> sections = new ArrayList<>();
         for (Map<String, Object> row : sectionRows) {
             Map<String, Object> section = toSectionMap(row);
-            section.put("items", itemsBySectionId.getOrDefault(asString(row.get("id")), List.of()));
+            section.put("blockRefs", blockRefsBySectionId.getOrDefault(asString(row.get("id")), List.of()));
             sections.add(section);
         }
 
@@ -976,31 +909,81 @@ public class PortalRuntimeController {
         return result;
     }
 
-    private Map<String, Object> toItemMap(Map<String, Object> row) {
+    private Map<String, Object> toBlockRefMap(Map<String, Object> row, List<Map<String, Object>> blockTemplateActions) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", asString(row.get("id")));
         result.put("templateId", asString(row.get("template_id")));
         result.put("sectionId", asString(row.get("section_id")));
-        result.put("itemKey", asString(row.get("item_key")));
-        result.put("label", asString(row.get("label")));
-        result.put("dataKey", asString(row.get("data_key")));
-        result.put("displayType", asString(row.get("display_type")));
+        result.put("blockTemplateId", asString(row.get("block_template_id")));
         result.put("sortOrder", asInt(row.get("sort_order"), 0));
-        result.put("meta", asMap(row.get("meta")));
+        result.put("enabled", Boolean.TRUE.equals(row.get("enabled")));
+        result.put("overrideMeta", asMap(row.get("override_meta")));
+
+        Map<String, Object> blockTemplate = new LinkedHashMap<>();
+        blockTemplate.put("id", asString(row.get("block_template_id")));
+        blockTemplate.put("code", asString(row.get("block_template_code")));
+        blockTemplate.put("name", asString(row.get("block_template_name")));
+        blockTemplate.put("status", asString(row.get("block_template_status")));
+        blockTemplate.put("displayType", asString(row.get("block_template_display_type")));
+        blockTemplate.put("dataKey", asString(row.get("block_template_data_key")));
+        blockTemplate.put("label", asString(row.get("block_template_label")));
+        blockTemplate.put("meta", asMap(row.get("block_template_meta")));
+        blockTemplate.put("version", asInt(row.get("block_template_version"), 1));
+        blockTemplate.put("actions", blockTemplateActions);
+        result.put("blockTemplate", blockTemplate);
         return result;
     }
 
-    private Map<String, Object> toActionMap(Map<String, Object> row) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", asString(row.get("id")));
-        result.put("templateId", asString(row.get("template_id")));
-        result.put("itemId", asString(row.get("item_id")));
-        result.put("actionType", asString(row.get("action_type")));
-        result.put("targetSubjectType", asString(row.get("target_subject_type")));
-        result.put("targetIdPath", asString(row.get("target_id_path")));
-        result.put("sessionType", asString(row.get("session_type")));
-        result.put("meta", asMap(row.get("meta")));
+    private Map<String, List<Map<String, Object>>> loadBlockTemplateActionsByTemplateId(List<Map<String, Object>> blockRefRows) {
+        Set<String> templateIds = new LinkedHashSet<>();
+        for (Map<String, Object> row : blockRefRows) {
+            String id = asString(row.get("block_template_id"));
+            if (hasText(id)) {
+                templateIds.add(id);
+            }
+        }
+        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
+        for (String templateId : templateIds) {
+            List<Map<String, Object>> actionRows = jdbc.queryForList(
+                "SELECT id, action_type, target_subject_type, target_id_path, session_type, sort_order, meta " +
+                    "FROM mo_portal_block_template_actions WHERE block_template_id = ? ORDER BY sort_order, id",
+                templateId
+            );
+            List<Map<String, Object>> actions = new ArrayList<>();
+            for (Map<String, Object> row : actionRows) {
+                Map<String, Object> action = new LinkedHashMap<>();
+                action.put("id", asString(row.get("id")));
+                action.put("actionType", asString(row.get("action_type")));
+                action.put("targetSubjectType", asString(row.get("target_subject_type")));
+                action.put("targetIdPath", asString(row.get("target_id_path")));
+                action.put("sessionType", asString(row.get("session_type")));
+                action.put("sortOrder", asInt(row.get("sort_order"), 0));
+                action.put("meta", asMap(row.get("meta")));
+                actions.add(action);
+            }
+            result.put(templateId, actions);
+        }
         return result;
+    }
+
+    private Object readField(Map<String, Object> source, String camelKey, String snakeKey) {
+        if (source == null) {
+            return null;
+        }
+        if (source.containsKey(camelKey)) {
+            return source.get(camelKey);
+        }
+        return source.get(snakeKey);
+    }
+
+    private boolean asBoolean(Object value, boolean defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return "true".equalsIgnoreCase(String.valueOf(value).trim());
     }
 
     private Map<String, Object> metric(String key, String label, double value, String unit, double deltaRatio) {

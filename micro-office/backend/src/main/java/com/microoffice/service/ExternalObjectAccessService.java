@@ -124,7 +124,7 @@ public class ExternalObjectAccessService {
             return false;
         }
         for (String scopeOrgId : scopeOrgIds) {
-            if (isSameOrDescendant(scopeOrgId, targetOrgId, parentMap)) {
+            if (isSameOrDescendant(targetOrgId, scopeOrgId, parentMap)) {
                 return true;
             }
         }

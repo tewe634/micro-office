@@ -285,7 +285,15 @@ public class UserController {
     }
 
     private String resolveHomePath(List<String> menus) {
-        List<String> order = List.of("/org", "/users", "/objects", "/products", "/admin/permissions");
+        List<String> order = List.of(
+            "/org",
+            "/users",
+            "/objects",
+            "/products",
+            "/admin/portal-templates",
+            "/admin/portal-block-templates",
+            "/admin/permissions"
+        );
         for (String path : order) {
             if (menus.contains(path) || ("/admin/permissions".equals(path) && menus.contains("/admin"))) {
                 return path;

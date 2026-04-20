@@ -10,7 +10,7 @@
 | 角色来源 | `role` 不传时，仅根据主岗位 / 组织推导；辅助岗位不参与角色推导 | 同一测试人无法靠切换辅助岗位改变门户角色 |
 | 对象类型权限 | `users/me.objectTypes` 来自主岗位 + 辅助岗位的 `position_object_type` 并集；若配置了 `user_object_type`，则以用户级覆盖为准 | 可以验证“多岗位带来对象类型并集” |
 | 组织数据范围 | `DataScopeService` 只看 `sys_user.org_id`，不看辅助岗位 | 多岗位不会扩大 department / business / system 范围 |
-| 人员门户 | `PortalController` 只按 `user.role` 决定 `USER_SALES` 或 `USER_WORK` | 当前没有“多岗位门户切换”能力 |
+| 人员门户 | `GET /api/portal/users/{id}` 已开放；可通过 `positionId` 切换已绑定岗位上下文，门户 `variant` 按所选岗位推导 `effectiveRole` | 可以验“岗位切换影响门户视角”，但不会扩大组织数据范围 |
 | 客户 / 产品 scope | 前端存在 `dashboardApi.scopes()` / `dashboardApi.org()`，后端无 `/api/dashboard/*` 实现 | personal / department / business / system 汇总验收当前被阻塞 |
 | 门户数据口径 | 当前用户 / 客户 / 产品门户均为门户展示聚合数据，其中产品/客户门户未接入 scope 参数 | 只能做“页面可访问 / 数据结构正确”级别冒烟，不能做正式 scope 聚合验收 |
 
@@ -99,26 +99,29 @@ curl -X POST http://127.0.0.1:8080/api/users \
 
 ### 4.2 用户门户多岗位切换验收
 
-当前结论：正式验收阻塞。
+当前结论：可做最小正式验收，但验收范围要收敛到“岗位上下文切换”和“门户结构变化”，不要误判成“数据范围扩大”。
 
-原因：
+当前代码事实：
 
-1. 现有页面没有岗位切换 UI。
-2. 现有接口没有 `activePositionId`、`portalKey`、`scope` 一类参数。
-3. 当前用户门户只按 `role` 分成 `USER_SALES` 和 `USER_WORK` 两类。
+1. 后端已提供 `GET /api/portal/users/{id}?positionId=<岗位ID>`。
+2. `PortalController.resolveActivePosition(...)` 会校验目标岗位必须属于该用户。
+3. `effectiveRole(position, user.role)` 优先使用岗位默认角色，其次按岗位名称/编码兜底识别，因此切换岗位后 `variant` 可能变化。
+4. 组织数据范围仍只看 `sys_user.org_id`，辅助岗位不会扩大数据范围。
 
-当前可做的最小验收：
+建议验收步骤：
 
 1. 用管理员或 HR 打开 `/users/{id}/portal`。
-2. 记录返回 `variant`。
-3. 修改辅助岗位后再次访问门户。
-4. 预期：`variant` 不会变化；这证明当前没有多岗位门户切换，只是多岗位权限并集。
+2. 记录默认返回的 `portalOptions`、`activePortal`、`header.activePosition`、`variant`。
+3. 再用某个 `portalOptions[].positionId` 调用 `/api/portal/users/{id}?positionId=<岗位ID>`。
+4. 预期：`activePortal.positionId` 切换为指定岗位；`header.role` / `header.positionName` 与 `variant` 按该岗位上下文变化。
+5. 若传入未绑定岗位，预期返回 `400`。
 
-正式通过标准建议补齐后再验：
+当前通过标准：
 
-1. 页面能展示当前可切换岗位列表。
-2. 切换岗位后门户内容和统计维度发生变化。
-3. 接口层能明确传入当前岗位或当前门户上下文。
+1. 页面或接口能拿到当前可切换岗位列表。
+2. 切换岗位后门户上下文字段发生预期变化。
+3. 未绑定岗位不会被静默接受。
+4. 切换岗位不会带来额外组织范围扩张。
 
 ### 4.3 客户门户 / 产品门户不同 scope 验收
 
@@ -182,7 +185,7 @@ curl -X POST http://127.0.0.1:8080/api/users \
 ## 6. 已发现阻塞点
 
 1. 后端缺少 `/api/dashboard/scopes`、`/api/dashboard/org`，前端 dashboard scope 验收无法进行。
-2. 用户门户无岗位切换能力，辅助岗位不会改变门户 variant。
+2. 用户门户已支持按 `positionId` 切换岗位上下文，但当前仍需前端显式传参或提供切换 UI。
 3. 数据范围只由 `sys_user.org_id` 决定，辅助岗位不参与可见范围计算。
 4. `ExternalObjectAccessService.canAccess(...)` 入参里虽然有 `scopeOrgIds`，但当前实现未使用。
 5. 产品门户当前没有基于 scope 的聚合和权限收敛能力。

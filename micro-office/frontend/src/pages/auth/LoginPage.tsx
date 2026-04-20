@@ -3,8 +3,7 @@ import { Form, Input, Button, Card, message, Tabs } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { authApi, userApi } from '../../api';
 import { useAuthStore } from '../../store/auth';
-
-const resolveHomePath = () => '/org';
+import { resolveHomePath } from '../../constants/routes';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -18,13 +17,15 @@ export default function LoginPage() {
     setAuth(authData.token, authData.userId, authData.role);
     try {
       const me: any = await userApi.me();
+      const menus = me.data?.menus || [];
       setProfile({
         userId: me.data?.id ?? authData.userId,
         name: me.data?.name ?? null,
         role: me.data?.role ?? authData.role,
-        menus: me.data?.menus || [],
+        menus,
         objectTypes: me.data?.objectTypes || [],
       });
+      return resolveHomePath(menus);
     } catch (error: any) {
       if (error?.response?.status === 401) {
         logout();
@@ -37,6 +38,7 @@ export default function LoginPage() {
         objectTypes: [],
       });
       markAuthReady();
+      return resolveHomePath([]);
     }
   };
 
@@ -44,8 +46,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res: any = await authApi.login(values);
-      await completeLogin(res.data);
-      nav(resolveHomePath(), { replace: true });
+      const homePath = await completeLogin(res.data);
+      nav(homePath, { replace: true });
     } catch {
       message.error('登录失败，请检查手机号/邮箱或密码');
     } finally {
@@ -57,9 +59,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res: any = await authApi.register(values);
-      await completeLogin(res.data);
+      const homePath = await completeLogin(res.data);
       message.success('注册成功');
-      nav(resolveHomePath(), { replace: true });
+      nav(homePath, { replace: true });
     } catch {
       message.error('注册失败');
     } finally {
