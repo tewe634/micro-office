@@ -8,13 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.Set;
-
 @Service
 @RequiredArgsConstructor
 public class ProductService {
     private static final String DEFAULT_PRODUCT_LINE = "ABB";
-    private static final Set<String> NO_SECOND_LEVEL_STRUCTURE = Set.of("低压", "成套");
 
     private final ProductMapper mapper;
 
@@ -77,11 +74,6 @@ public class ProductService {
         product.setStructureLevel1(normalizeText(product.getStructureLevel1()));
         product.setStructureLevel2(normalizeText(product.getStructureLevel2()));
         product.setSeriesDisplayName(normalizeText(product.getSeriesDisplayName()));
-
-        if (!StringUtils.hasText(product.getStructureLevel1())
-            || NO_SECOND_LEVEL_STRUCTURE.contains(product.getStructureLevel1())) {
-            product.setStructureLevel2(null);
-        }
     }
 
     private String normalizeText(String value) {
