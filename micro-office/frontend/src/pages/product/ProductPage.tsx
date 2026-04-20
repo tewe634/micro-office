@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Button, Card, Divider, Form, Input, Modal, Pagination, Popconfirm, Space, Table, Tabs, message } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Card, Divider, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tabs, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
@@ -8,6 +8,87 @@ const productLineOptions = [
   { key: 'ABB', label: 'ABB' },
   { key: 'INVEX', label: 'INVEX' },
 ];
+
+const abbStructureLevel1Options = [
+  { value: 'DP', label: 'DP' },
+  { value: 'HP', label: 'HP' },
+  { value: 'SE', label: 'SE' },
+  { value: '电机', label: '电机' },
+  { value: '低压', label: '低压' },
+  { value: '成套', label: '成套' },
+];
+
+const abbStructureLevel2Map: Record<string, { value: string; label: string }[]> = {
+  DP: [
+    { value: 'ACS55/150/310/355', label: 'ACS55/150/310/355' },
+    { value: 'ACS180', label: 'ACS180' },
+    { value: 'ACS280', label: 'ACS280' },
+    { value: 'ACS380', label: 'ACS380' },
+    { value: 'ACS380E', label: 'ACS380E' },
+    { value: 'ACS510', label: 'ACS510' },
+    { value: 'ACP510', label: 'ACP510' },
+    { value: 'ACM510', label: 'ACM510' },
+    { value: 'ACS530', label: 'ACS530' },
+    { value: 'ACH531', label: 'ACH531' },
+    { value: 'ACQ531', label: 'ACQ531' },
+    { value: 'ACS550', label: 'ACS550' },
+    { value: 'ACH550/ACH580/ACQ580', label: 'ACH550/ACH580/ACQ580' },
+    { value: 'ACS580-01/04 (R0-R11)', label: 'ACS580-01/04 (R0-R11)' },
+    { value: 'ACS580-07', label: 'ACS580-07' },
+    { value: 'ACS800-11/31', label: 'ACS800-11/31' },
+    { value: 'ACS880-01/04(R1-R11)', label: 'ACS880-01/04(R1-R11)' },
+    { value: 'ACS880-11/31/14/34', label: 'ACS880-11/31/14/34' },
+    { value: 'Servo (Controller+Driver+Motor)', label: 'Servo (Controller+Driver+Motor)' },
+    { value: 'AC500/AC500-eco/HMI', label: 'AC500/AC500-eco/HMI' },
+    { value: 'External Options/DP Others', label: 'External Options/DP Others' },
+  ],
+  HP: [
+    { value: 'ACS580MV', label: 'ACS580MV' },
+    { value: 'ACS800-67', label: 'ACS800-67' },
+    { value: 'ACS800-67 LC', label: 'ACS800-67 LC' },
+    { value: 'ACS800-77 LC', label: 'ACS800-77 LC' },
+    { value: 'ACS800-87 LC', label: 'ACS800-87 LC' },
+    { value: 'ACS800/860/880 MD(Module&Cabinet)', label: 'ACS800/860/880 MD(Module&Cabinet)' },
+    { value: 'ACS800/880-07/ACS880-07C/ACS880-07XT', label: 'ACS800/880-07/ACS880-07C/ACS880-07XT' },
+    { value: 'ACS800/880-14/04(n*R8i)/ACS880-04XT/HES880', label: 'ACS800/880-14/04(n*R8i)/ACS880-04XT/HES880' },
+    { value: 'ACS800/ACS880-17/37/SD-LC', label: 'ACS800/ACS880-17/37/SD-LC' },
+    { value: 'ACS880-87 LC', label: 'ACS880-87 LC' },
+    { value: 'ACS1000/ACS2000/5000A', label: 'ACS1000/ACS2000/5000A' },
+    { value: 'ACS1000Ex/ACS2000Ex', label: 'ACS1000Ex/ACS2000Ex' },
+    { value: 'ACS5000W/6080/LCI', label: 'ACS5000W/6080/LCI' },
+    { value: 'LCI', label: 'LCI' },
+    { value: 'DC Drive products', label: 'DC Drive products' },
+    { value: 'HPD Others(Options and Packages)', label: 'HPD Others(Options and Packages)' },
+    { value: 'Packaging', label: 'Packaging' },
+    { value: 'PCS6000 Wind', label: 'PCS6000 Wind' },
+    { value: 'Wind Service', label: 'Wind Service' },
+    { value: 'Windmill', label: 'Windmill' },
+  ],
+  SE: [
+    { value: '服务产品', label: '服务产品' },
+    { value: '服务业务', label: '服务业务' },
+    { value: '电机服务', label: '电机服务' },
+    { value: '保内服务', label: '保内服务' },
+  ],
+  电机: [
+    { value: '高压电机', label: '高压电机' },
+    { value: '低压电机', label: '低压电机' },
+  ],
+};
+
+const noSecondLevelStructure = new Set(['低压', '成套']);
+const ALL_STRUCTURE_TAB_KEY = '__ALL__';
+
+function getStructureLevel2Options(level1?: string) {
+  if (!level1) return [];
+  return abbStructureLevel2Map[level1] || [];
+}
+
+function getStructureLevel2Placeholder(level1?: string) {
+  if (!level1) return '请先选择一级分类';
+  if (noSecondLevelStructure.has(level1)) return '该一级分类暂无二级分类';
+  return '请选择或输入二级分类';
+}
 
 export default function ProductPage() {
   const nav = useNavigate();
@@ -19,20 +100,41 @@ export default function ProductPage() {
   const [filters, setFilters] = useState<any>({});
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+  const [activeStructureLevel1Tab, setActiveStructureLevel1Tab] = useState(ALL_STRUCTURE_TAB_KEY);
+  const [activeStructureLevel2Tab, setActiveStructureLevel2Tab] = useState(ALL_STRUCTURE_TAB_KEY);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
+  const structureLevel1 = Form.useWatch('structureLevel1', form);
+
+  const structureLevel2Options = useMemo(() => getStructureLevel2Options(structureLevel1), [structureLevel1]);
+  const structureLevel2UsesSelect = structureLevel2Options.length > 0;
+  const structureLevel2Disabled = !structureLevel1 || noSecondLevelStructure.has(structureLevel1);
+  const activeStructureLevel2Options = useMemo(
+    () => getStructureLevel2Options(activeStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : activeStructureLevel1Tab),
+    [activeStructureLevel1Tab],
+  );
 
   const load = async (options?: {
     current?: number;
     size?: number;
     filters?: any;
     productLine?: string;
+    structureLevel1Tab?: string;
+    structureLevel2Tab?: string;
   }) => {
     const nextCurrent = options?.current ?? current;
     const nextSize = options?.size ?? size;
     const nextFilters = options?.filters ?? filters;
     const nextLine = options?.productLine ?? activeLine;
-    const r: any = await productApi.list({ current: nextCurrent, size: nextSize, productLine: nextLine, ...nextFilters });
+    const nextStructureLevel1Tab = options?.structureLevel1Tab ?? activeStructureLevel1Tab;
+    const nextStructureLevel2Tab = options?.structureLevel2Tab ?? activeStructureLevel2Tab;
+    const structureParams = nextLine === 'ABB'
+      ? {
+          structureLevel1: nextStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel1Tab,
+          structureLevel2: nextStructureLevel2Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel2Tab,
+        }
+      : {};
+    const r: any = await productApi.list({ current: nextCurrent, size: nextSize, productLine: nextLine, ...nextFilters, ...structureParams });
     setData(r.data?.records || []);
     setTotal(r.data?.total || 0);
     setCurrent(nextCurrent);
@@ -41,7 +143,11 @@ export default function ProductPage() {
   };
 
   useEffect(() => {
-    load({ current: 1, size, filters: {}, productLine: activeLine });
+    const resetStructureLevel1Tab = ALL_STRUCTURE_TAB_KEY;
+    const resetStructureLevel2Tab = ALL_STRUCTURE_TAB_KEY;
+    setActiveStructureLevel1Tab(resetStructureLevel1Tab);
+    setActiveStructureLevel2Tab(resetStructureLevel2Tab);
+    load({ current: 1, size, filters: {}, productLine: activeLine, structureLevel1Tab: resetStructureLevel1Tab, structureLevel2Tab: resetStructureLevel2Tab });
   }, [activeLine]);
 
   const onSearch = async () => {
@@ -52,7 +158,21 @@ export default function ProductPage() {
   const onTabChange = (key: string) => {
     setActiveLine(key);
     setFilters({});
+    setActiveStructureLevel1Tab(ALL_STRUCTURE_TAB_KEY);
+    setActiveStructureLevel2Tab(ALL_STRUCTURE_TAB_KEY);
     searchForm.resetFields();
+  };
+
+  const onStructureLevel1TabChange = async (key: string) => {
+    const nextStructureLevel2Tab = ALL_STRUCTURE_TAB_KEY;
+    setActiveStructureLevel1Tab(key);
+    setActiveStructureLevel2Tab(nextStructureLevel2Tab);
+    await load({ current: 1, size, filters, productLine: activeLine, structureLevel1Tab: key, structureLevel2Tab: nextStructureLevel2Tab });
+  };
+
+  const onStructureLevel2TabChange = async (key: string) => {
+    setActiveStructureLevel2Tab(key);
+    await load({ current: 1, size, filters, productLine: activeLine, structureLevel1Tab: activeStructureLevel1Tab, structureLevel2Tab: key });
   };
 
   const save = async (values: any) => {
@@ -101,6 +221,30 @@ export default function ProductPage() {
             label: option.label,
             children: (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {option.key === 'ABB' ? (
+                  <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: 12, padding: '0 12px' }}>
+                    <Tabs
+                      activeKey={activeStructureLevel1Tab}
+                      onChange={onStructureLevel1TabChange}
+                      items={[
+                        { key: ALL_STRUCTURE_TAB_KEY, label: '全部' },
+                        ...abbStructureLevel1Options.map(item => ({ key: item.value, label: item.label })),
+                      ]}
+                    />
+                    {activeStructureLevel2Options.length > 0 ? (
+                      <Tabs
+                        size="small"
+                        activeKey={activeStructureLevel2Tab}
+                        onChange={onStructureLevel2TabChange}
+                        items={[
+                          { key: ALL_STRUCTURE_TAB_KEY, label: '全部' },
+                          ...activeStructureLevel2Options.map(item => ({ key: item.value, label: item.label })),
+                        ]}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
                   <Form
                     form={searchForm}
@@ -148,9 +292,6 @@ export default function ProductPage() {
                         { title: '原一级类别', dataIndex: 'categoryLevel1', width: 180, ellipsis: true },
                         { title: '原二级类别', dataIndex: 'categoryLevel2', width: 220, ellipsis: true },
                         { title: '原三级类别', dataIndex: 'categoryLevel3', width: 220, ellipsis: true },
-                        { title: '一级分类', dataIndex: 'structureLevel1', width: 160, ellipsis: true },
-                        { title: '二级分类', dataIndex: 'structureLevel2', width: 180, ellipsis: true },
-                        { title: '系列展示口径', dataIndex: 'seriesDisplayName', width: 220, ellipsis: true },
                         {
                           title: '操作',
                           width: 200,
@@ -210,6 +351,11 @@ export default function ProductPage() {
           form={form}
           onFinish={save}
           layout="vertical"
+          onValuesChange={(changedValues) => {
+            if (Object.prototype.hasOwnProperty.call(changedValues, 'structureLevel1')) {
+              form.setFieldValue('structureLevel2', undefined);
+            }
+          }}
         >
           <Form.Item name="productLine" hidden><Input /></Form.Item>
           <Form.Item name="code" label="物料号" rules={[{ required: true }]}><Input /></Form.Item>
@@ -223,9 +369,28 @@ export default function ProductPage() {
           <Form.Item name="categoryLevel3" label="原三级类别名称"><Input /></Form.Item>
 
           <Divider>产品分类</Divider>
-          <Form.Item name="structureLevel1" label="一级分类"><Input /></Form.Item>
-          <Form.Item name="structureLevel2" label="二级分类"><Input /></Form.Item>
-          <Form.Item name="seriesDisplayName" label="系列展示口径"><Input /></Form.Item>
+          <Form.Item name="structureLevel1" label="一级分类">
+            {activeLine === 'ABB' ? (
+              <Select
+                style={{ width: '100%' }}
+                allowClear
+                placeholder="请选择一级分类"
+                options={abbStructureLevel1Options}
+              />
+            ) : (
+              <Input placeholder="请输入一级分类" />
+            )}
+          </Form.Item>
+          <Form.Item name="structureLevel2" label="二级分类">
+            {structureLevel2UsesSelect ? (
+              <Select style={{ width: '100%' }} allowClear placeholder="请选择二级分类" options={structureLevel2Options} />
+            ) : (
+              <Input disabled={structureLevel2Disabled} placeholder={getStructureLevel2Placeholder(structureLevel1)} />
+            )}
+          </Form.Item>
+          <Form.Item name="seriesDisplayName" label="系列展示口径">
+            <Input placeholder="请输入系列展示名称" />
+          </Form.Item>
         </Form>
       </Modal>
     </Card>
