@@ -245,6 +245,7 @@ export default function AdminPortalTemplatePage() {
           </div>
 
           <Card
+            className="portal-position-generation-card"
             type="inner"
             title="按岗位生成模板"
             extra={<Button type="link" icon={<TeamOutlined />} onClick={() => positionTableHostRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>查看岗位列表</Button>}
