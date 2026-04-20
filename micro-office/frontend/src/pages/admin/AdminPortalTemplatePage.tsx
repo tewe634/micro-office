@@ -274,7 +274,7 @@ export default function AdminPortalTemplatePage() {
                           ),
                         },
                         {
-                          title: '推荐种子',
+                          title: '推荐模板',
                           width: 220,
                           render: (_: any, row: any) => (
                             <Space direction="vertical" size={2}>
