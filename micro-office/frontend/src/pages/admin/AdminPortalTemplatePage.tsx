@@ -66,6 +66,7 @@ export default function AdminPortalTemplatePage() {
   const pageSize = 10;
 
   const statusOptions = useMemo(() => meta.statusOptions || [], [meta]);
+  const templateTypeOptions = useMemo(() => meta.templateTypes || [], [meta]);
 
   const loadLists = async () => {
     setLoading(true);
@@ -182,6 +183,9 @@ export default function AdminPortalTemplatePage() {
 
   const activeBlockCount = blockTemplates.filter(item => item.status === 'ACTIVE').length;
   const referencedBlockCount = blockTemplates.filter(item => Number(item.referenceCount || 0) > 0).length;
+  const createPresetLabel = createPreset
+    ? (templateTypeOptions.find((item: any) => item.value === createPreset.templateType)?.label || createPreset.templateType)
+    : '';
 
   return (
     <div className="page-fill" style={{ gap: 16, minWidth: 0, overflowX: 'hidden', overflowY: 'auto', paddingRight: 4 }}>
@@ -195,7 +199,7 @@ export default function AdminPortalTemplatePage() {
         >
           <Space direction="vertical" size={6} style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>按岗位一键生成岗位门户模板</div>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>用于人员岗位模板初始化，生成后进入模板装配页继续引用卡片块。</div>
+            <div style={{ color: '#6b7280', fontSize: 12 }}>人员模板按岗位设计，生成后进入模板装配设计页继续引用卡片块。</div>
           </Space>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
             <Statistic title="岗位数" value={positions.length} />
@@ -226,14 +230,14 @@ export default function AdminPortalTemplatePage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: 16, flex: 1, minWidth: 0, minHeight: 0, alignItems: 'start', overflowX: 'hidden' }}>
         <Card
           className="page-card"
-          title="模板设计入口"
+          title="模板装配设计入口"
           style={{ height: 'auto', minWidth: 0 }}
           bodyStyle={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}
         >
           <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
             <Space direction="vertical" size={6}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>对象模板新建</div>
-              <div style={{ color: '#6b7280', fontSize: 12 }}>按业务对象直接新建模板，不再只保留“新建空模板”的泛化入口。</div>
+              <div style={{ color: '#6b7280', fontSize: 12 }}>外部对象模板按定义对象类型创建，创建时先确定模板定义类型，再进入装配设计。</div>
             </Space>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginTop: 16 }}>
               {objectCreatePresets.map(preset => (
@@ -267,22 +271,12 @@ export default function AdminPortalTemplatePage() {
                           title: '岗位',
                           dataIndex: 'positionName',
                           width: 190,
-                          render: (_: any, row: any) => (
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{row.positionName}</div>
-                              <div style={{ color: '#6b7280', fontSize: 12 }}>{row.positionCode || '-'}</div>
-                            </div>
-                          ),
+                          render: (_: any, row: any) => <div style={{ fontWeight: 600 }}>{row.positionName}</div>,
                         },
                         {
                           title: '推荐模板',
                           width: 220,
-                          render: (_: any, row: any) => (
-                            <Space direction="vertical" size={2}>
-                              {row.recommendedRole ? <Tag color="blue">{row.recommendedRole}</Tag> : <Tag>未推断</Tag>}
-                              <span style={{ color: '#6b7280', fontSize: 12 }}>{row.seedTemplateName || '无匹配种子，生成空装配模板'}</span>
-                            </Space>
-                          ),
+                          render: (_: any, row: any) => row.recommendedRole ? <Tag color="blue">{row.recommendedRole}</Tag> : <Tag>未推断</Tag>,
                         },
                         {
                           title: '当前模板',
@@ -421,8 +415,8 @@ export default function AdminPortalTemplatePage() {
         width={560}
       >
         <Form form={createForm} layout="vertical" initialValues={{ status: 'DRAFT', version: 1 }}>
-          <Form.Item label="模板类型">
-            <Input value={createPreset?.templateType} disabled />
+          <Form.Item label="定义对象类型">
+            <Input value={createPresetLabel} disabled />
           </Form.Item>
           <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入模板名称' }]}>
             <Input />

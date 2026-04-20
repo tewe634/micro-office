@@ -369,11 +369,16 @@ public class PortalTemplateAdminController {
             );
         }
 
+        PreviewEntityRef automatic = resolveAutomaticPreviewEntity(template);
+        if (automatic != null) {
+            return automatic;
+        }
+
         Map<String, Object> previewEntity = asMap(asMap(template.get("meta")).get("previewEntity"));
         String fromMetaType = asNullableString(previewEntity.get("entityType"));
         String fromMetaId = asNullableString(previewEntity.get("entityId"));
         if (!hasText(fromMetaType) && !hasText(fromMetaId)) {
-            throw new IllegalArgumentException("未配置预览主体，请传入 entityType/entityId 或在模板 meta.previewEntity 中配置");
+            throw new IllegalArgumentException("当前模板暂无可用预览主体，请先准备对应岗位用户或对象数据");
         }
         if (!hasText(fromMetaType) || !hasText(fromMetaId)) {
             throw new IllegalArgumentException("模板 meta.previewEntity 配置不完整，entityType 与 entityId 必须同时存在");
@@ -383,6 +388,63 @@ public class PortalTemplateAdminController {
             fromMetaId,
             "TEMPLATE_META"
         );
+    }
+
+    private PreviewEntityRef resolveAutomaticPreviewEntity(Map<String, Object> template) {
+        String templateType = asString(template.get("templateType"));
+        return switch (Objects.toString(templateType, "")) {
+            case "PERSON_ROLE" -> resolveAutomaticPersonPreviewEntity(template);
+            case "PRODUCT" -> resolveAutomaticPreviewEntityById("PRODUCT", loadFirstId(
+                "SELECT id FROM product ORDER BY name, code, id LIMIT 1"
+            ), "TEMPLATE_TYPE_SAMPLE");
+            case "ORGANIZATION" -> resolveAutomaticPreviewEntityById("ORGANIZATION", loadFirstId(
+                "SELECT id FROM organization ORDER BY sort_order, name, id LIMIT 1"
+            ), "TEMPLATE_TYPE_SAMPLE");
+            case "CUSTOMER_COMPANY" -> resolveAutomaticPreviewEntityById("CUSTOMER_COMPANY", loadFirstId(
+                "SELECT id FROM external_object WHERE type = 'CUSTOMER' ORDER BY name, id LIMIT 1"
+            ), "TEMPLATE_TYPE_SAMPLE");
+            case "SUPPLIER" -> resolveAutomaticPreviewEntityById("SUPPLIER", loadFirstId(
+                "SELECT id FROM external_object WHERE type = 'SUPPLIER' ORDER BY name, id LIMIT 1"
+            ), "TEMPLATE_TYPE_SAMPLE");
+            case "CARRIER" -> resolveAutomaticPreviewEntityById("CARRIER", loadFirstId(
+                "SELECT id FROM external_object WHERE type = 'CARRIER' ORDER BY name, id LIMIT 1"
+            ), "TEMPLATE_TYPE_SAMPLE");
+            case "BANK" -> resolveAutomaticPreviewEntityById("BANK", loadFirstId(
+                "SELECT id FROM external_object WHERE type = 'BANK' ORDER BY name, id LIMIT 1"
+            ), "TEMPLATE_TYPE_SAMPLE");
+            default -> null;
+        };
+    }
+
+    private PreviewEntityRef resolveAutomaticPersonPreviewEntity(Map<String, Object> template) {
+        Map<String, Object> templateMeta = asMap(template.get("meta"));
+        String positionId = asNullableString(template.get("positionId"));
+        if (hasText(positionId)) {
+            Map<String, Object> previewUser = resolvePreviewUser(positionId, templateMeta);
+            return new PreviewEntityRef("PERSON", asString(previewUser.get("userId")), "TEMPLATE_POSITION");
+        }
+
+        String roleKey = asNullableString(template.get("roleKey"));
+        if (!hasText(roleKey)) {
+            return null;
+        }
+
+        String previewUserId = loadFirstId(
+            "SELECT su.id " +
+                "FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE UPPER(COALESCE(su.role, '')) = ? " +
+                "ORDER BY CASE WHEN su.primary_position_id IS NULL THEN 1 ELSE 0 END, COALESCE(p.name, ''), su.name, su.id LIMIT 1",
+            roleKey.trim().toUpperCase(Locale.ROOT)
+        );
+        return resolveAutomaticPreviewEntityById("PERSON", previewUserId, "TEMPLATE_ROLE");
+    }
+
+    private PreviewEntityRef resolveAutomaticPreviewEntityById(String entityType, String entityId, String source) {
+        if (!hasText(entityId)) {
+            return null;
+        }
+        return new PreviewEntityRef(entityType, entityId, source);
     }
 
     private void validatePreviewEntityMatchesTemplate(String templateType, String entityType) {
@@ -445,7 +507,10 @@ public class PortalTemplateAdminController {
 
     private Map<String, Object> loadPersonPreviewSnapshot(String userId) {
         Map<String, Object> row = jdbc.queryForMap(
-            "SELECT id, name, email, phone, org_id, primary_position_id, role, emp_no FROM sys_user WHERE id = ?",
+            "SELECT su.id, su.name, su.email, su.phone, su.org_id, su.primary_position_id, su.role, su.emp_no, COALESCE(p.name, '') AS primary_position_name " +
+                "FROM sys_user su " +
+                "LEFT JOIN position p ON p.id = su.primary_position_id " +
+                "WHERE su.id = ?",
             userId
         );
         Map<String, Object> result = new LinkedHashMap<>();
@@ -455,6 +520,7 @@ public class PortalTemplateAdminController {
         result.put("phone", asString(row.get("phone")));
         result.put("orgId", asString(row.get("org_id")));
         result.put("primaryPositionId", asString(row.get("primary_position_id")));
+        result.put("positionName", asString(row.get("primary_position_name")));
         result.put("role", asString(row.get("role")));
         result.put("empNo", asString(row.get("emp_no")));
         return result;
@@ -1094,6 +1160,11 @@ public class PortalTemplateAdminController {
             (rs, rowNum) -> rs.getString(1),
             positionId
         );
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    private String loadFirstId(String sql, Object... args) {
+        List<String> ids = jdbc.query(sql, (rs, rowNum) -> rs.getString(1), args);
         return ids.isEmpty() ? null : ids.get(0);
     }
 
