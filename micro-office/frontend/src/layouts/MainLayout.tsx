@@ -34,9 +34,6 @@ const pageTitles: Record<string, string> = {
   '/products': '产品与服务',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
-  '/admin/workflow-node-features': '工作节点模版管理',
-  '/admin/workflow-templates': '工作流模版管理',
-  '/admin/daily-entries': '日常条目管理',
   '/admin/portal-block-templates': '门户卡片管理',
   '/admin/portal-templates': '门户管理',
 };
@@ -46,19 +43,13 @@ const menuOrder = ['/org', '/users', '/objects', '/products'];
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
-  { key: '/admin/workflow-node-features', label: '工作节点模版管理' },
-  { key: '/admin/workflow-templates', label: '工作流模版管理' },
-  { key: '/admin/daily-entries', label: '日常条目管理' },
   { key: '/admin/portal-block-templates', label: '门户卡片管理' },
   { key: '/admin/portal-templates', label: '门户管理' },
 ];
 
 function resolveSelectedKey(pathname: string) {
-  if (pathname.startsWith('/admin/daily-entries')) return '/admin/daily-entries';
   if (pathname.startsWith('/admin/portal-block-templates')) return '/admin/portal-block-templates';
   if (pathname.startsWith('/admin/portal-templates')) return '/admin/portal-templates';
-  if (pathname.startsWith('/admin/workflow-templates')) return '/admin/workflow-templates';
-  if (pathname.startsWith('/admin/workflow-node-features')) return '/admin/workflow-node-features';
   if (pathname.startsWith('/admin/sales-collab')) return '/admin/sales-collab';
   if (pathname.startsWith('/admin/permissions')) return '/admin/permissions';
   if (pathname.startsWith('/admin')) return '/admin';
@@ -77,9 +68,6 @@ function resolvePageTitle(pathname: string) {
   if (/^\/admin\/portal-templates\/[^/]+\/preview$/.test(pathname)) return '预览门户模板';
   if (/^\/admin\/portal-templates\/[^/]+$/.test(pathname)) return '门户管理';
   if (/^\/admin\/portal-block-templates\/[^/]+$/.test(pathname)) return '门户卡片管理';
-  if (/^\/admin\/daily-entries\/[^/]+$/.test(pathname)) return '日常条目管理';
-  if (/^\/admin\/workflow-templates\/[^/]+$/.test(pathname)) return '工作流模版管理';
-  if (/^\/admin\/workflow-node-features\/[^/]+$/.test(pathname)) return '工作节点模版管理';
   return pageTitles[pathname] || '东华微办公';
 }
 
@@ -100,7 +88,7 @@ export default function MainLayout() {
     .map(key => ({ key, icon: menuDefs[key].icon, label: menuDefs[key].label }));
 
   const allowedAdminChildren = adminChildren.filter(item => canAccessMenu(item.key, allowedMenus));
-  if (allowedAdminChildren.length > 0 || canAccessMenu('/admin', allowedMenus)) {
+  if (allowedAdminChildren.length > 0) {
     menuItems.push({
       key: '/admin',
       icon: <AppstoreOutlined />,
