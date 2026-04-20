@@ -76,17 +76,48 @@ const abbStructureLevel2Map: Record<string, { value: string; label: string }[]> 
   ],
 };
 
-const noSecondLevelStructure = new Set(['低压', '成套']);
+const invexStructureLevel1Options = [
+  { value: '自主', label: '自主' },
+  { value: '贴牌', label: '贴牌' },
+  { value: '服务', label: '服务' },
+  { value: '成套', label: '成套' },
+  { value: '外购', label: '外购' },
+];
+
+const structureLevel1OptionsMap: Record<string, { value: string; label: string }[]> = {
+  ABB: abbStructureLevel1Options,
+  INVEX: invexStructureLevel1Options,
+};
+
+const structureLevel2OptionsMap: Record<string, Record<string, { value: string; label: string }[]>> = {
+  ABB: abbStructureLevel2Map,
+  INVEX: {},
+};
+
+const noSecondLevelStructureByLine: Record<string, Set<string>> = {
+  ABB: new Set(['低压', '成套']),
+  INVEX: new Set(invexStructureLevel1Options.map(item => item.value)),
+};
+
 const ALL_STRUCTURE_TAB_KEY = '__ALL__';
 
-function getStructureLevel2Options(level1?: string) {
-  if (!level1) return [];
-  return abbStructureLevel2Map[level1] || [];
+function getStructureLevel1Options(productLine?: string) {
+  if (!productLine) return [];
+  return structureLevel1OptionsMap[productLine] || [];
 }
 
-function getStructureLevel2Placeholder(level1?: string) {
+function usesStructureTabs(productLine?: string) {
+  return getStructureLevel1Options(productLine).length > 0;
+}
+
+function getStructureLevel2Options(productLine?: string, level1?: string) {
+  if (!productLine || !level1) return [];
+  return structureLevel2OptionsMap[productLine]?.[level1] || [];
+}
+
+function getStructureLevel2Placeholder(productLine?: string, level1?: string) {
   if (!level1) return '请先选择一级分类';
-  if (noSecondLevelStructure.has(level1)) return '该一级分类暂无二级分类';
+  if (noSecondLevelStructureByLine[productLine || '']?.has(level1)) return '该一级分类暂无二级分类';
   return '请选择或输入二级分类';
 }
 
@@ -104,14 +135,16 @@ export default function ProductPage() {
   const [activeStructureLevel2Tab, setActiveStructureLevel2Tab] = useState(ALL_STRUCTURE_TAB_KEY);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
+  const formProductLine = Form.useWatch('productLine', form) || activeLine;
   const structureLevel1 = Form.useWatch('structureLevel1', form);
 
-  const structureLevel2Options = useMemo(() => getStructureLevel2Options(structureLevel1), [structureLevel1]);
+  const structureLevel1Options = useMemo(() => getStructureLevel1Options(formProductLine), [formProductLine]);
+  const structureLevel2Options = useMemo(() => getStructureLevel2Options(formProductLine, structureLevel1), [formProductLine, structureLevel1]);
   const structureLevel2UsesSelect = structureLevel2Options.length > 0;
-  const structureLevel2Disabled = !structureLevel1 || noSecondLevelStructure.has(structureLevel1);
+  const structureLevel2Disabled = !structureLevel1 || Boolean(noSecondLevelStructureByLine[formProductLine]?.has(structureLevel1));
   const activeStructureLevel2Options = useMemo(
-    () => getStructureLevel2Options(activeStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : activeStructureLevel1Tab),
-    [activeStructureLevel1Tab],
+    () => getStructureLevel2Options(activeLine, activeStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : activeStructureLevel1Tab),
+    [activeLine, activeStructureLevel1Tab],
   );
 
   const load = async (options?: {
@@ -128,10 +161,12 @@ export default function ProductPage() {
     const nextLine = options?.productLine ?? activeLine;
     const nextStructureLevel1Tab = options?.structureLevel1Tab ?? activeStructureLevel1Tab;
     const nextStructureLevel2Tab = options?.structureLevel2Tab ?? activeStructureLevel2Tab;
-    const structureParams = nextLine === 'ABB'
+    const nextStructureLevel1 = nextStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel1Tab;
+    const nextStructureLevel2Options = getStructureLevel2Options(nextLine, nextStructureLevel1);
+    const structureParams = usesStructureTabs(nextLine)
       ? {
-          structureLevel1: nextStructureLevel1Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel1Tab,
-          structureLevel2: nextStructureLevel2Tab === ALL_STRUCTURE_TAB_KEY ? undefined : nextStructureLevel2Tab,
+          structureLevel1: nextStructureLevel1,
+          structureLevel2: nextStructureLevel2Options.length > 0 && nextStructureLevel2Tab !== ALL_STRUCTURE_TAB_KEY ? nextStructureLevel2Tab : undefined,
         }
       : {};
     const r: any = await productApi.list({ current: nextCurrent, size: nextSize, productLine: nextLine, ...nextFilters, ...structureParams });
@@ -196,7 +231,21 @@ export default function ProductPage() {
   const openCreate = () => {
     setEdit(null);
     form.resetFields();
-    form.setFieldsValue({ productLine: activeLine });
+
+    const initialValues: Record<string, string> = { productLine: activeLine };
+    if (usesStructureTabs(activeLine) && activeStructureLevel1Tab !== ALL_STRUCTURE_TAB_KEY) {
+      initialValues.structureLevel1 = activeStructureLevel1Tab;
+    }
+    if (
+      usesStructureTabs(activeLine)
+      && initialValues.structureLevel1
+      && getStructureLevel2Options(activeLine, initialValues.structureLevel1).length > 0
+      && activeStructureLevel2Tab !== ALL_STRUCTURE_TAB_KEY
+    ) {
+      initialValues.structureLevel2 = activeStructureLevel2Tab;
+    }
+
+    form.setFieldsValue(initialValues);
     setModal(true);
   };
 
@@ -221,14 +270,14 @@ export default function ProductPage() {
             label: option.label,
             children: (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {option.key === 'ABB' ? (
+                {usesStructureTabs(option.key) ? (
                   <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: 12, padding: '0 12px' }}>
                     <Tabs
                       activeKey={activeStructureLevel1Tab}
                       onChange={onStructureLevel1TabChange}
                       items={[
                         { key: ALL_STRUCTURE_TAB_KEY, label: '全部' },
-                        ...abbStructureLevel1Options.map(item => ({ key: item.value, label: item.label })),
+                        ...getStructureLevel1Options(option.key).map(item => ({ key: item.value, label: item.label })),
                       ]}
                     />
                     {activeStructureLevel2Options.length > 0 ? (
@@ -370,12 +419,12 @@ export default function ProductPage() {
 
           <Divider>产品分类</Divider>
           <Form.Item name="structureLevel1" label="一级分类">
-            {activeLine === 'ABB' ? (
+            {structureLevel1Options.length > 0 ? (
               <Select
                 style={{ width: '100%' }}
                 allowClear
                 placeholder="请选择一级分类"
-                options={abbStructureLevel1Options}
+                options={structureLevel1Options}
               />
             ) : (
               <Input placeholder="请输入一级分类" />
@@ -385,7 +434,7 @@ export default function ProductPage() {
             {structureLevel2UsesSelect ? (
               <Select style={{ width: '100%' }} allowClear placeholder="请选择二级分类" options={structureLevel2Options} />
             ) : (
-              <Input disabled={structureLevel2Disabled} placeholder={getStructureLevel2Placeholder(structureLevel1)} />
+              <Input disabled={structureLevel2Disabled} placeholder={getStructureLevel2Placeholder(formProductLine, structureLevel1)} />
             )}
           </Form.Item>
           <Form.Item name="seriesDisplayName" label="系列展示口径">
