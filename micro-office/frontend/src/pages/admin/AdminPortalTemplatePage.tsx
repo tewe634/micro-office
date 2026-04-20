@@ -184,13 +184,14 @@ export default function AdminPortalTemplatePage() {
   const referencedBlockCount = blockTemplates.filter(item => Number(item.referenceCount || 0) > 0).length;
 
   return (
-    <div className="page-fill" style={{ gap: 16, minWidth: 0, overflow: 'auto', paddingRight: 4 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+    <div className="page-fill" style={{ gap: 16, minWidth: 0, overflowX: 'hidden', overflowY: 'auto', paddingRight: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, minWidth: 0 }}>
         <Card
           className="page-card"
           title="按岗位生成模板"
           extra={<Button icon={<ReloadOutlined />} onClick={() => void loadLists()}>刷新</Button>}
-          bodyStyle={{ padding: 12 }}
+          style={{ minWidth: 0 }}
+          bodyStyle={{ padding: 12, minWidth: 0 }}
         >
           <Space direction="vertical" size={6} style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>按岗位一键生成岗位门户模板</div>
@@ -207,7 +208,8 @@ export default function AdminPortalTemplatePage() {
           className="page-card"
           title="卡片块定义"
           extra={<Button type="primary" icon={<BlockOutlined />} onClick={() => nav('/admin/portal-block-templates')}>进入卡片块定义</Button>}
-          bodyStyle={{ padding: 12 }}
+          style={{ minWidth: 0 }}
+          bodyStyle={{ padding: 12, minWidth: 0 }}
         >
           <Space direction="vertical" size={6} style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>先定义卡片块，再在模板设计页引用装配</div>
@@ -221,12 +223,12 @@ export default function AdminPortalTemplatePage() {
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: 16, flex: 1, minWidth: 0, minHeight: 0, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: 16, flex: 1, minWidth: 0, minHeight: 0, alignItems: 'start', overflowX: 'hidden' }}>
         <Card
           className="page-card"
           title="模板设计入口"
-          style={{ height: 'auto' }}
-          bodyStyle={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 16 }}
+          style={{ height: 'auto', minWidth: 0 }}
+          bodyStyle={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}
         >
           <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
             <Space direction="vertical" size={6}>
@@ -246,9 +248,10 @@ export default function AdminPortalTemplatePage() {
             type="inner"
             title="按岗位生成模板"
             extra={<Button type="link" icon={<TeamOutlined />} onClick={() => positionTableHostRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>查看岗位列表</Button>}
-            bodyStyle={{ padding: 0, minHeight: 0 }}
+            style={{ minWidth: 0 }}
+            bodyStyle={{ padding: 0, minHeight: 0, minWidth: 0 }}
           >
-            <div ref={positionTableHostRef} style={{ minHeight: 0 }}>
+            <div ref={positionTableHostRef} style={{ minHeight: 0, minWidth: 0 }}>
               <Spin spinning={loading}>
                 <FixedTablePage
                   table={(
@@ -327,7 +330,7 @@ export default function AdminPortalTemplatePage() {
         <Card
           className="page-card"
           title="模板列表"
-          style={{ height: 'auto', minHeight: 560 }}
+          style={{ height: 'auto', minHeight: 560, minWidth: 0 }}
           extra={<Button icon={<BlockOutlined />} onClick={() => nav('/admin/portal-block-templates')}>查看卡片块定义</Button>}
           bodyStyle={{ padding: 12, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         >
