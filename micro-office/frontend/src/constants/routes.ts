@@ -1,11 +1,5 @@
 const baseMenus = ['/org'];
 
-const disabledMenus = new Set([
-  '/admin/workflow-node-features',
-  '/admin/workflow-templates',
-  '/admin/daily-entries',
-]);
-
 const routePriority = [
   '/org',
   '/users',
@@ -13,6 +7,9 @@ const routePriority = [
   '/products',
   '/admin/permissions',
   '/admin/sales-collab',
+  '/admin/workflow-node-features',
+  '/admin/workflow-templates',
+  '/admin/daily-entries',
   '/admin/portal-block-templates',
   '/admin/portal-templates',
 ];
@@ -20,6 +17,9 @@ const routePriority = [
 const adminRoutePriority = [
   '/admin/permissions',
   '/admin/sales-collab',
+  '/admin/workflow-node-features',
+  '/admin/workflow-templates',
+  '/admin/daily-entries',
   '/admin/portal-block-templates',
   '/admin/portal-templates',
 ];
@@ -29,14 +29,11 @@ export function buildAllowedMenus(menus: string[]) {
 }
 
 export function canAccessMenu(menuKey: string, menus: string[]) {
-  if (disabledMenus.has(menuKey)) {
-    return false;
-  }
   if (menuKey === '/org') {
     return true;
   }
-  if (menuKey === '/admin') {
-    return menus.some(menu => menu.startsWith('/admin/') && !disabledMenus.has(menu));
+  if (menus.includes('/admin') && menuKey.startsWith('/admin')) {
+    return true;
   }
   return menus.includes(menuKey);
 }
