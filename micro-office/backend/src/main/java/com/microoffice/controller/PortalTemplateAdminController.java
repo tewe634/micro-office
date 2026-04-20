@@ -369,16 +369,15 @@ public class PortalTemplateAdminController {
             );
         }
 
-        PreviewEntityRef automatic = resolveAutomaticPreviewEntity(template);
-        if (automatic != null) {
-            return automatic;
-        }
-
         Map<String, Object> previewEntity = asMap(asMap(template.get("meta")).get("previewEntity"));
         String fromMetaType = asNullableString(previewEntity.get("entityType"));
         String fromMetaId = asNullableString(previewEntity.get("entityId"));
         if (!hasText(fromMetaType) && !hasText(fromMetaId)) {
-            throw new IllegalArgumentException("当前模板暂无可用预览主体，请先准备对应岗位用户或对象数据");
+            PreviewEntityRef automatic = resolveAutomaticPreviewEntity(template);
+            if (automatic != null) {
+                return automatic;
+            }
+            throw new IllegalArgumentException("当前模板暂无可用预览主体，请先配置预览主体或准备对应岗位用户/对象数据");
         }
         if (!hasText(fromMetaType) || !hasText(fromMetaId)) {
             throw new IllegalArgumentException("模板 meta.previewEntity 配置不完整，entityType 与 entityId 必须同时存在");

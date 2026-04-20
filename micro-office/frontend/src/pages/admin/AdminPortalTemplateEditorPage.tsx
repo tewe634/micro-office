@@ -24,7 +24,7 @@ import {
   DownOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { portalBlockTemplateAdminApi, portalTemplateAdminApi } from '../../api';
+import { objectApi, orgApi, portalBlockTemplateAdminApi, portalTemplateAdminApi, productApi, userApi } from '../../api';
 
 const { Text } = Typography;
 
@@ -75,6 +75,33 @@ type EditorTemplate = {
   version: number;
   meta: Record<string, any>;
   sections: EditorSection[];
+};
+
+type PreviewEntityType = 'PERSON' | 'PRODUCT' | 'CUSTOMER_COMPANY' | 'SUPPLIER' | 'CARRIER' | 'BANK' | 'ORGANIZATION';
+
+type PreviewSubjectOption = {
+  value: string;
+  label: string;
+};
+
+const previewEntityTypeOptions: OptionItem[] = [
+  { value: 'PERSON', label: '人员' },
+  { value: 'PRODUCT', label: '产品' },
+  { value: 'CUSTOMER_COMPANY', label: '客户公司' },
+  { value: 'SUPPLIER', label: '供应商' },
+  { value: 'CARRIER', label: '承运商' },
+  { value: 'BANK', label: '银行' },
+  { value: 'ORGANIZATION', label: '组织' },
+];
+
+const previewEntityByTemplateType: Record<string, PreviewEntityType> = {
+  PERSON_ROLE: 'PERSON',
+  PRODUCT: 'PRODUCT',
+  CUSTOMER_COMPANY: 'CUSTOMER_COMPANY',
+  SUPPLIER: 'SUPPLIER',
+  CARRIER: 'CARRIER',
+  BANK: 'BANK',
+  ORGANIZATION: 'ORGANIZATION',
 };
 
 function localId(prefix: string) {
@@ -134,6 +161,14 @@ function normalizeTemplate(detail: any): EditorTemplate {
     version: typeof detail?.version === 'number' ? detail.version : Number(detail?.version || 1),
     meta: asObject(detail?.meta),
     sections: Array.isArray(detail?.sections) ? detail.sections.map(normalizeSection) : [],
+  };
+}
+
+function readPreviewEntity(meta: Record<string, any>) {
+  const previewEntity = asObject(meta?.previewEntity);
+  return {
+    entityType: typeof previewEntity.entityType === 'string' ? previewEntity.entityType : undefined,
+    entityId: typeof previewEntity.entityId === 'string' ? previewEntity.entityId : undefined,
   };
 }
 
@@ -219,12 +254,63 @@ export default function AdminPortalTemplateEditorPage() {
   const [availableBlockTemplates, setAvailableBlockTemplates] = useState<BlockTemplateSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [subjectOptions, setSubjectOptions] = useState<PreviewSubjectOption[]>([]);
+  const [subjectLoading, setSubjectLoading] = useState(false);
   const [blockPickerBySection, setBlockPickerBySection] = useState<Record<string, string | undefined>>({});
   const [contractIssues, setContractIssues] = useState<string[]>([]);
 
   const templateTypeOptions: OptionItem[] = meta.templateTypes || [];
   const roleOptions: OptionItem[] = meta.roleKeys || [];
   const statusOptions: OptionItem[] = meta.statusOptions || [];
+  const previewEntity = useMemo(() => readPreviewEntity(detail?.meta || {}), [detail?.meta]);
+  const expectedPreviewEntityType = detail ? previewEntityByTemplateType[detail.templateType] : undefined;
+
+  const validatePreviewEntityConsistency = (template: EditorTemplate) => {
+    const preview = readPreviewEntity(template.meta);
+    if (!preview.entityType) return null;
+    const expectedType = previewEntityByTemplateType[template.templateType];
+    if (!expectedType) return null;
+    if (preview.entityType !== expectedType) {
+      return `模板类型 ${template.templateType} 仅允许预览主体类型 ${expectedType}`;
+    }
+    return null;
+  };
+
+  const loadSubjectOptions = async (entityType?: string) => {
+    if (!entityType) {
+      setSubjectOptions([]);
+      return;
+    }
+    setSubjectLoading(true);
+    try {
+      if (entityType === 'PERSON') {
+        const response: any = await userApi.list();
+        setSubjectOptions((response.data || []).map((item: any) => ({ value: String(item.id), label: `${item.name}${item.empNo ? ` (${item.empNo})` : ''}` })));
+        return;
+      }
+      if (entityType === 'PRODUCT') {
+        const response: any = await productApi.list({ current: 1, size: 200 });
+        const records = response.data?.records || response.data || [];
+        setSubjectOptions((records || []).map((item: any) => ({ value: String(item.id), label: `${item.name}${item.code ? ` (${item.code})` : ''}` })));
+        return;
+      }
+      if (entityType === 'ORGANIZATION') {
+        const response: any = await orgApi.list();
+        setSubjectOptions((response.data || []).map((item: any) => ({ value: String(item.id), label: item.name })));
+        return;
+      }
+
+      const objectType = entityType === 'CUSTOMER_COMPANY' ? 'CUSTOMER' : entityType;
+      const response: any = await objectApi.page({ current: 1, size: 200, type: objectType });
+      const records = response.data?.records || [];
+      setSubjectOptions((records || []).map((item: any) => ({ value: String(item.id), label: item.name })));
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '预览主体加载失败');
+      setSubjectOptions([]);
+    } finally {
+      setSubjectLoading(false);
+    }
+  };
 
   const loadPage = async (templateId: string) => {
     setLoading(true);
@@ -262,6 +348,10 @@ export default function AdminPortalTemplateEditorPage() {
     }
   }, [id]);
 
+  useEffect(() => {
+    void loadSubjectOptions(previewEntity.entityType);
+  }, [previewEntity.entityType]);
+
   const refreshDetail = async () => {
     if (id) {
       await loadPage(id);
@@ -274,6 +364,11 @@ export default function AdminPortalTemplateEditorPage() {
 
   const saveTemplate = async () => {
     if (!detail?.id) return;
+    const consistencyError = validatePreviewEntityConsistency(detail);
+    if (consistencyError) {
+      message.error(consistencyError);
+      return;
+    }
     try {
       setSaving(true);
       const resp: any = await portalTemplateAdminApi.updateTemplate(detail.id, buildPayload(detail));
@@ -295,7 +390,46 @@ export default function AdminPortalTemplateEditorPage() {
 
   const handleGoPreview = () => {
     if (!detail?.id) return;
-    nav(`/admin/portal-templates/${detail.id}/preview`);
+    const consistencyError = validatePreviewEntityConsistency(detail);
+    if (consistencyError) {
+      message.error(consistencyError);
+      return;
+    }
+    if (!previewEntity.entityType || !previewEntity.entityId) {
+      message.warning('请先配置预览主体类型和预览主体');
+      return;
+    }
+    const query = new URLSearchParams();
+    query.set('entityType', previewEntity.entityType);
+    query.set('entityId', previewEntity.entityId);
+    nav(`/admin/portal-templates/${detail.id}/preview?${query.toString()}`);
+  };
+
+  const setPreviewMeta = (updates: { entityType?: string; entityId?: string }) => {
+    updateDetail(prev => {
+      const nextPreview = { ...asObject(prev.meta.previewEntity) };
+      if (Object.prototype.hasOwnProperty.call(updates, 'entityType')) {
+        if (updates.entityType) {
+          nextPreview.entityType = updates.entityType;
+        } else {
+          delete nextPreview.entityType;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'entityId')) {
+        if (updates.entityId) {
+          nextPreview.entityId = updates.entityId;
+        } else {
+          delete nextPreview.entityId;
+        }
+      }
+      const nextMeta = { ...prev.meta };
+      if (nextPreview.entityType || nextPreview.entityId) {
+        nextMeta.previewEntity = nextPreview;
+      } else {
+        delete nextMeta.previewEntity;
+      }
+      return { ...prev, meta: nextMeta };
+    });
   };
 
   const availableBlockOptions = useMemo(() => availableBlockTemplates.map(item => ({
@@ -369,7 +503,7 @@ export default function AdminPortalTemplateEditorPage() {
                 type="info"
                 showIcon
                 message="当前页面只负责装配块引用"
-                description="人员模板按岗位装配，对象模板按对象类型装配。模板定义类型在创建时确定，预览主体由后端按岗位绑定或对象类型自动选择。"
+                description="人员模板按岗位装配，对象模板按对象类型装配。模板定义类型仍在创建时确定；预览主体类型与预览主体字段已恢复，用于手工指定预览对象。"
                 action={<Button size="small" onClick={() => nav('/admin/portal-block-templates')}>进入卡片块定义</Button>}
               />
 
@@ -410,10 +544,38 @@ export default function AdminPortalTemplateEditorPage() {
                     <div style={{ marginBottom: 6 }}>设计主体</div>
                     <Input value={designSubjectLabel} disabled />
                   </div>
+                  <div>
+                    <div style={{ marginBottom: 6 }}>预览主体类型</div>
+                    <Select
+                      style={{ width: '100%' }}
+                      allowClear
+                      value={previewEntity.entityType}
+                      options={previewEntityTypeOptions}
+                      onChange={value => setPreviewMeta({ entityType: value, entityId: undefined })}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: 6 }}>预览主体</div>
+                    <Select
+                      style={{ width: '100%' }}
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      loading={subjectLoading}
+                      disabled={!previewEntity.entityType}
+                      value={previewEntity.entityId}
+                      options={subjectOptions}
+                      placeholder={previewEntity.entityType ? '选择真实业务主体' : '先选择主体类型'}
+                      onChange={value => setPreviewMeta({ entityId: value })}
+                    />
+                  </div>
                   <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
                     {detail.positionId
-                      ? '岗位模板的预览将优先按当前岗位自动选取可用用户。'
-                      : '当前页不再维护预览主体；对象模板会按模板定义类型自动选择可用预览对象，角色种子模板保留角色标识。'}
+                      ? '岗位模板仍按岗位设计；预览对象可在这里手工指定。'
+                      : '对象模板与角色种子模板保留当前设计主体，同时允许手工指定预览主体。'}
+                  </div>
+                  <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
+                    {expectedPreviewEntityType ? `当前模板类型仅允许预览主体类型：${expectedPreviewEntityType}` : '当前模板类型未配置预览主体映射'}
                   </div>
                 </div>
               </Card>
