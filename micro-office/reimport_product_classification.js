@@ -35,6 +35,7 @@ const LPDA_MAP = {
   'ACH531': { structureLevel2: 'ACH531' },
   'ACQ531': { structureLevel2: 'ACQ531' },
   'ACS380': { structureLevel2: 'ACS380' },
+  'ACS260': { structureLevel2: 'ACS280' },
   'ACS180': { structureLevel2: 'ACS180' },
   'ACP510': { structureLevel2: 'ACP510' },
   'ACM510': { structureLevel2: 'ACM510' },
