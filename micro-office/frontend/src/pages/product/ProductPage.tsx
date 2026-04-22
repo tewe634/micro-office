@@ -331,7 +331,7 @@ export default function ProductPage() {
                       rowKey="id"
                       pagination={false}
                       tableLayout="fixed"
-                      scroll={{ x: 1700, y: 'calc(100dvh - 560px)' }}
+                      scroll={{ x: 2200, y: 'calc(100dvh - 560px)' }}
                       columns={[
                         { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                         { title: '物料号', dataIndex: 'code', width: 180, ellipsis: true },
@@ -341,6 +341,9 @@ export default function ProductPage() {
                         { title: '原一级类别', dataIndex: 'categoryLevel1', width: 180, ellipsis: true },
                         { title: '原二级类别', dataIndex: 'categoryLevel2', width: 220, ellipsis: true },
                         { title: '原三级类别', dataIndex: 'categoryLevel3', width: 220, ellipsis: true },
+                        { title: '一级分类', dataIndex: 'structureLevel1', width: 140, ellipsis: true, render: (value: string | null | undefined) => value || '—' },
+                        { title: '二级分类', dataIndex: 'structureLevel2', width: 220, ellipsis: true, render: (value: string | null | undefined) => value || '—' },
+                        { title: '系列展示口径', dataIndex: 'seriesDisplayName', width: 220, ellipsis: true, render: (value: string | null | undefined) => value || '—' },
                         {
                           title: '操作',
                           width: 200,
