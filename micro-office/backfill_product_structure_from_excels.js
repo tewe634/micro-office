@@ -153,11 +153,11 @@ const rules = [
 ];
 
 const db = new Client({
-  host: 'localhost',
-  port: 5432,
-  database: 'micro_office',
-  user: 'postgres',
-  password: 'postgres',
+  host: process.env.PRODUCT_DB_HOST || 'localhost',
+  port: Number(process.env.PRODUCT_DB_PORT || 5432),
+  database: process.env.PRODUCT_DB_NAME || 'micro_office',
+  user: process.env.PRODUCT_DB_USER || 'postgres',
+  password: process.env.PRODUCT_DB_PASSWORD || 'postgres',
 });
 
 function makeKey(code, categoryLevel2) {
