@@ -7,6 +7,7 @@ _Learn about the person you're helping. Update this as you go._
 - **Pronouns:** _(optional)_
 - **Timezone:**
 - **Notes:**
+  - Git commits should use `2533314379@qq.com` as the commit email; do not use AI/default-generated emails like `openclaw@local`.
 
 ## Context
 
