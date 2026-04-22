@@ -270,7 +270,6 @@ export default function AdminPortalTemplateEditorPage() {
   const roleOptions: OptionItem[] = meta.roleKeys || [];
   const statusOptions: OptionItem[] = meta.statusOptions || [];
   const previewEntity = useMemo(() => readPreviewEntity(detail?.meta || {}), [detail?.meta]);
-  const expectedPreviewEntityType = detail ? previewEntityByTemplateType[detail.templateType] : undefined;
 
   const validatePreviewEntityConsistency = (template: EditorTemplate) => {
     const preview = readPreviewEntity(template.meta);
@@ -441,12 +440,12 @@ export default function AdminPortalTemplateEditorPage() {
 
   const availableBlockOptions = useMemo(() => availableBlockTemplates.map(item => ({
     value: item.id,
-    label: `${blockTemplateLabel(item)} · ${item.code || item.dataKey}`,
+    label: blockTemplateLabel(item),
   })), [availableBlockTemplates]);
 
   const sectionNameOptions = useMemo(() => availableBlockTemplates.map(item => ({
     value: item.id,
-    label: `${blockTemplateLabel(item)} · ${item.code || item.dataKey}`,
+    label: blockTemplateLabel(item),
   })), [availableBlockTemplates]);
 
   const templateTypeLabel = useMemo(
@@ -573,14 +572,6 @@ export default function AdminPortalTemplateEditorPage() {
                       onChange={value => setPreviewMeta({ entityId: value })}
                     />
                   </div>
-                  <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
-                    {detail.positionId
-                      ? '岗位模板仍按岗位设计；预览对象可在这里手工指定。'
-                      : '对象模板与角色种子模板保留当前设计主体，同时允许手工指定预览主体。'}
-                  </div>
-                  <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
-                    {expectedPreviewEntityType ? `当前模板类型仅允许预览主体类型：${expectedPreviewEntityType}` : '当前模板类型未配置预览主体映射'}
-                  </div>
                 </div>
               </Card>
 
@@ -597,7 +588,7 @@ export default function AdminPortalTemplateEditorPage() {
                   const sectionNameSelectValue = linkedSectionNameBlockId || (section.name ? `__current__:${section.id}` : undefined);
                   const sectionNameSelectOptions = linkedSectionNameBlockId || !section.name
                     ? sectionNameOptions
-                    : [{ value: `__current__:${section.id}`, label: `${section.name} · 当前已保存值` }, ...sectionNameOptions];
+                    : [{ value: `__current__:${section.id}`, label: section.name }, ...sectionNameOptions];
                   return (
                     <Card
                       key={section.id}
@@ -695,8 +686,7 @@ export default function AdminPortalTemplateEditorPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
                         <Space>
                           <SortAscendingOutlined />
-                          <Text strong>块引用装配</Text>
-                          <Text type="secondary">选择 ACTIVE 卡片块加入当前分区</Text>
+                          <Text strong>门户卡片</Text>
                         </Space>
                         <Space wrap>
                           <Select
@@ -704,7 +694,7 @@ export default function AdminPortalTemplateEditorPage() {
                             showSearch
                             optionFilterProp="label"
                             value={blockPickerValue}
-                            placeholder="选择一个 ACTIVE 卡片块"
+                            placeholder="选择门户卡片"
                             options={availableBlockOptions.filter(option => !section.blockRefs.some(ref => ref.blockTemplateId === option.value))}
                             onChange={value => setBlockPickerBySection(prev => ({ ...prev, [section.id]: value }))}
                           />
@@ -752,17 +742,9 @@ export default function AdminPortalTemplateEditorPage() {
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flex: 1 }}>
                                     <Space wrap>
                                       <Tag color={blockRef.enabled ? 'green' : 'default'}>{blockRef.enabled ? '启用中' : '已停用'}</Tag>
-                                      <Tag>{blockTemplate?.displayType || 'UNKNOWN'}</Tag>
-                                      <Tag>{blockTemplate?.dataKey || blockRef.blockTemplateId}</Tag>
                                     </Space>
                                     <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>
                                       {blockTemplateLabel(blockTemplate)}
-                                    </div>
-                                    <div style={{ color: '#64748b', fontSize: 12 }}>
-                                      {blockTemplate?.code || blockRef.blockTemplateId}
-                                    </div>
-                                    <div style={{ color: '#475569', fontSize: 12 }}>
-                                      该引用会沿用卡片块定义中的展示类型、数据键和动作配置，不在模板页内直接改写。
                                     </div>
                                   </div>
 
