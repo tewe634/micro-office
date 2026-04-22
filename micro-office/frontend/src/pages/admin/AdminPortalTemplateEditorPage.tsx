@@ -177,7 +177,7 @@ function createEmptySection(index: number): EditorSection {
   return {
     id: localId('section'),
     code: `SECTION_${index + 1}`,
-    name: `分区 ${index + 1}`,
+    name: '',
     sectionType: 'BLOCK',
     sortOrder: order,
     meta: {},
@@ -239,6 +239,13 @@ function resequenceBlockRefs(blockRefs: EditorBlockRef[]) {
 function blockTemplateLabel(blockTemplate?: BlockTemplateSummary) {
   if (!blockTemplate) return '未关联块模板';
   return blockTemplate.label || blockTemplate.name || blockTemplate.code || '未命名块模板';
+}
+
+function sectionNameLinkedBlockId(section: EditorSection, templates: BlockTemplateSummary[]) {
+  const linkedId = typeof section.meta?.linkedBlockTemplateId === 'string' ? section.meta.linkedBlockTemplateId : undefined;
+  if (linkedId && templates.some(item => item.id === linkedId)) return linkedId;
+  const matched = templates.find(item => blockTemplateLabel(item) === section.name || item.name === section.name || item.label === section.name);
+  return matched?.id;
 }
 
 function findOptionLabel(options: OptionItem[], value?: string) {
@@ -437,6 +444,11 @@ export default function AdminPortalTemplateEditorPage() {
     label: `${blockTemplateLabel(item)} · ${item.code || item.dataKey}`,
   })), [availableBlockTemplates]);
 
+  const sectionNameOptions = useMemo(() => availableBlockTemplates.map(item => ({
+    value: item.id,
+    label: `${blockTemplateLabel(item)} · ${item.code || item.dataKey}`,
+  })), [availableBlockTemplates]);
+
   const templateTypeLabel = useMemo(
     () => findOptionLabel(templateTypeOptions, detail?.templateType),
     [detail?.templateType, templateTypeOptions],
@@ -498,14 +510,6 @@ export default function AdminPortalTemplateEditorPage() {
               {contractIssues.map(issue => (
                 <Alert key={issue} type="warning" showIcon message="检测到旧结构残留" description={issue} />
               ))}
-
-              <Alert
-                type="info"
-                showIcon
-                message="当前页面只负责装配块引用"
-                description="人员模板按岗位装配，对象模板按对象类型装配。模板定义类型仍在创建时确定；预览主体类型与预览主体字段已恢复，用于手工指定预览对象。"
-                action={<Button size="small" onClick={() => nav('/admin/portal-block-templates')}>进入卡片块定义</Button>}
-              />
 
               <Card type="inner" title="模板基础信息">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
@@ -589,6 +593,11 @@ export default function AdminPortalTemplateEditorPage() {
                   <Empty description="当前模板还没有分区，请先新增分区并引用卡片块" />
                 ) : detail.sections.map((section, sectionIndex) => {
                   const blockPickerValue = blockPickerBySection[section.id];
+                  const linkedSectionNameBlockId = sectionNameLinkedBlockId(section, availableBlockTemplates);
+                  const sectionNameSelectValue = linkedSectionNameBlockId || (section.name ? `__current__:${section.id}` : undefined);
+                  const sectionNameSelectOptions = linkedSectionNameBlockId || !section.name
+                    ? sectionNameOptions
+                    : [{ value: `__current__:${section.id}`, label: `${section.name} · 当前已保存值` }, ...sectionNameOptions];
                   return (
                     <Card
                       key={section.id}
@@ -645,10 +654,30 @@ export default function AdminPortalTemplateEditorPage() {
                         </div>
                         <div>
                           <div style={{ marginBottom: 6 }}>分区名称</div>
-                          <Input value={section.name} onChange={e => updateDetail(prev => ({
-                            ...prev,
-                            sections: prev.sections.map((item, index) => index === sectionIndex ? { ...item, name: e.target.value } : item),
-                          }))} />
+                          <Select
+                            style={{ width: '100%' }}
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder="从门户卡片管理中选择"
+                            value={sectionNameSelectValue}
+                            options={sectionNameSelectOptions}
+                            onChange={value => {
+                              if (String(value).startsWith('__current__:')) return;
+                              const chosen = availableBlockTemplates.find(item => item.id === value);
+                              if (!chosen) return;
+                              updateDetail(prev => ({
+                                ...prev,
+                                sections: prev.sections.map((item, index) => index === sectionIndex ? {
+                                  ...item,
+                                  name: blockTemplateLabel(chosen),
+                                  meta: {
+                                    ...item.meta,
+                                    linkedBlockTemplateId: chosen.id,
+                                  },
+                                } : item),
+                              }));
+                            }}
+                          />
                         </div>
                         <div>
                           <div style={{ marginBottom: 6 }}>分区类型</div>
