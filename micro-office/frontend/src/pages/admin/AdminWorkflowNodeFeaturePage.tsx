@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Input, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
-import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CopyOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowNodeFeatureApi, type WorkflowNodeFeatureStatus } from '../../api';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
@@ -145,14 +145,9 @@ export default function AdminWorkflowNodeFeaturePage() {
         className="page-card"
         title="工作节点模版管理"
         extra={
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey })}>
-              刷新
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/admin/workflow-node-features/new')}>
-              新建工作节点模版
-            </Button>
-          </Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/admin/workflow-node-features/new')}>
+            新建工作节点模版
+          </Button>
         }
         bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
