@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Input, Modal, Space, Tag, message } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { WorkflowRelationType, WorkflowTemplatePackageNodePayload, WorkflowTemplateStatus } from '../../api';
 import { workflowNodeFeatureApi, workflowTemplateApi } from '../../api';
@@ -581,9 +581,6 @@ export default function AdminWorkflowTemplateEditorPage() {
               >
                 <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/admin/workflow-templates')}>
                   返回列表
-                </Button>
-                <Button icon={<ReloadOutlined />} onClick={() => void loadPage()}>
-                  重载
                 </Button>
                 {packageDetail?.status === 'ACTIVE' ? (
                   <Button onClick={() => void updatePackageStatus('DISABLED')}>停用（DISABLED）</Button>
