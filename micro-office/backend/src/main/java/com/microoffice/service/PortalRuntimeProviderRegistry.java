@@ -59,6 +59,7 @@ public class PortalRuntimeProviderRegistry {
         register(registrations, "customer_list", this::buildCustomerList);
         register(registrations, "sales.customers", this::buildCustomerList);
         register(registrations, "daily_list", context -> dailyEntryRuntimeService.buildDailyList(context.runtimePayload()));
+        register(registrations, "message_center", context -> buildMessageCenter(context.runtimePayload()));
         register(registrations, "relation_graph", context -> buildRelationGraph(context.runtimePayload()));
         register(registrations, "aiwarn_list", context -> buildAiWarnings(context.runtimePayload()));
         register(registrations, "sales.summary", context -> buildSummaryDataset(context.runtimePayload()));
@@ -523,35 +524,36 @@ public class PortalRuntimeProviderRegistry {
         return result;
     }
 
+    private Map<String, Object> buildMessageCenter(Map<String, Object> runtimePayload) {
+        List<Map<String, Object>> rows = queryRecentMessages(runtimePayload, 8);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            String content = asNullableString(row.get("content"));
+            String conversationTitle = asNullableString(row.get("conversation_title"));
+            String senderName = firstNonBlank(asNullableString(row.get("sender_name")), "系统");
+            String severity = detectPriority(content);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", asString(row.get("id")));
+            item.put("entry_id", asString(row.get("conversation_id")));
+            item.put("title", firstNonBlank(content, conversationTitle, "消息通知"));
+            item.put("source", firstNonBlank(conversationTitle, senderName, "消息中心"));
+            item.put("severity", severity);
+            item.put("time", formatDateTime(row.get("created_at")));
+            item.put("from", senderName);
+            item.put("preview", content);
+            item.put("owner_name", firstNonBlank(senderName, conversationTitle, "系统"));
+            item.put("customer_status", severity);
+            items.add(item);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("items", items);
+        result.put("generatedAt", OffsetDateTime.now(ZoneId.of("Asia/Shanghai")).format(DATE_TIME_FORMATTER));
+        result.put("source", "mo_messages + mo_conversations");
+        return result;
+    }
+
     private List<Map<String, Object>> buildCeoCollabNotifications(Map<String, Object> runtimePayload) {
-        String runtimeUserId = runtimeUserId(runtimePayload);
-        List<Map<String, Object>> rows;
-        if (hasText(runtimeUserId)) {
-            rows = jdbc.queryForList(
-                "SELECT m.id, c.id AS conversation_id, c.title AS conversation_title, COALESCE(u.name, CAST(m.sender_type AS text)) AS sender_name, m.content, m.created_at " +
-                    "FROM mo_messages m " +
-                    "JOIN mo_conversations c ON c.id = m.conversation_id " +
-                    "LEFT JOIN sys_user u ON u.id = m.sender_user_id " +
-                    "WHERE m.sender_type <> 'AI' " +
-                    "  AND EXISTS (SELECT 1 FROM mo_conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id = ?) " +
-                    "  AND COALESCE(CAST(m.sender_user_id AS text), '') <> ? " +
-                    "ORDER BY m.created_at DESC LIMIT 6",
-                runtimeUserId,
-                runtimeUserId
-            );
-        } else {
-            rows = List.of();
-        }
-        if (rows.isEmpty()) {
-            rows = jdbc.queryForList(
-                "SELECT m.id, c.id AS conversation_id, c.title AS conversation_title, COALESCE(u.name, CAST(m.sender_type AS text)) AS sender_name, m.content, m.created_at " +
-                    "FROM mo_messages m " +
-                    "JOIN mo_conversations c ON c.id = m.conversation_id " +
-                    "LEFT JOIN sys_user u ON u.id = m.sender_user_id " +
-                    "WHERE m.sender_type <> 'AI' " +
-                    "ORDER BY m.created_at DESC LIMIT 6"
-            );
-        }
+        List<Map<String, Object>> rows = queryRecentMessages(runtimePayload, 6);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             String content = asNullableString(row.get("content"));
@@ -565,6 +567,40 @@ public class PortalRuntimeProviderRegistry {
             result.add(item);
         }
         return result;
+    }
+
+    private List<Map<String, Object>> queryRecentMessages(Map<String, Object> runtimePayload, int limit) {
+        String runtimeUserId = runtimeUserId(runtimePayload);
+        List<Map<String, Object>> rows;
+        if (hasText(runtimeUserId)) {
+            rows = jdbc.queryForList(
+                "SELECT m.id, c.id AS conversation_id, c.title AS conversation_title, COALESCE(u.name, CAST(m.sender_type AS text)) AS sender_name, m.content, m.created_at " +
+                    "FROM mo_messages m " +
+                    "JOIN mo_conversations c ON c.id = m.conversation_id " +
+                    "LEFT JOIN sys_user u ON u.id = m.sender_user_id " +
+                    "WHERE m.sender_type <> 'AI' " +
+                    "  AND EXISTS (SELECT 1 FROM mo_conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id = ?) " +
+                    "  AND COALESCE(CAST(m.sender_user_id AS text), '') <> ? " +
+                    "ORDER BY m.created_at DESC LIMIT ?",
+                runtimeUserId,
+                runtimeUserId,
+                limit
+            );
+        } else {
+            rows = List.of();
+        }
+        if (rows.isEmpty()) {
+            rows = jdbc.queryForList(
+                "SELECT m.id, c.id AS conversation_id, c.title AS conversation_title, COALESCE(u.name, CAST(m.sender_type AS text)) AS sender_name, m.content, m.created_at " +
+                    "FROM mo_messages m " +
+                    "JOIN mo_conversations c ON c.id = m.conversation_id " +
+                    "LEFT JOIN sys_user u ON u.id = m.sender_user_id " +
+                    "WHERE m.sender_type <> 'AI' " +
+                    "ORDER BY m.created_at DESC LIMIT ?",
+                limit
+            );
+        }
+        return rows;
     }
 
     private Map<String, Object> buildRelationGraph(Map<String, Object> runtimePayload) {
