@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Empty,
@@ -320,24 +319,6 @@ function formatDateTime(value?: string | null) {
     minute: '2-digit',
     hour12: false,
   }).format(date);
-}
-
-function ManagementLeaderHint() {
-  return (
-    <Alert
-      type="info"
-      showIcon
-      message="管理沟通协同 · 默认设计"
-      description={(
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div>支持两种配置：<strong>按领导匹配</strong>、<strong>灵活指派人员</strong>。</div>
-          <div>当前销售部门：关联一级到部门经理。</div>
-          <div>销售大区：关联到业务部两级，默认包含<strong>部门经理 + 大区总</strong>。</div>
-          <div>固定组织：默认关联到“销售体系”，包含<strong>部门经理 + 大区总 + 体系负责人</strong>；命中本人时会自动跳过本人。</div>
-        </div>
-      )}
-    />
-  );
 }
 
 function RuleEditor({
@@ -753,13 +734,6 @@ export default function AdminSalesCollabPage() {
 
   return (
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
-      <Alert
-        type="info"
-        showIcon
-        message="协同配置"
-        description="负责人固定为业务销售负责人；模板管理负责维护协同规则，部门应用负责按列表绑定模板，模板命中的其他人员默认为协作者。"
-      />
-
       <Tabs
         className="page-tabs"
         items={[
@@ -874,10 +848,6 @@ export default function AdminSalesCollabPage() {
                         value={orgKeyword}
                         onChange={event => setOrgKeyword(event.target.value)}
                       />
-                      <Space size={[8, 8]} wrap>
-                        <Tag color="blue">负责人：业务销售负责人</Tag>
-                        <Tag>协作者：模板命中的其他人员</Tag>
-                      </Space>
                     </div>
                   </Card>
 
@@ -979,7 +949,7 @@ export default function AdminSalesCollabPage() {
             <Input placeholder="例如：销售协同标准模板" />
           </Form.Item>
           <Form.Item name="remark" label="备注">
-            <Input.TextArea rows={3} placeholder="补充说明这个模板适用的销售组织或业务特点" />
+            <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item name="enabled" label="启用" valuePropName="checked">
             <Switch />
@@ -1001,16 +971,9 @@ export default function AdminSalesCollabPage() {
           <Empty description="正在加载模板配置..." />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflow: 'auto', paddingRight: 4 }}>
-            <Alert
-              type="info"
-              showIcon
-              message="模板协同配置"
-              description="负责人固定为业务销售负责人；在模板中配置的其他人员、岗位或领导解析结果，默认都作为协作者。"
-            />
             <Card>
               <Space size={[8, 8]} wrap>
                 {templateDetail.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
-                <Tag color="blue">负责人：业务销售负责人</Tag>
                 {templateDetail.remark ? <Tag>{templateDetail.remark}</Tag> : null}
               </Space>
             </Card>
@@ -1021,7 +984,6 @@ export default function AdminSalesCollabPage() {
                 extra={<Space size={[4, 4]} wrap>{group.scenes.map(scene => <Tag key={scene.id}>{scene.sceneName}</Tag>)}</Space>}
               >
                 {group.description ? <div style={{ color: '#64748b', marginBottom: 12 }}>{group.description}</div> : null}
-                {group.groupKey === 'MANAGEMENT_SYNC' ? <ManagementLeaderHint /> : null}
                 <RuleEditor
                   rules={normalizeRules(group.rules)}
                   onChange={rules => updateTemplateGroupRules(group.id, rules)}
@@ -1058,19 +1020,13 @@ export default function AdminSalesCollabPage() {
           <Form.Item label="绑定模板" name="templateId">
             <Select
               allowClear
-              placeholder="选择要应用的协同模板；清空表示解绑"
+              placeholder="选择协同模板"
               options={templates.map(template => ({ value: template.id, label: template.name }))}
             />
           </Form.Item>
           <Form.Item label="启用" name="enabled" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Alert
-            type="info"
-            showIcon
-            message="部门应用说明"
-            description="这里仅负责绑定模板，不再维护部门级协同规则。绑定完成后，该部门按模板规则执行，业务销售负责人为负责人，模板命中的其他人员默认为协作者。"
-          />
         </Form>
       </Modal>
     </div>
