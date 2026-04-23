@@ -263,7 +263,7 @@ export const portalBlockTemplateAdminApi = {
 };
 
 export const dailyEntryAdminApi = {
-  listEntries: (params?: { status?: DailyEntryStatus }) => api.get('/admin/daily-entries', { params }),
+  listEntries: (params?: { current?: number; size?: number; status?: DailyEntryStatus; keyword?: string }) => api.get('/admin/daily-entries', { params }),
   getEntry: (id: string | number) => api.get(`/admin/daily-entries/${id}`),
   createEntry: (data: DailyEntryPayload) => api.post('/admin/daily-entries', data),
   updateEntry: (id: string | number, data: DailyEntryPayload) => api.put(`/admin/daily-entries/${id}`, data),

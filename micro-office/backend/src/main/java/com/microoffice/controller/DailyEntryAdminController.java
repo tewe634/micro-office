@@ -1,5 +1,6 @@
 package com.microoffice.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.microoffice.dto.response.ApiResponse;
 import com.microoffice.service.DailyEntryAdminService;
 import com.microoffice.service.DailyEntryChatAdminService;
@@ -27,11 +28,13 @@ public class DailyEntryAdminController {
     private final MenuPermissionService menuPermissionService;
 
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) String status,
+    public ApiResponse<Page<Map<String, Object>>> list(@RequestParam(defaultValue = "1") long current,
+                                                       @RequestParam(defaultValue = "20") long size,
+                                                       @RequestParam(required = false) String status,
                                                        @RequestParam(required = false) String keyword,
                                                        Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(dailyEntryAdminService.listEntries(status, keyword));
+        return ApiResponse.ok(dailyEntryAdminService.listEntries(current, size, status, keyword));
     }
 
     @GetMapping("/{id}")

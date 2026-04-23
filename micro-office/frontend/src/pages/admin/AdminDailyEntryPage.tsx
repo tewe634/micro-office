@@ -9,6 +9,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Pagination,
   Popconfirm,
   Select,
   Space,
@@ -30,6 +31,7 @@ import {
   type DailyEntryTargetPayload,
   type DailyEntryTargetType,
 } from '../../api';
+import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -167,6 +169,9 @@ export default function AdminDailyEntryPage() {
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<DailyEntryRecord[]>([]);
   const [status, setStatus] = useState<DailyEntryStatus | undefined>();
+  const [current, setCurrent] = useState(1);
+  const [size, setSize] = useState(20);
+  const [total, setTotal] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -191,11 +196,28 @@ export default function AdminDailyEntryPage() {
     setUserOptions((userResp.data || []).map((item: any) => ({ value: String(item.id), label: item.name })));
   };
 
-  const loadRecords = async (nextStatus = status) => {
+  const loadRecords = async (options?: {
+    status?: DailyEntryStatus;
+    current?: number;
+    size?: number;
+  }) => {
+    const nextStatus = options?.status !== undefined ? options.status : status;
+    const nextCurrent = options?.current ?? current;
+    const nextSize = options?.size ?? size;
     setLoading(true);
     try {
-      const resp: any = await dailyEntryAdminApi.listEntries({ status: nextStatus });
-      setRecords((resp.data || []).map(normalizeEntry));
+      const resp: any = await dailyEntryAdminApi.listEntries({ status: nextStatus, current: nextCurrent, size: nextSize });
+      const pageData = resp.data || {};
+      const nextRecords = (pageData.records || []).map(normalizeEntry);
+      const nextTotal = Number(pageData.total || 0);
+      if (nextTotal > 0 && nextCurrent > 1 && !nextRecords.length) {
+        await loadRecords({ status: nextStatus, current: nextCurrent - 1, size: nextSize });
+        return;
+      }
+      setRecords(nextRecords);
+      setCurrent(Number(pageData.current || nextCurrent));
+      setSize(Number(pageData.size || nextSize));
+      setTotal(nextTotal);
       setContractIssues([]);
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || '日常条目列表加载失败';
@@ -204,6 +226,7 @@ export default function AdminDailyEntryPage() {
         setContractIssues(['后端尚未提供 /api/admin/daily-entries 管理接口，前端已预留独立页面与交互结构。']);
       }
       setRecords([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -211,7 +234,7 @@ export default function AdminDailyEntryPage() {
 
   useEffect(() => {
     void loadLookups();
-    void loadRecords();
+    void loadRecords({ current: 1, size });
   }, []);
 
   const loadDetail = async (id: string) => {
@@ -364,7 +387,7 @@ export default function AdminDailyEntryPage() {
 
       message.success(editing?.id ? '日常条目已保存' : '日常条目已创建');
       setDrawerOpen(false);
-      await loadRecords();
+      await loadRecords({ status, current, size });
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || '保存失败';
       message.error(errorMessage);
@@ -380,7 +403,7 @@ export default function AdminDailyEntryPage() {
     try {
       await dailyEntryAdminApi.updateEntryStatus(record.id, nextStatus);
       message.success(nextStatus === 'ACTIVE' ? '条目已启用' : '条目已停用');
-      await loadRecords();
+      await loadRecords({ status, current, size });
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || '状态更新失败';
       message.error(errorMessage);
@@ -409,86 +432,107 @@ export default function AdminDailyEntryPage() {
               options={statusOptions}
               onChange={(value) => {
                 setStatus(value);
-                void loadRecords(value);
+                void loadRecords({ status: value, current: 1, size });
               }}
             />
           </Space>
         </div>
 
-        <div className="page-card-scroll">
-          <Table
-            loading={loading}
-            rowKey="id"
-            size="middle"
-            dataSource={records}
-            pagination={{ pageSize: 20 }}
-            scroll={{ x: 1320 }}
-            locale={{ emptyText: <Empty description="暂无日常条目" /> }}
-            columns={[
-              {
-                title: '条目名称',
-                width: 220,
-                render: (_: unknown, row: DailyEntryRecord) => (
-                  <Button type="link" style={{ paddingInline: 0, fontWeight: 600 }} onClick={() => void handleEdit(row)}>
-                    {row.name || '-'}
-                  </Button>
-                ),
-              },
-              { title: '条目编码', dataIndex: 'code', width: 180 },
-              {
-                title: '状态',
-                dataIndex: 'status',
-                width: 110,
-                render: (value: DailyEntryStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
-              },
-              { title: '排序', dataIndex: 'sortOrder', width: 100 },
-              {
-                title: '适用范围摘要',
-                width: 260,
-                render: (_: unknown, row: DailyEntryRecord) => targetSummary(row.targets || [], orgMap, userMap),
-              },
-              {
-                title: '会话策略摘要',
-                width: 220,
-                render: (_: unknown, row: DailyEntryRecord) => policySummary(row.chatPolicy),
-              },
-              {
-                title: '最近更新时间',
-                dataIndex: 'updatedAt',
-                width: 180,
-                render: (value: string) => value || '-',
-              },
-              {
-                title: '操作',
-                width: 260,
-                fixed: 'right',
-                render: (_: unknown, row: DailyEntryRecord) => (
-                  <Space wrap>
-                    <Button size="small" onClick={() => void handleEdit(row)}>编辑</Button>
-                    {row.status === 'ACTIVE' ? (
-                      <Popconfirm
-                        title="确认停用该条目？"
-                        okText="停用"
-                        cancelText="取消"
-                        onConfirm={() => void handleStatus(row, 'INACTIVE')}
-                      >
-                        <Button size="small">停用</Button>
-                      </Popconfirm>
-                    ) : (
-                      <Popconfirm
-                        title="确认启用该条目？"
-                        okText="启用"
-                        cancelText="取消"
-                        onConfirm={() => void handleStatus(row, 'ACTIVE')}
-                      >
-                        <Button size="small" type="primary">启用</Button>
-                      </Popconfirm>
-                    )}
-                  </Space>
-                ),
-              },
-            ]}
-          />
+        <div className="fixed-table-page__frame" style={{ borderRadius: 12 }}>
+          <div className="fixed-table-page__table">
+            <Table
+              loading={loading}
+              rowKey="id"
+              size="middle"
+              dataSource={records}
+              pagination={false}
+              scroll={{ x: 1320, y: 'calc(100dvh - 360px)' }}
+              locale={{ emptyText: <Empty description="暂无日常条目" /> }}
+              columns={[
+                {
+                  title: '序号',
+                  width: 80,
+                  render: (_: unknown, __: DailyEntryRecord, index: number) => (current - 1) * size + index + 1,
+                },
+                {
+                  title: '条目名称',
+                  width: 220,
+                  render: (_: unknown, row: DailyEntryRecord) => (
+                    <Button type="link" style={{ paddingInline: 0, fontWeight: 600 }} onClick={() => void handleEdit(row)}>
+                      {row.name || '-'}
+                    </Button>
+                  ),
+                },
+                { title: '条目编码', dataIndex: 'code', width: 180 },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 110,
+                  render: (value: DailyEntryStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
+                },
+                { title: '排序', dataIndex: 'sortOrder', width: 100 },
+                {
+                  title: '适用范围摘要',
+                  width: 260,
+                  render: (_: unknown, row: DailyEntryRecord) => targetSummary(row.targets || [], orgMap, userMap),
+                },
+                {
+                  title: '会话策略摘要',
+                  width: 220,
+                  render: (_: unknown, row: DailyEntryRecord) => policySummary(row.chatPolicy),
+                },
+                {
+                  title: '最近更新时间',
+                  dataIndex: 'updatedAt',
+                  width: 180,
+                  render: (value: string) => value || '-',
+                },
+                {
+                  title: '操作',
+                  width: 260,
+                  fixed: 'right',
+                  render: (_: unknown, row: DailyEntryRecord) => (
+                    <Space wrap>
+                      <Button size="small" onClick={() => void handleEdit(row)}>编辑</Button>
+                      {row.status === 'ACTIVE' ? (
+                        <Popconfirm
+                          title="确认停用该条目？"
+                          okText="停用"
+                          cancelText="取消"
+                          onConfirm={() => void handleStatus(row, 'INACTIVE')}
+                        >
+                          <Button size="small">停用</Button>
+                        </Popconfirm>
+                      ) : (
+                        <Popconfirm
+                          title="确认启用该条目？"
+                          okText="启用"
+                          cancelText="取消"
+                          onConfirm={() => void handleStatus(row, 'ACTIVE')}
+                        >
+                          <Button size="small" type="primary">启用</Button>
+                        </Popconfirm>
+                      )}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          </div>
+
+          <div className="fixed-table-page__footer">
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={size}
+              total={total}
+              showSizeChanger
+              showTotal={(count) => formatPaginationTotal(count)}
+              onChange={(page, pageSize) => {
+                void loadRecords({ status, current: page, size: pageSize });
+              }}
+            />
+          </div>
         </div>
       </Card>
 

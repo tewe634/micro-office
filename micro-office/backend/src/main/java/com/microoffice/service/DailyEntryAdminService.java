@@ -1,5 +1,6 @@
 package com.microoffice.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,52 +35,48 @@ public class DailyEntryAdminService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
-    public List<Map<String, Object>> listEntries(String status, String keyword) {
+    public Page<Map<String, Object>> listEntries(long current, long size, String status, String keyword) {
+        long normalizedCurrent = normalizeCurrent(current);
+        long normalizedSize = normalizePageSize(size);
         String normalizedStatus = normalizeStatus(status, true, "条目状态不合法，仅支持 ACTIVE 或 INACTIVE");
         String normalizedKeyword = blankToNull(keyword);
-        List<Map<String, Object>> rows;
-        if (hasText(normalizedStatus) && hasText(normalizedKeyword)) {
-            String pattern = "%" + normalizedKeyword + "%";
-            rows = jdbc.queryForList(
-                "SELECT c.id, c.code, c.name, c.sort_order, c.status, c.meta, c.version, c.created_at, c.created_by, c.updated_at, c.updated_by, " +
-                    "COALESCE((SELECT COUNT(*) FROM mo_daily_entry_targets t WHERE t.daily_entry_id = c.id AND t.status = 'ACTIVE'), 0) AS active_target_count, " +
-                    "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy " +
-                    "FROM mo_daily_categories c " +
-                    "WHERE c.status = ? AND (c.code ILIKE ? OR c.name ILIKE ?) " +
-                    "ORDER BY c.sort_order, c.code, c.id",
-                normalizedStatus,
-                pattern,
-                pattern
-            );
-        } else if (hasText(normalizedStatus)) {
-            rows = jdbc.queryForList(
-                "SELECT c.id, c.code, c.name, c.sort_order, c.status, c.meta, c.version, c.created_at, c.created_by, c.updated_at, c.updated_by, " +
-                    "COALESCE((SELECT COUNT(*) FROM mo_daily_entry_targets t WHERE t.daily_entry_id = c.id AND t.status = 'ACTIVE'), 0) AS active_target_count, " +
-                    "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy " +
-                    "FROM mo_daily_categories c " +
-                    "WHERE c.status = ? ORDER BY c.sort_order, c.code, c.id",
-                normalizedStatus
-            );
-        } else if (hasText(normalizedKeyword)) {
-            String pattern = "%" + normalizedKeyword + "%";
-            rows = jdbc.queryForList(
-                "SELECT c.id, c.code, c.name, c.sort_order, c.status, c.meta, c.version, c.created_at, c.created_by, c.updated_at, c.updated_by, " +
-                    "COALESCE((SELECT COUNT(*) FROM mo_daily_entry_targets t WHERE t.daily_entry_id = c.id AND t.status = 'ACTIVE'), 0) AS active_target_count, " +
-                    "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy " +
-                    "FROM mo_daily_categories c " +
-                    "WHERE c.code ILIKE ? OR c.name ILIKE ? " +
-                    "ORDER BY c.sort_order, c.code, c.id",
-                pattern,
-                pattern
-            );
-        } else {
-            rows = jdbc.queryForList(
-                "SELECT c.id, c.code, c.name, c.sort_order, c.status, c.meta, c.version, c.created_at, c.created_by, c.updated_at, c.updated_by, " +
-                    "COALESCE((SELECT COUNT(*) FROM mo_daily_entry_targets t WHERE t.daily_entry_id = c.id AND t.status = 'ACTIVE'), 0) AS active_target_count, " +
-                    "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy " +
-                    "FROM mo_daily_categories c ORDER BY c.sort_order, c.code, c.id"
-            );
+
+        String selectSql = "SELECT c.id, c.code, c.name, c.sort_order, c.status, c.meta, c.version, c.created_at, c.created_by, c.updated_at, c.updated_by, " +
+            "COALESCE((SELECT COUNT(*) FROM mo_daily_entry_targets t WHERE t.daily_entry_id = c.id AND t.status = 'ACTIVE'), 0) AS active_target_count, " +
+            "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy " +
+            "FROM mo_daily_categories c";
+        String countSql = "SELECT COUNT(*) FROM mo_daily_categories c";
+
+        StringBuilder where = new StringBuilder();
+        List<Object> params = new ArrayList<>();
+        if (hasText(normalizedStatus)) {
+            where.append(params.isEmpty() ? " WHERE " : " AND ").append("c.status = ?");
+            params.add(normalizedStatus);
         }
+        if (hasText(normalizedKeyword)) {
+            String pattern = "%" + normalizedKeyword + "%";
+            where.append(params.isEmpty() ? " WHERE " : " AND ").append("(c.code ILIKE ? OR c.name ILIKE ?)");
+            params.add(pattern);
+            params.add(pattern);
+        }
+
+        Number totalNumber = jdbc.queryForObject(countSql + where, Number.class, params.toArray());
+        long total = totalNumber == null ? 0L : totalNumber.longValue();
+        Page<Map<String, Object>> page = new Page<>(normalizedCurrent, normalizedSize, total);
+        if (total <= 0) {
+            page.setRecords(List.of());
+            return page;
+        }
+
+        long offset = (normalizedCurrent - 1) * normalizedSize;
+        List<Object> queryParams = new ArrayList<>(params);
+        queryParams.add(normalizedSize);
+        queryParams.add(offset);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            selectSql + where + " ORDER BY c.sort_order, c.code, c.id LIMIT ? OFFSET ?",
+            queryParams.toArray()
+        );
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             Map<String, Object> item = toEntry(row);
@@ -87,7 +84,8 @@ public class DailyEntryAdminService {
             item.put("hasChatPolicy", Boolean.TRUE.equals(row.get("has_chat_policy")));
             result.add(item);
         }
-        return result;
+        page.setRecords(result);
+        return page;
     }
 
     public Map<String, Object> getEntry(String id) {
@@ -376,6 +374,17 @@ public class DailyEntryAdminService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "version 必须大于 0");
         }
         return version;
+    }
+
+    private long normalizeCurrent(long value) {
+        return value <= 0 ? 1 : value;
+    }
+
+    private long normalizePageSize(long value) {
+        if (value <= 0) {
+            return 20;
+        }
+        return Math.min(value, 200);
     }
 
     private boolean hasText(String value) {
