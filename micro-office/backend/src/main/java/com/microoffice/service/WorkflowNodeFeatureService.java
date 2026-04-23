@@ -1,5 +1,6 @@
 package com.microoffice.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microoffice.dto.request.WorkflowNodeBehaviorSaveRequest;
@@ -41,44 +42,65 @@ public class WorkflowNodeFeatureService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
-    public List<Map<String, Object>> listFeatures(String status,
+    public Page<Map<String, Object>> listFeatures(long current,
+                                                  long size,
+                                                  String status,
                                                   String nodeType,
                                                   String keyword,
                                                   String positionKey,
                                                   String roleKey) {
+        long normalizedCurrent = normalizeCurrent(current);
+        long normalizedSize = normalizePageSize(size);
+
         List<Object> args = new ArrayList<>();
-        StringBuilder sql = new StringBuilder(
-            "SELECT d.id, d.source_module_id, d.code, d.name, d.source_system, d.node_type, d.is_active, d.version, d.created_at, d.created_by, d.updated_at, d.updated_by, d.role_key, d.position_key, " +
-                "wm.id AS behavior_module_id, wm.version AS behavior_version " +
-                "FROM mo_module_definitions d " +
-                "LEFT JOIN mo_workflow_module_definitions wm ON wm.id = d.id " +
-                "WHERE 1=1"
-        );
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
         if (hasText(status)) {
-            sql.append(" AND d.is_active = ?");
+            where.append(" AND d.is_active = ?");
             args.add("ACTIVE".equals(normalizeStatus(status)));
         }
         if (hasText(nodeType)) {
-            sql.append(" AND d.node_type = CAST(? AS mo_node_type)");
+            where.append(" AND d.node_type = CAST(? AS mo_node_type)");
             args.add(nodeType.trim().toUpperCase(Locale.ROOT));
         }
         if (hasText(keyword)) {
-            sql.append(" AND (d.code ILIKE ? OR d.name ILIKE ?)");
+            where.append(" AND (d.code ILIKE ? OR d.name ILIKE ?)");
             String key = "%" + keyword.trim() + "%";
             args.add(key);
             args.add(key);
         }
         if (hasText(positionKey)) {
-            sql.append(" AND d.position_key = ?");
+            where.append(" AND d.position_key = ?");
             args.add(positionKey.trim());
         }
         if (hasText(roleKey)) {
-            sql.append(" AND d.role_key = ?");
+            where.append(" AND d.role_key = ?");
             args.add(roleKey.trim().toUpperCase(Locale.ROOT));
         }
-        sql.append(" ORDER BY d.updated_at DESC, d.created_at DESC");
 
-        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        Number totalNumber = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM mo_module_definitions d" + where,
+            Number.class,
+            args.toArray()
+        );
+        long total = totalNumber == null ? 0L : totalNumber.longValue();
+        Page<Map<String, Object>> page = new Page<>(normalizedCurrent, normalizedSize, total);
+        if (total <= 0) {
+            page.setRecords(List.of());
+            return page;
+        }
+
+        List<Object> queryArgs = new ArrayList<>(args);
+        queryArgs.add(normalizedSize);
+        queryArgs.add((normalizedCurrent - 1) * normalizedSize);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT d.id, d.source_module_id, d.code, d.name, d.source_system, d.node_type, d.is_active, d.version, d.created_at, d.created_by, d.updated_at, d.updated_by, d.role_key, d.position_key, " +
+                "wm.id AS behavior_module_id, wm.version AS behavior_version " +
+                "FROM mo_module_definitions d " +
+                "LEFT JOIN mo_workflow_module_definitions wm ON wm.id = d.id" +
+                where +
+                " ORDER BY d.updated_at DESC, d.created_at DESC LIMIT ? OFFSET ?",
+            queryArgs.toArray()
+        );
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             Map<String, Object> item = toFeatureMap(row);
@@ -86,7 +108,8 @@ public class WorkflowNodeFeatureService {
             item.put("behaviorConfigVersion", asInt(row.get("behavior_version"), 0));
             result.add(item);
         }
-        return result;
+        page.setRecords(result);
+        return page;
     }
 
     public Map<String, Object> getFeature(String id) {
@@ -753,6 +776,17 @@ public class WorkflowNodeFeatureService {
 
     private String normalizeNodeType(String nodeType) {
         return requireText(nodeType, "nodeType 不能为空").trim().toUpperCase(Locale.ROOT);
+    }
+
+    private long normalizeCurrent(long value) {
+        return value <= 0 ? 1 : value;
+    }
+
+    private long normalizePageSize(long value) {
+        if (value <= 0) {
+            return 20;
+        }
+        return Math.min(value, 200);
     }
 
     private int normalizeVersion(Integer version) {

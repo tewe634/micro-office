@@ -3,11 +3,35 @@ import { Button, Card, Input, Popconfirm, Select, Space, Table, Tag, message } f
 import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowNodeFeatureApi, type WorkflowNodeFeatureStatus } from '../../api';
+import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const statusOptions: Array<{ value: WorkflowNodeFeatureStatus; label: string }> = [
   { value: 'ACTIVE', label: 'ACTIVE' },
   { value: 'DISABLED', label: 'DISABLED' },
 ];
+
+const nodeTypeLabelMap: Record<string, string> = {
+  TASK: '任务',
+  APPROVAL: '审批',
+  REVIEW: '审核',
+  CC: '抄送',
+  COPY: '抄送',
+  NOTIFY: '通知',
+  NOTICE: '通知',
+  HANDLE: '办理',
+  PROCESS: '处理',
+  START: '开始',
+  END: '结束',
+  CONDITION: '条件',
+  BRANCH: '分支',
+  MERGE: '汇聚',
+  AUTO: '自动',
+};
+
+function formatNodeTypeLabel(nodeType?: string) {
+  const key = String(nodeType || '').trim().toUpperCase();
+  return key ? nodeTypeLabelMap[key] || key : '-';
+}
 
 function statusColor(status?: string) {
   return status === 'ACTIVE' ? 'green' : 'default';
@@ -22,33 +46,62 @@ export default function AdminWorkflowNodeFeaturePage() {
   const [nodeType, setNodeType] = useState<string | undefined>();
   const [positionKey, setPositionKey] = useState<string | undefined>();
   const [roleKey, setRoleKey] = useState<string | undefined>();
+  const [current, setCurrent] = useState(1);
+  const [size, setSize] = useState(20);
+  const [total, setTotal] = useState(0);
 
-  const nodeTypeOptions = useMemo(
-    () =>
-      Array.from(new Set(records.map((item) => String(item.nodeType || '')).filter(Boolean)))
-        .sort()
-        .map((item) => ({ value: item, label: item })),
-    [records],
-  );
+  const nodeTypeOptions = useMemo(() => {
+    const values = new Set(records.map((item) => String(item.nodeType || '')).filter(Boolean));
+    if (nodeType) {
+      values.add(String(nodeType));
+    }
+    return Array.from(values)
+      .sort()
+      .map((item) => ({ value: item, label: formatNodeTypeLabel(item) }));
+  }, [records, nodeType]);
 
   const load = async (params?: {
+    current?: number;
+    size?: number;
     status?: WorkflowNodeFeatureStatus;
     nodeType?: string;
     keyword?: string;
     positionKey?: string;
     roleKey?: string;
   }) => {
+    const nextCurrent = params?.current ?? current;
+    const nextSize = params?.size ?? size;
+    const nextStatus = params?.status ?? status;
+    const nextNodeType = params?.nodeType ?? nodeType;
+    const nextKeyword = params?.keyword ?? (keyword || undefined);
+    const nextPositionKey = params?.positionKey ?? positionKey;
+    const nextRoleKey = params?.roleKey ?? roleKey;
+
     setLoading(true);
     try {
       const response: any = await workflowNodeFeatureApi.list({
-        status: params?.status ?? status,
-        nodeType: params?.nodeType ?? nodeType,
-        keyword: params?.keyword ?? (keyword || undefined),
-        positionKey: params?.positionKey ?? positionKey,
-        roleKey: params?.roleKey ?? roleKey,
+        current: nextCurrent,
+        size: nextSize,
+        status: nextStatus,
+        nodeType: nextNodeType,
+        keyword: nextKeyword,
+        positionKey: nextPositionKey,
+        roleKey: nextRoleKey,
       });
-      setRecords(response.data || []);
+      const payload = response.data;
+      const nextRecords = Array.isArray(payload) ? payload : payload?.records || [];
+      const nextTotal = Array.isArray(payload) ? nextRecords.length : Number(payload?.total || 0);
+      if (nextTotal > 0 && nextCurrent > 1 && !nextRecords.length) {
+        await load({ ...params, current: nextCurrent - 1, size: nextSize });
+        return;
+      }
+      setRecords(nextRecords);
+      setCurrent(Number(Array.isArray(payload) ? nextCurrent : payload?.current || nextCurrent));
+      setSize(Number(Array.isArray(payload) ? nextSize : payload?.size || nextSize));
+      setTotal(nextTotal);
     } catch (error: any) {
+      setRecords([]);
+      setTotal(0);
       message.error(error?.response?.data?.message || '节点功能列表加载失败');
     } finally {
       setLoading(false);
@@ -56,14 +109,14 @@ export default function AdminWorkflowNodeFeaturePage() {
   };
 
   useEffect(() => {
-    void load({});
+    void load({ current: 1, size });
   }, []);
 
   const updateStatus = async (record: any, nextStatus: WorkflowNodeFeatureStatus) => {
     try {
       await workflowNodeFeatureApi.updateStatus(record.id, nextStatus);
       message.success(nextStatus === 'ACTIVE' ? '节点功能已启用（ACTIVE）' : '节点功能已停用（DISABLED）');
-      await load({});
+      await load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
     } catch (error: any) {
       message.error(error?.response?.data?.message || '状态切换失败');
     }
@@ -73,7 +126,7 @@ export default function AdminWorkflowNodeFeaturePage() {
     try {
       const response: any = await workflowNodeFeatureApi.copy(record.id);
       message.success('节点功能已复制');
-      await load({});
+      await load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
       if (response.data?.id) {
         nav(`/admin/workflow-node-features/${response.data.id}`);
       }
@@ -89,7 +142,7 @@ export default function AdminWorkflowNodeFeaturePage() {
         title="工作节点模版管理"
         extra={
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void load({})}>
+            <Button icon={<ReloadOutlined />} onClick={() => void load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey })}>
               刷新
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/admin/workflow-node-features/new')}>
@@ -103,11 +156,11 @@ export default function AdminWorkflowNodeFeaturePage() {
           <Space wrap>
             <Input
               allowClear
-              placeholder="搜索节点编码 / 节点名称 / 来源系统"
+              placeholder="搜索节点编码 / 节点名称"
               value={keyword}
               style={{ width: 260 }}
               onChange={(e) => setKeyword(e.target.value)}
-              onPressEnter={() => void load({})}
+              onPressEnter={() => void load({ current: 1, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey })}
             />
             <Select
               allowClear
@@ -127,7 +180,7 @@ export default function AdminWorkflowNodeFeaturePage() {
             />
             <Input allowClear placeholder="岗位标识" value={positionKey} style={{ width: 180 }} onChange={(e) => setPositionKey(e.target.value || undefined)} />
             <Input allowClear placeholder="角色标识" value={roleKey} style={{ width: 160 }} onChange={(e) => setRoleKey(e.target.value || undefined)} />
-            <Button type="primary" onClick={() => void load({})}>
+            <Button type="primary" onClick={() => void load({ current: 1, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey })}>
               查询
             </Button>
           </Space>
@@ -138,8 +191,18 @@ export default function AdminWorkflowNodeFeaturePage() {
             loading={loading}
             rowKey="id"
             dataSource={records}
-            pagination={{ pageSize: 20 }}
-            scroll={{ x: 1280 }}
+            pagination={{
+              locale: paginationLocale,
+              current,
+              pageSize: size,
+              total,
+              showSizeChanger: true,
+              showTotal: (count) => formatPaginationTotal(count),
+              onChange: (page, pageSize) => {
+                void load({ current: page, size: pageSize, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+              },
+            }}
+            scroll={{ x: 1480 }}
             columns={[
               {
                 title: '节点功能',
@@ -154,8 +217,12 @@ export default function AdminWorkflowNodeFeaturePage() {
                 ),
               },
               { title: '节点编码', dataIndex: 'code', width: 180 },
-              { title: '节点类型', dataIndex: 'nodeType', width: 160 },
-              { title: '来源系统', dataIndex: 'sourceSystem', width: 160 },
+              {
+                title: '节点类型',
+                dataIndex: 'nodeType',
+                width: 160,
+                render: (value: string) => formatNodeTypeLabel(value),
+              },
               { title: '岗位标识', dataIndex: 'positionKey', width: 160 },
               { title: '角色标识', dataIndex: 'roleKey', width: 140 },
               {

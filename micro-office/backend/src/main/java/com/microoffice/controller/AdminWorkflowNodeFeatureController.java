@@ -1,5 +1,6 @@
 package com.microoffice.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.microoffice.dto.request.WorkflowNodeBehaviorSaveRequest;
 import com.microoffice.dto.request.WorkflowNodeFeatureBindingValidateRequest;
 import com.microoffice.dto.request.WorkflowNodeFeatureSaveRequest;
@@ -33,14 +34,16 @@ public class AdminWorkflowNodeFeatureController {
      * 查询节点功能列表。
      */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) String status,
+    public ApiResponse<Page<Map<String, Object>>> list(@RequestParam(defaultValue = "1") long current,
+                                                        @RequestParam(defaultValue = "20") long size,
+                                                        @RequestParam(required = false) String status,
                                                         @RequestParam(required = false) String nodeType,
                                                         @RequestParam(required = false) String keyword,
                                                         @RequestParam(required = false) String positionKey,
                                                         @RequestParam(required = false) String roleKey,
                                                         Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowNodeFeatureService.listFeatures(status, nodeType, keyword, positionKey, roleKey));
+        return ApiResponse.ok(workflowNodeFeatureService.listFeatures(current, size, status, nodeType, keyword, positionKey, roleKey));
     }
 
     /**

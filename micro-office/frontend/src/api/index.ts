@@ -312,6 +312,8 @@ export const workflowTemplateApi = {
 
 export const workflowNodeFeatureApi = {
   list: (params?: {
+    current?: number;
+    size?: number;
     status?: WorkflowNodeFeatureStatus;
     nodeType?: string;
     keyword?: string;
