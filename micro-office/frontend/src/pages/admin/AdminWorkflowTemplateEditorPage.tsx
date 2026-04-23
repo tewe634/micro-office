@@ -238,9 +238,28 @@ export default function AdminWorkflowTemplateEditorPage() {
   };
 
   const loadNodeFeatures = async () => {
-    const response: any = await workflowNodeFeatureApi.list();
-    const records = response.data || [];
-    setNodeFeatureMap(new Map(records.map((item: any) => [String(item.id), item])));
+    const allRecords: any[] = [];
+    let current = 1;
+    const size = 200;
+
+    while (true) {
+      const response: any = await workflowNodeFeatureApi.list({ current, size });
+      const payload = response.data;
+      const records = Array.isArray(payload) ? payload : payload?.records || [];
+      allRecords.push(...records);
+
+      if (Array.isArray(payload)) {
+        break;
+      }
+
+      const total = Number(payload?.total || 0);
+      if (!records.length || allRecords.length >= total) {
+        break;
+      }
+      current += 1;
+    }
+
+    setNodeFeatureMap(new Map(allRecords.map((item: any) => [String(item.id), item])));
   };
 
   const loadRecommendations = async () => {
