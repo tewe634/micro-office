@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
-import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CopyOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowTemplateApi } from '../../api';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
@@ -133,12 +133,7 @@ export default function AdminWorkflowTemplatePage() {
       <Card
         className="page-card"
         title="工作流模板包"
-        extra={(
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void loadPackages(sceneCategory, status)}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建模板包</Button>
-          </Space>
-        )}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建模板包</Button>}
         bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
         <div className="page-toolbar" style={{ marginBottom: 12 }}>
