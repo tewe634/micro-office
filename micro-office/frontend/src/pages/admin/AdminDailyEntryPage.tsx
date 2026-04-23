@@ -17,7 +17,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import {
   dailyEntryAdminApi,
   orgApi,
@@ -392,22 +392,9 @@ export default function AdminDailyEntryPage() {
       <Card
         className="page-card"
         title="日常条目管理"
-        extra={(
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void loadRecords(status)}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>新建条目</Button>
-          </Space>
-        )}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>新建条目</Button>}
         bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="条目管理与门户卡片管理职责分离"
-          description="本页管理请假、报销、会议等业务条目本身；门户卡片管理页只负责 daily_list 这类容器资产，不逐条维护业务条目。"
-        />
-
         {contractIssues.map((issue) => (
           <Alert key={issue} type="warning" showIcon style={{ marginBottom: 12 }} message="检测到契约缺口" description={issue} />
         ))}
