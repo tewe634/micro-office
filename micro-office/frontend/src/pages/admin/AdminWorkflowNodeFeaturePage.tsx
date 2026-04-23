@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Input, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Input, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowNodeFeatureApi, type WorkflowNodeFeatureStatus } from '../../api';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const statusOptions: Array<{ value: WorkflowNodeFeatureStatus; label: string }> = [
-  { value: 'ACTIVE', label: 'ACTIVE' },
-  { value: 'DISABLED', label: 'DISABLED' },
+  { value: 'ACTIVE', label: '启用' },
+  { value: 'DISABLED', label: '停用' },
 ];
 
 const nodeTypeLabelMap: Record<string, string> = {
@@ -35,6 +35,10 @@ function formatNodeTypeLabel(nodeType?: string) {
 
 function statusColor(status?: string) {
   return status === 'ACTIVE' ? 'green' : 'default';
+}
+
+function statusLabel(status?: string) {
+  return status === 'ACTIVE' ? '启用' : status === 'DISABLED' ? '停用' : status || '-';
 }
 
 export default function AdminWorkflowNodeFeaturePage() {
@@ -186,81 +190,113 @@ export default function AdminWorkflowNodeFeaturePage() {
           </Space>
         </div>
 
-        <div className="page-card-scroll">
-          <Table
-            loading={loading}
-            rowKey="id"
-            dataSource={records}
-            pagination={{
-              locale: paginationLocale,
-              current,
-              pageSize: size,
-              total,
-              showSizeChanger: true,
-              showTotal: (count) => formatPaginationTotal(count),
-              onChange: (page, pageSize) => {
-                void load({ current: page, size: pageSize, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
-              },
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#fff',
+            border: '1px solid #f0f0f0',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+            <Table
+              loading={loading}
+              rowKey="id"
+              dataSource={records}
+              pagination={false}
+              tableLayout="fixed"
+              scroll={{ y: 'calc(100dvh - 455px)' }}
+              columns={[
+                {
+                  title: '序号',
+                  key: 'index',
+                  width: 70,
+                  render: (_: unknown, __: any, index: number) => (current - 1) * size + index + 1,
+                },
+                {
+                  title: '节点功能',
+                  width: 220,
+                  render: (_: unknown, row: any) => (
+                    <div>
+                      <Button type="link" style={{ paddingInline: 0, fontWeight: 700 }} onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
+                        {row.name}
+                      </Button>
+                      <div style={{ color: '#64748b', fontSize: 12 }}>{row.id}</div>
+                    </div>
+                  ),
+                },
+                { title: '节点编码', dataIndex: 'code', width: 150, ellipsis: true },
+                {
+                  title: '节点类型',
+                  dataIndex: 'nodeType',
+                  width: 100,
+                  render: (value: string) => formatNodeTypeLabel(value),
+                },
+                { title: '岗位标识', dataIndex: 'positionKey', width: 140, ellipsis: true },
+                { title: '角色标识', dataIndex: 'roleKey', width: 120, ellipsis: true },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 100,
+                  render: (value: WorkflowNodeFeatureStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
+                },
+                { title: '版本', dataIndex: 'version', width: 80 },
+                { title: '更新时间', dataIndex: 'updatedAt', width: 180, ellipsis: true },
+                {
+                  title: '操作',
+                  width: 220,
+                  render: (_: unknown, row: any) => (
+                    <Space size={6} wrap>
+                      <Button size="small" onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
+                        编辑
+                      </Button>
+                      <Button size="small" icon={<CopyOutlined />} onClick={() => void copyRecord(row)}>
+                        复制
+                      </Button>
+                      {row.status === 'ACTIVE' ? (
+                        <Popconfirm title="确认停用该节点功能？" okText="停用" cancelText="取消" onConfirm={() => void updateStatus(row, 'DISABLED')}>
+                          <Button size="small">停用</Button>
+                        </Popconfirm>
+                      ) : (
+                        <Popconfirm title="确认启用该节点功能？" okText="启用" cancelText="取消" onConfirm={() => void updateStatus(row, 'ACTIVE')}>
+                          <Button size="small" type="primary">
+                            启用
+                          </Button>
+                        </Popconfirm>
+                      )}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          </div>
+
+          <div
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '12px 16px 16px',
+              borderTop: '1px solid #f0f0f0',
+              background: '#fff',
             }}
-            scroll={{ x: 1480 }}
-            columns={[
-              {
-                title: '节点功能',
-                width: 260,
-                render: (_: unknown, row: any) => (
-                  <div>
-                    <Button type="link" style={{ paddingInline: 0, fontWeight: 700 }} onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
-                      {row.name}
-                    </Button>
-                    <div style={{ color: '#64748b', fontSize: 12 }}>{row.id}</div>
-                  </div>
-                ),
-              },
-              { title: '节点编码', dataIndex: 'code', width: 180 },
-              {
-                title: '节点类型',
-                dataIndex: 'nodeType',
-                width: 160,
-                render: (value: string) => formatNodeTypeLabel(value),
-              },
-              { title: '岗位标识', dataIndex: 'positionKey', width: 160 },
-              { title: '角色标识', dataIndex: 'roleKey', width: 140 },
-              {
-                title: '状态',
-                dataIndex: 'status',
-                width: 120,
-                render: (value: WorkflowNodeFeatureStatus) => <Tag color={statusColor(value)}>{value}</Tag>,
-              },
-              { title: '版本', dataIndex: 'version', width: 100 },
-              { title: '更新时间', dataIndex: 'updatedAt', width: 200 },
-              {
-                title: '操作',
-                width: 320,
-                fixed: 'right',
-                render: (_: unknown, row: any) => (
-                  <Space wrap>
-                    <Button size="small" onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
-                      编辑
-                    </Button>
-                    <Button size="small" icon={<CopyOutlined />} onClick={() => void copyRecord(row)}>
-                      复制
-                    </Button>
-                    {row.status === 'ACTIVE' ? (
-                      <Popconfirm title="确认停用该节点功能？" okText="停用" cancelText="取消" onConfirm={() => void updateStatus(row, 'DISABLED')}>
-                        <Button size="small">停用</Button>
-                      </Popconfirm>
-                    ) : (
-                      <Popconfirm title="确认启用该节点功能？" okText="启用" cancelText="取消" onConfirm={() => void updateStatus(row, 'ACTIVE')}>
-                        <Button size="small" type="primary">
-                          启用
-                        </Button>
-                      </Popconfirm>
-                    )}
-                  </Space>
-                ),
-              },
-            ]}
-          />
+          >
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={size}
+              total={total}
+              showSizeChanger
+              showTotal={(count) => formatPaginationTotal(count)}
+              onChange={(page, pageSize) => {
+                void load({ current: page, size: pageSize, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+              }}
+            />
+          </div>
         </div>
       </Card>
     </div>
