@@ -221,12 +221,9 @@ export default function AdminWorkflowNodeFeaturePage() {
                   title: '节点功能',
                   width: 220,
                   render: (_: unknown, row: any) => (
-                    <div>
-                      <Button type="link" style={{ paddingInline: 0, fontWeight: 700 }} onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
-                        {row.name}
-                      </Button>
-                      <div style={{ color: '#64748b', fontSize: 12 }}>{row.id}</div>
-                    </div>
+                    <Button type="link" style={{ paddingInline: 0, fontWeight: 700 }} onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
+                      {row.name}
+                    </Button>
                   ),
                 },
                 { title: '节点编码', dataIndex: 'code', width: 150, ellipsis: true },
