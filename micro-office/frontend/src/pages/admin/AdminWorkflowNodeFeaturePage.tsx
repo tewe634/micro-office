@@ -242,7 +242,6 @@ export default function AdminWorkflowNodeFeaturePage() {
                   render: (value: WorkflowNodeFeatureStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
                 },
                 { title: '版本', dataIndex: 'version', width: 80 },
-                { title: '更新时间', dataIndex: 'updatedAt', width: 180, ellipsis: true },
                 {
                   title: '操作',
                   width: 220,
