@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Pagination, Select, Space, Table, Tag, message } from 'antd';
-import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CopyOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { portalBlockTemplateAdminApi, type PortalBlockTemplateStatus } from '../../api';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
@@ -101,12 +101,7 @@ export default function AdminPortalBlockTemplatePage() {
       <Card
         className="page-card"
         title="门户卡片管理"
-        extra={(
-          <Space wrap>
-            <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/admin/portal-block-templates/new')}>新建门户卡片</Button>
-          </Space>
-        )}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/admin/portal-block-templates/new')}>新建门户卡片</Button>}
         bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
         {contractIssues.map((issue) => (
