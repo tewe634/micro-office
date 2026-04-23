@@ -446,51 +446,44 @@ export default function AdminDailyEntryPage() {
               size="middle"
               dataSource={records}
               pagination={false}
-              scroll={{ x: 1320, y: 'calc(100dvh - 360px)' }}
+              tableLayout="fixed"
+              scroll={{ y: 'calc(100dvh - 360px)' }}
               locale={{ emptyText: <Empty description="暂无日常条目" /> }}
               columns={[
                 {
                   title: '序号',
-                  width: 80,
+                  width: 72,
                   render: (_: unknown, __: DailyEntryRecord, index: number) => (current - 1) * size + index + 1,
                 },
                 {
                   title: '条目名称',
-                  width: 220,
+                  width: 180,
                   render: (_: unknown, row: DailyEntryRecord) => (
                     <Button type="link" style={{ paddingInline: 0, fontWeight: 600 }} onClick={() => void handleEdit(row)}>
                       {row.name || '-'}
                     </Button>
                   ),
                 },
-                { title: '条目编码', dataIndex: 'code', width: 180 },
+                { title: '条目编码', dataIndex: 'code', width: 150, ellipsis: true },
                 {
                   title: '状态',
                   dataIndex: 'status',
-                  width: 110,
+                  width: 96,
                   render: (value: DailyEntryStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
                 },
-                { title: '排序', dataIndex: 'sortOrder', width: 100 },
+                { title: '排序', dataIndex: 'sortOrder', width: 80 },
                 {
                   title: '适用范围摘要',
-                  width: 260,
                   render: (_: unknown, row: DailyEntryRecord) => targetSummary(row.targets || [], orgMap, userMap),
                 },
                 {
                   title: '会话策略摘要',
-                  width: 220,
+                  width: 180,
                   render: (_: unknown, row: DailyEntryRecord) => policySummary(row.chatPolicy),
                 },
                 {
-                  title: '最近更新时间',
-                  dataIndex: 'updatedAt',
-                  width: 180,
-                  render: (value: string) => value || '-',
-                },
-                {
                   title: '操作',
-                  width: 260,
-                  fixed: 'right',
+                  width: 180,
                   render: (_: unknown, row: DailyEntryRecord) => (
                     <Space wrap>
                       <Button size="small" onClick={() => void handleEdit(row)}>编辑</Button>
