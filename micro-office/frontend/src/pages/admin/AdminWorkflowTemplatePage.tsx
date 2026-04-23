@@ -1,18 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowTemplateApi } from '../../api';
+import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 type WorkflowTemplateStatus = 'ACTIVE' | 'DISABLED';
 
 const statusOptions: Array<{ value: WorkflowTemplateStatus; label: string }> = [
-  { value: 'ACTIVE', label: 'ACTIVE' },
-  { value: 'DISABLED', label: 'DISABLED' },
+  { value: 'ACTIVE', label: '启用' },
+  { value: 'DISABLED', label: '停用' },
 ];
 
 function statusTagColor(status: WorkflowTemplateStatus) {
   return status === 'ACTIVE' ? 'green' : 'default';
+}
+
+function statusLabel(status: WorkflowTemplateStatus) {
+  return status === 'ACTIVE' ? '启用' : '停用';
 }
 
 export default function AdminWorkflowTemplatePage() {
@@ -22,6 +27,8 @@ export default function AdminWorkflowTemplatePage() {
   const [sceneOptions, setSceneOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [sceneCategory, setSceneCategory] = useState<string | undefined>();
   const [status, setStatus] = useState<WorkflowTemplateStatus | undefined>();
+  const [current, setCurrent] = useState(1);
+  const [size, setSize] = useState(20);
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm] = Form.useForm();
 
@@ -50,6 +57,10 @@ export default function AdminWorkflowTemplatePage() {
     void loadPackages();
   }, []);
 
+  useEffect(() => {
+    setCurrent(1);
+  }, [sceneCategory, status]);
+
   const filteredPackages = useMemo(() => {
     return packages.filter((item) => {
       if (sceneCategory && item.scene_category !== sceneCategory) return false;
@@ -57,6 +68,18 @@ export default function AdminWorkflowTemplatePage() {
       return true;
     });
   }, [packages, sceneCategory, status]);
+
+  const pagedPackages = useMemo(() => {
+    const start = (current - 1) * size;
+    return filteredPackages.slice(start, start + size);
+  }, [filteredPackages, current, size]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredPackages.length / size));
+    if (current > maxPage) {
+      setCurrent(maxPage);
+    }
+  }, [filteredPackages.length, current, size]);
 
   const handleCreate = async () => {
     const values = await createForm.validateFields();
@@ -139,70 +162,110 @@ export default function AdminWorkflowTemplatePage() {
           </Space>
         </div>
 
-        <div className="page-card-scroll">
-          <Table
-            loading={loading}
-            rowKey="id"
-            size="middle"
-            dataSource={filteredPackages}
-            pagination={{ pageSize: 20 }}
-            scroll={{ x: 1200 }}
-            columns={[
-              {
-                title: '模板包',
-                width: 280,
-                render: (_: unknown, row: any) => (
-                  <div>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#fff',
+            border: '1px solid #f0f0f0',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0, padding: '12px 12px 32px 12px', overflow: 'hidden' }}>
+            <Table
+              loading={loading}
+              rowKey="id"
+              size="middle"
+              dataSource={pagedPackages}
+              pagination={false}
+              tableLayout="fixed"
+              scroll={{ y: 'calc(100dvh - 455px)' }}
+              columns={[
+                {
+                  title: '序号',
+                  key: 'index',
+                  width: 70,
+                  render: (_: unknown, __: any, index: number) => (current - 1) * size + index + 1,
+                },
+                {
+                  title: '模板包',
+                  width: 220,
+                  render: (_: unknown, row: any) => (
                     <Button type="link" style={{ paddingInline: 0, fontWeight: 600 }} onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>
                       {row.name}
                     </Button>
-                    <div style={{ color: '#64748b', fontSize: 12 }}>{row.id}</div>
-                  </div>
-                ),
-              },
-              { title: '场景分类', dataIndex: 'scene_category', width: 180 },
-              {
-                title: '状态',
-                dataIndex: 'status',
-                width: 120,
-                render: (value: WorkflowTemplateStatus) => <Tag color={statusTagColor(value)}>{value}</Tag>,
-              },
-              { title: '排序值', dataIndex: 'sort_order', width: 100 },
-              { title: '版本', dataIndex: 'version', width: 90 },
-              {
-                title: '操作',
-                width: 320,
-                fixed: 'right',
-                render: (_: unknown, row: any) => (
-                  <Space wrap>
-                    <Button size="small" onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>节点编排</Button>
-                    <Button size="small" icon={<CopyOutlined />} onClick={() => void handleCopy(row)}>复制</Button>
-                    {row.status === 'ACTIVE' ? (
-                      <Popconfirm
-                        title="确认停用该模板包？"
-                        description="停用后将无法用于新建流程实例。"
-                        okText="停用"
-                        cancelText="取消"
-                        onConfirm={() => void handleUpdateStatus(row, 'DISABLED')}
-                      >
-                        <Button size="small">停用</Button>
-                      </Popconfirm>
-                    ) : (
-                      <Popconfirm
-                        title="确认启用该模板包？"
-                        description="启用后可用于新建流程实例。"
-                        okText="启用"
-                        cancelText="取消"
-                        onConfirm={() => void handleUpdateStatus(row, 'ACTIVE')}
-                      >
-                        <Button size="small" type="primary">启用</Button>
-                      </Popconfirm>
-                    )}
-                  </Space>
-                ),
-              },
-            ]}
-          />
+                  ),
+                },
+                { title: '场景分类', dataIndex: 'scene_category', width: 180, ellipsis: true },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 100,
+                  render: (value: WorkflowTemplateStatus) => <Tag color={statusTagColor(value)}>{statusLabel(value)}</Tag>,
+                },
+                { title: '排序值', dataIndex: 'sort_order', width: 100 },
+                { title: '版本', dataIndex: 'version', width: 90 },
+                {
+                  title: '操作',
+                  width: 260,
+                  render: (_: unknown, row: any) => (
+                    <Space size={6} wrap>
+                      <Button size="small" onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>节点编排</Button>
+                      <Button size="small" icon={<CopyOutlined />} onClick={() => void handleCopy(row)}>复制</Button>
+                      {row.status === 'ACTIVE' ? (
+                        <Popconfirm
+                          title="确认停用该模板包？"
+                          description="停用后将无法用于新建流程实例。"
+                          okText="停用"
+                          cancelText="取消"
+                          onConfirm={() => void handleUpdateStatus(row, 'DISABLED')}
+                        >
+                          <Button size="small">停用</Button>
+                        </Popconfirm>
+                      ) : (
+                        <Popconfirm
+                          title="确认启用该模板包？"
+                          description="启用后可用于新建流程实例。"
+                          okText="启用"
+                          cancelText="取消"
+                          onConfirm={() => void handleUpdateStatus(row, 'ACTIVE')}
+                        >
+                          <Button size="small" type="primary">启用</Button>
+                        </Popconfirm>
+                      )}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          </div>
+
+          <div
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '12px 16px 16px',
+              borderTop: '1px solid #f0f0f0',
+              background: '#fff',
+            }}
+          >
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={size}
+              total={filteredPackages.length}
+              showSizeChanger
+              showTotal={(count) => formatPaginationTotal(count)}
+              onChange={(page, pageSize) => {
+                setCurrent(page);
+                setSize(pageSize);
+              }}
+            />
+          </div>
         </div>
       </Card>
 
