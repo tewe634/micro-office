@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Select, Space, Table, Tag, message } from 'antd';
+import { Alert, Button, Card, Pagination, Select, Space, Table, Tag, message } from 'antd';
 import { CopyOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { portalBlockTemplateAdminApi, type PortalBlockTemplateStatus } from '../../api';
+import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const statusOptions: Array<{ value: PortalBlockTemplateStatus; label: string }> = [
-  { value: 'DRAFT', label: 'DRAFT' },
-  { value: 'ACTIVE', label: 'ACTIVE' },
-  { value: 'INACTIVE', label: 'INACTIVE' },
+  { value: 'DRAFT', label: '草稿' },
+  { value: 'ACTIVE', label: '启用' },
+  { value: 'INACTIVE', label: '停用' },
 ];
 
 function statusColor(status: PortalBlockTemplateStatus) {
@@ -16,11 +17,19 @@ function statusColor(status: PortalBlockTemplateStatus) {
   return 'default';
 }
 
+function statusLabel(status: PortalBlockTemplateStatus) {
+  if (status === 'ACTIVE') return '启用';
+  if (status === 'DRAFT') return '草稿';
+  return '停用';
+}
+
 export default function AdminPortalBlockTemplatePage() {
   const nav = useNavigate();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [status, setStatus] = useState<PortalBlockTemplateStatus | undefined>();
+  const [current, setCurrent] = useState(1);
+  const [size, setSize] = useState(20);
 
   const contractIssues = useMemo(() => {
     const invalidNames = items
@@ -29,6 +38,11 @@ export default function AdminPortalBlockTemplatePage() {
     if (!invalidNames.length) return [];
     return ['后端返回的卡片资产名称仍包含 legacy/UUID 技术命名，需由后端或数据库修正 name，前端未做清洗兜底。'];
   }, [items]);
+
+  const pagedItems = useMemo(() => {
+    const start = (current - 1) * size;
+    return items.slice(start, start + size);
+  }, [items, current, size]);
 
   const load = async (nextStatus = status) => {
     setLoading(true);
@@ -48,6 +62,17 @@ export default function AdminPortalBlockTemplatePage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    setCurrent(1);
+  }, [status]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(items.length / size));
+    if (current > maxPage) {
+      setCurrent(maxPage);
+    }
+  }, [items.length, current, size]);
+
   const handleCopy = async (id: string) => {
     try {
       const resp: any = await portalBlockTemplateAdminApi.copyTemplate(id);
@@ -64,7 +89,7 @@ export default function AdminPortalBlockTemplatePage() {
   const handleStatus = async (id: string, nextStatus: PortalBlockTemplateStatus) => {
     try {
       await portalBlockTemplateAdminApi.updateStatus(id, nextStatus);
-      message.success(`状态已更新为 ${nextStatus}`);
+      message.success(`状态已更新为${statusLabel(nextStatus)}`);
       await load();
     } catch (error: any) {
       message.error(error?.response?.data?.message || '状态更新失败');
@@ -105,68 +130,95 @@ export default function AdminPortalBlockTemplatePage() {
           </Space>
         </div>
 
-        <div className="fixed-table-page__table">
-          <Table
-            rowKey="id"
-            loading={loading}
-            size="small"
-            pagination={false}
-            dataSource={items}
-            scroll={{ x: 1080, y: 'calc(100dvh - 320px)' }}
-            columns={[
-              {
-                title: '卡片块',
-                width: 260,
-                render: (_: any, row: any) => (
-                  <Button type="link" style={{ paddingInline: 0, fontWeight: 700 }} onClick={() => nav(`/admin/portal-block-templates/${row.id}`)}>
-                    {row.name}
-                  </Button>
-                ),
-              },
-              {
-                title: '状态',
-                dataIndex: 'status',
-                width: 120,
-                render: (value: PortalBlockTemplateStatus) => <Tag color={statusColor(value)}>{value}</Tag>,
-              },
-              {
-                title: '展示类型',
-                dataIndex: 'displayType',
-                width: 120,
-              },
-              {
-                title: '数据键',
-                dataIndex: 'dataKey',
-                width: 180,
-              },
-              {
-                title: '标题',
-                dataIndex: 'label',
-                width: 220,
-              },
-              {
-                title: '引用次数',
-                dataIndex: 'referenceCount',
-                width: 100,
-                render: (value: any) => value ?? 0,
-              },
-              {
-                title: '操作',
-                width: 320,
-                render: (_: any, row: any) => (
-                  <Space wrap>
-                    <Button size="small" onClick={() => nav(`/admin/portal-block-templates/${row.id}`)}>编辑</Button>
-                    <Button size="small" icon={<CopyOutlined />} onClick={() => void handleCopy(row.id)}>复制</Button>
-                    {row.status !== 'ACTIVE' ? (
-                      <Button size="small" onClick={() => void handleStatus(row.id, 'ACTIVE')}>启用</Button>
-                    ) : (
-                      <Button size="small" onClick={() => void handleStatus(row.id, 'INACTIVE')}>停用</Button>
-                    )}
-                  </Space>
-                ),
-              },
-            ]}
-          />
+        <div className="fixed-table-page__frame" style={{ borderRadius: 12 }}>
+          <div className="fixed-table-page__table">
+            <Table
+              rowKey="id"
+              loading={loading}
+              size="small"
+              pagination={false}
+              dataSource={pagedItems}
+              tableLayout="fixed"
+              scroll={{ x: 1080, y: 'calc(100dvh - 360px)' }}
+              columns={[
+                {
+                  title: '序号',
+                  key: 'index',
+                  width: 72,
+                  render: (_: any, __: any, index: number) => (current - 1) * size + index + 1,
+                },
+                {
+                  title: '卡片块',
+                  width: 220,
+                  render: (_: any, row: any) => (
+                    <Button type="link" style={{ paddingInline: 0, fontWeight: 700 }} onClick={() => nav(`/admin/portal-block-templates/${row.id}`)}>
+                      {row.name}
+                    </Button>
+                  ),
+                },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 100,
+                  render: (value: PortalBlockTemplateStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
+                },
+                {
+                  title: '展示类型',
+                  dataIndex: 'displayType',
+                  width: 120,
+                  ellipsis: true,
+                },
+                {
+                  title: '数据键',
+                  dataIndex: 'dataKey',
+                  width: 180,
+                  ellipsis: true,
+                },
+                {
+                  title: '标题',
+                  dataIndex: 'label',
+                  width: 220,
+                  ellipsis: true,
+                },
+                {
+                  title: '引用次数',
+                  dataIndex: 'referenceCount',
+                  width: 100,
+                  render: (value: any) => value ?? 0,
+                },
+                {
+                  title: '操作',
+                  width: 220,
+                  render: (_: any, row: any) => (
+                    <Space size={6} wrap>
+                      <Button size="small" onClick={() => nav(`/admin/portal-block-templates/${row.id}`)}>编辑</Button>
+                      <Button size="small" icon={<CopyOutlined />} onClick={() => void handleCopy(row.id)}>复制</Button>
+                      {row.status !== 'ACTIVE' ? (
+                        <Button size="small" onClick={() => void handleStatus(row.id, 'ACTIVE')}>启用</Button>
+                      ) : (
+                        <Button size="small" onClick={() => void handleStatus(row.id, 'INACTIVE')}>停用</Button>
+                      )}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          </div>
+
+          <div className="fixed-table-page__footer">
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={size}
+              total={items.length}
+              showSizeChanger
+              showTotal={(count) => formatPaginationTotal(count)}
+              onChange={(page, pageSize) => {
+                setCurrent(page);
+                setSize(pageSize);
+              }}
+            />
+          </div>
         </div>
       </Card>
     </div>
