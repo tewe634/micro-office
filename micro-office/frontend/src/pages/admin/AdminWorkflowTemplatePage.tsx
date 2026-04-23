@@ -169,7 +169,6 @@ export default function AdminWorkflowTemplatePage() {
               },
               { title: '排序值', dataIndex: 'sort_order', width: 100 },
               { title: '版本', dataIndex: 'version', width: 90 },
-              { title: '更新时间', dataIndex: 'updated_at', width: 200 },
               {
                 title: '操作',
                 width: 320,
