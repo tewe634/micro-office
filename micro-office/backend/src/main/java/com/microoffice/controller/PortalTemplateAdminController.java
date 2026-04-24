@@ -1088,6 +1088,7 @@ public class PortalTemplateAdminController {
     }
 
     private void saveTemplateSections(String templateId, List<Map<String, Object>> sections, String currentUserId) {
+        Map<String, Object> templateContext = loadTemplateCompatibilityContext(templateId);
         jdbc.update("DELETE FROM mo_portal_template_sections WHERE template_id = ?", templateId);
         for (Map<String, Object> section : sections) {
             String sectionId = persistentId(asString(section.get("id")));
@@ -1119,6 +1120,8 @@ public class PortalTemplateAdminController {
                 if (!"ACTIVE".equals(asString(blockTemplate.get("status")))) {
                     throw new IllegalArgumentException("仅允许引用 ACTIVE 块模板");
                 }
+                boolean enabled = asBoolean(readField(blockRef, "enabled", "enabled"), true);
+                validateEnabledBlockRefCompatibility(templateContext, blockTemplate, enabled);
                 jdbc.update(
                     "INSERT INTO mo_portal_template_block_refs (id, template_id, section_id, block_template_id, sort_order, enabled, override_meta, created_by, updated_by) " +
                         "VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)",
@@ -1127,7 +1130,7 @@ public class PortalTemplateAdminController {
                     sectionId,
                     blockTemplateId,
                     asInt(readField(blockRef, "sortOrder", "sort_order"), 0),
-                    asBoolean(readField(blockRef, "enabled", "enabled"), true),
+                    enabled,
                     toJson(asMap(readField(blockRef, "overrideMeta", "override_meta"))),
                     currentUserId,
                     currentUserId
@@ -1267,7 +1270,7 @@ public class PortalTemplateAdminController {
     private Map<String, Object> requireActiveBlockTemplate(String blockTemplateId) {
         try {
             Map<String, Object> row = jdbc.queryForMap(
-                "SELECT id, status FROM mo_portal_block_templates WHERE id = ?",
+                "SELECT id, code, name, label, data_key, status FROM mo_portal_block_templates WHERE id = ?",
                 blockTemplateId
             );
             String status = asString(row.get("status"));
@@ -1287,6 +1290,54 @@ public class PortalTemplateAdminController {
             || readField(blockRef, "actions", "actions") != null) {
             throw new IllegalArgumentException("块引用不允许覆盖 displayType/dataKey/actions");
         }
+    }
+
+    private Map<String, Object> loadTemplateCompatibilityContext(String templateId) {
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                "SELECT id, code, name, meta FROM mo_portal_templates WHERE id = ?",
+                templateId
+            );
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("id", asString(row.get("id")));
+            result.put("code", asString(row.get("code")));
+            result.put("name", asString(row.get("name")));
+            result.put("meta", toJsonMap(row.get("meta")));
+            return result;
+        } catch (EmptyResultDataAccessException ex) {
+            throw new IllegalArgumentException("模板不存在");
+        }
+    }
+
+    private void validateEnabledBlockRefCompatibility(Map<String, Object> templateContext,
+                                                      Map<String, Object> blockTemplate,
+                                                      boolean enabled) {
+        if (!enabled) {
+            return;
+        }
+        String dataKey = asNullableString(blockTemplate.get("data_key"));
+        if (!hasText(dataKey)) {
+            return;
+        }
+        if (dataKey.trim().toLowerCase(Locale.ROOT).startsWith("ceo.")
+            && !isCeoTemplateDefinition(asNullableString(templateContext.get("code")), asMap(templateContext.get("meta")))) {
+            String blockName = firstNonBlank(
+                asNullableString(blockTemplate.get("label")),
+                asNullableString(blockTemplate.get("name")),
+                asNullableString(blockTemplate.get("code")),
+                dataKey
+            );
+            throw new IllegalArgumentException("块模板「" + blockName + "」(" + dataKey + ") 仅允许 CEO 模板引用");
+        }
+    }
+
+    private boolean isCeoTemplateDefinition(String templateCode, Map<String, Object> templateMeta) {
+        Map<String, Object> safeMeta = templateMeta == null ? Map.of() : templateMeta;
+        String layoutMode = asNullableString(safeMeta.get("layout_mode"));
+        String designIntent = asNullableString(safeMeta.get("designIntent"));
+        return "ceo-dashboard-v1".equalsIgnoreCase(layoutMode)
+            || "executive-decision-dashboard".equalsIgnoreCase(designIntent)
+            || Objects.toString(templateCode, "").toUpperCase(Locale.ROOT).contains("CEO");
     }
 
     private Object readField(Map<String, Object> source, String camelKey, String snakeKey) {
