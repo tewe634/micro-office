@@ -22,7 +22,7 @@ const { Header, Sider, Content } = Layout;
 const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
   '/org': { icon: <TeamOutlined />, label: '组织架构' },
   '/users': { icon: <UserOutlined />, label: '人员管理' },
-  '/objects': { icon: <ContactsOutlined />, label: '外部对象' },
+  '/objects': { icon: <ContactsOutlined />, label: '客户&对象' },
   '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
   '/admin/permissions': { icon: <SettingOutlined />, label: '权限配置' },
 };
@@ -30,7 +30,7 @@ const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
 const pageTitles: Record<string, string> = {
   '/org': '公司整体组织架构',
   '/users': '人员管理',
-  '/objects': '外部对象管理',
+  '/objects': '客户&对象管理',
   '/products': '产品与服务',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
@@ -72,7 +72,7 @@ function resolveSelectedKey(pathname: string) {
 function resolvePageTitle(pathname: string) {
   if (/^\/users\/[^/]+\/portal\/details\/[^/]+$/.test(pathname)) return '人员门户详情';
   if (/^\/users\/[^/]+\/portal$/.test(pathname)) return '人员门户';
-  if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '外部对象门户';
+  if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '客户&对象门户';
   if (/^\/products\/[^/]+\/portal$/.test(pathname)) return '产品门户';
   if (/^\/admin\/portal-templates\/[^/]+\/preview$/.test(pathname)) return '预览门户模板';
   if (/^\/admin\/portal-templates\/[^/]+$/.test(pathname)) return '门户管理';

@@ -179,7 +179,7 @@ public class ObjectController {
             }
             String normalizedOrgId = findObjectRootOrgId(obj.getOrgId(), allNodes);
             if (normalizedOrgId == null) {
-                throw badRequest("所属组织不在外部对象可用组织架构内");
+                throw badRequest("所属组织不在客户&对象可用组织架构内");
             }
             if (!normalizedOrgId.equals(obj.getOrgId())) {
                 if (obj.getDeptId() == null) {
@@ -200,7 +200,7 @@ public class ObjectController {
             }
             String departmentOrgId = findObjectRootOrgId(obj.getDeptId(), allNodes);
             if (departmentOrgId == null) {
-                throw badRequest("所属部门不在外部对象可用组织架构内");
+                throw badRequest("所属部门不在客户&对象可用组织架构内");
             }
             if (isObjectRootOrg(deptNode)) {
                 if (obj.getOrgId() == null || obj.getDeptId().equals(obj.getOrgId())) {
@@ -220,7 +220,7 @@ public class ObjectController {
             OrgNode orgNode = allNodes.get(obj.getOrgId());
             String normalizedOrgId = findObjectRootOrgId(obj.getOrgId(), allNodes);
             if (orgNode == null || normalizedOrgId == null || !normalizedOrgId.equals(obj.getOrgId()) || !isObjectRootOrg(orgNode)) {
-                throw badRequest("所属组织必须选择外部对象可用组织");
+                throw badRequest("所属组织必须选择客户&对象可用组织");
             }
         }
     }

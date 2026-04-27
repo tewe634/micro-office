@@ -63,7 +63,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/positions/**").hasAnyRole("HR", "ADMIN")
                 // 系统管理: 仅 ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // 外部对象: 登录即可访问（具体范围在业务侧控制）
+                // 客户&对象: 登录即可访问（具体范围在业务侧控制）
                 .requestMatchers("/api/objects/**").authenticated()
                 .anyRequest().authenticated()
             )
