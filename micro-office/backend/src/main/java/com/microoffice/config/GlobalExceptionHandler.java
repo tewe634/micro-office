@@ -109,7 +109,7 @@ public class GlobalExceptionHandler {
         }
         return switch (message) {
             case "must not be blank", "must not be null" -> field + " 不能为空";
-            default -> field + " " + message;
+            default -> message;
         };
     }
 
@@ -121,7 +121,7 @@ public class GlobalExceptionHandler {
         }
         return switch (message) {
             case "must not be blank", "must not be null" -> path + " 不能为空";
-            default -> path + " " + message;
+            default -> message;
         };
     }
 }
