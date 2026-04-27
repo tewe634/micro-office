@@ -23,7 +23,7 @@ const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
   '/org': { icon: <TeamOutlined />, label: '组织架构' },
   '/users': { icon: <UserOutlined />, label: '人员管理' },
   '/objects': { icon: <ContactsOutlined />, label: '客户&对象' },
-  '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
+  '/products': { icon: <ShoppingOutlined />, label: '产品&服务' },
   '/admin/permissions': { icon: <SettingOutlined />, label: '权限配置' },
 };
 
@@ -31,7 +31,7 @@ const pageTitles: Record<string, string> = {
   '/org': '公司整体组织架构',
   '/users': '人员管理',
   '/objects': '客户&对象管理',
-  '/products': '产品与服务',
+  '/products': '产品&服务',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
   '/admin/workflow-node-features': '工作节点模版管理',

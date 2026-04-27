@@ -26,7 +26,7 @@ const roleColorMap: Record<string, string> = {
 const menus = [
   { key: '/users', label: '人员管理' },
   { key: '/objects', label: '客户&对象' },
-  { key: '/products', label: '产品服务' },
+  { key: '/products', label: '产品&服务' },
   { key: '/admin', label: '系统管理' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
