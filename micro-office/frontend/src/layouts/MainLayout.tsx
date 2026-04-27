@@ -70,8 +70,6 @@ function resolveSelectedKey(pathname: string) {
 }
 
 function resolvePageTitle(pathname: string) {
-  if (/^\/users\/[^/]+\/portal\/details\/[^/]+$/.test(pathname)) return '人员门户详情';
-  if (/^\/users\/[^/]+\/portal$/.test(pathname)) return '人员门户';
   if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '客户&对象门户';
   if (/^\/products\/[^/]+\/portal$/.test(pathname)) return '产品门户';
   if (/^\/admin\/portal-templates\/[^/]+\/preview$/.test(pathname)) return '预览门户模板';
