@@ -43,9 +43,9 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((request, response, ex) ->
-                    writeJson(response, HttpStatus.UNAUTHORIZED, ApiResponse.error(401, "未登录或登录已失效")))
+                    writeJson(response, HttpStatus.UNAUTHORIZED, ApiResponse.error(401, "未登录或登录已失效", "UNAUTHORIZED")))
                 .accessDeniedHandler((request, response, ex) ->
-                    writeJson(response, HttpStatus.FORBIDDEN, ApiResponse.error(403, "无权限访问")))
+                    writeJson(response, HttpStatus.FORBIDDEN, ApiResponse.error(403, "无权限访问", "FORBIDDEN")))
             )
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()

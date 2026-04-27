@@ -82,7 +82,24 @@ class AuthControllerValidationTest {
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message").value("登录账号不能为空"));
+            .andExpect(jsonPath("$.message").value("登录账号不能为空"))
+            .andExpect(jsonPath("$.errorType").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.field").value("email"))
+            .andExpect(jsonPath("$.errors[0].field").value("email"))
+            .andExpect(jsonPath("$.errors[0].message").value("登录账号不能为空"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void loginShouldReturnStructuredErrorWhenJsonInvalid() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{bad json"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("请求体格式错误或字段类型不匹配"))
+            .andExpect(jsonPath("$.errorType").value("REQUEST_BODY_INVALID"));
 
         verifyNoInteractions(authService);
     }
