@@ -36,8 +36,14 @@ type OrgPageTabKey = 'org' | 'users' | 'positions';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
-const ROOT_DISPLAY_LEADER_NAME = '杨筱辉';
+const FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
+  总经办: ['杨筱辉'],
+  产品支持体系: ['杨筱辉'],
+  销售体系: ['杨筱辉'],
+};
 const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
+  产品支持体系: ['杨筱辉'],
+  销售体系: ['杨筱辉'],
   管理体系: ['王舟珍'],
   财务部: ['王舟珍'],
   业务数字化: ['杨筱辉'],
@@ -45,7 +51,7 @@ const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
 };
 
 function shouldHideMemberSection(depth: number) {
-  return depth <= 3;
+  return depth <= 2;
 }
 
 function dedupeUsers(list: OrgUser[]) {
@@ -489,8 +495,9 @@ function OrgChartNode({
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
   const showMemberSection = !shouldHideMemberSection(depth);
-  const leaderSourceUsers = isRoot
-    ? users.filter(user => user.name === ROOT_DISPLAY_LEADER_NAME)
+  const fixedLeaderNames = FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME[node.name] || [];
+  const leaderSourceUsers = fixedLeaderNames.length > 0
+    ? users.filter(user => fixedLeaderNames.includes(user.name))
     : showMemberSection
       ? users
       : sortUsers(dedupeUsers([
