@@ -6,7 +6,12 @@ import { useAuthStore } from '../../store/auth';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
-export default function UserTab() {
+type UserTabProps = {
+  orgId?: string;
+  onOrgIdChange?: (orgId?: string) => void;
+};
+
+export default function UserTab({ orgId, onOrgIdChange }: UserTabProps) {
   const role = useAuthStore(s => s.role);
   const canManagePersonnel = role === 'ADMIN' || role === 'HR';
   const [users, setUsers] = useState<any[]>([]);
@@ -17,7 +22,9 @@ export default function UserTab() {
   const [orgs, setOrgs] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [filterOrg, setFilterOrg] = useState<any>();
+  const [internalFilterOrg, setInternalFilterOrg] = useState<string | undefined>();
+  const isOrgFilterControlled = typeof onOrgIdChange === 'function' || orgId !== undefined;
+  const filterOrg = isOrgFilterControlled ? orgId : internalFilterOrg;
 
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
@@ -88,8 +95,15 @@ export default function UserTab() {
             optionFilterProp="label"
             placeholder="按组织筛选"
             style={{ width: 220 }}
+            value={filterOrg}
             options={orgs.map(o => ({ value: o.id, label: o.name }))}
-            onChange={v => setFilterOrg(v)}
+            onChange={(value) => {
+              const nextValue = value as string | undefined;
+              if (!isOrgFilterControlled) {
+                setInternalFilterOrg(nextValue);
+              }
+              onOrgIdChange?.(nextValue);
+            }}
           />
           <div className="page-toolbar-right">
             {canManagePersonnel ? <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button> : null}

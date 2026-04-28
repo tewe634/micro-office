@@ -24,7 +24,7 @@ const roleColorMap: Record<string, string> = {
 };
 
 const menus = [
-  { key: '/users', label: '人员管理' },
+  { key: '/users', label: '人员/岗位' },
   { key: '/objects', label: '客户&对象' },
   { key: '/products', label: '产品&服务' },
   { key: '/admin', label: '系统管理' },
@@ -84,7 +84,7 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
 
   return (
     <div className="page-fill" style={{ gap: 16 }}>
-      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织架构模块固定为全员可见；人员管理仍走权限配置，与组织架构查看权限相互独立。</p>
+      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织标签固定为全员可见；人员/岗位标签仍走权限配置，与组织架构查看权限相互独立。</p>
       <div className="page-card-scroll">
         <Table
           dataSource={menus}
