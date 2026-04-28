@@ -117,7 +117,7 @@ function buildDisplayUsersByOrg(
     specialLeaderUserIdsByOrg.set(org.id, specialLeaderIds);
   });
 
-  return { usersByOrg, specialLeaderUserIdsByOrg };
+  return { usersByOrg, directUsersByOrg, specialLeaderUserIdsByOrg };
 }
 
 const orgChartStyles = `
@@ -454,6 +454,7 @@ function OrgChartNode({
   depth,
   childrenMap,
   usersByOrg,
+  directUsersByOrg,
   specialLeaderUserIdsByOrg,
   expandedKeys,
   onToggle,
@@ -469,6 +470,7 @@ function OrgChartNode({
   depth: number;
   childrenMap: Map<string | null, OrgItem[]>;
   usersByOrg: Map<string, OrgUser[]>;
+  directUsersByOrg: Map<string, OrgUser[]>;
   specialLeaderUserIdsByOrg: Map<string, Set<string>>;
   expandedKeys: string[];
   onToggle: (id: string) => void;
@@ -481,13 +483,20 @@ function OrgChartNode({
 }) {
   const children = childrenMap.get(node.id) || [];
   const users = usersByOrg.get(node.id) || [];
+  const directUsers = directUsersByOrg.get(node.id) || [];
   const specialLeaderUserIds = specialLeaderUserIdsByOrg.get(node.id) || new Set<string>();
-  const leaderUsers = dedupeUsers(users.filter(user => user.leaderCandidate || specialLeaderUserIds.has(user.id)));
-  const leaderUserIds = new Set(leaderUsers.map(user => user.id));
-  const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
   const showMemberSection = !shouldHideMemberSection(depth);
+  const leaderSourceUsers = isRoot || showMemberSection
+    ? users
+    : sortUsers(dedupeUsers([
+        ...directUsers,
+        ...users.filter(user => specialLeaderUserIds.has(user.id)),
+      ]));
+  const leaderUsers = dedupeUsers(leaderSourceUsers.filter(user => user.leaderCandidate || specialLeaderUserIds.has(user.id)));
+  const leaderUserIds = new Set(leaderUsers.map(user => user.id));
+  const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
 
   return (
     <div className="org-node-wrap">
@@ -565,6 +574,7 @@ function OrgChartNode({
                 depth={depth + 1}
                 childrenMap={childrenMap}
                 usersByOrg={usersByOrg}
+                directUsersByOrg={directUsersByOrg}
                 specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
                 expandedKeys={expandedKeys}
                 onToggle={onToggle}
@@ -622,7 +632,7 @@ export default function OrgPage() {
     return orgs.find(item => !item.parentId) || null;
   }, [orgs]);
 
-  const { usersByOrg, specialLeaderUserIdsByOrg } = useMemo(() => {
+  const { usersByOrg, directUsersByOrg, specialLeaderUserIdsByOrg } = useMemo(() => {
     return buildDisplayUsersByOrg(orgs, orgUsers, rootOrg?.id, childrenMap);
   }, [childrenMap, orgUsers, orgs, rootOrg?.id]);
 
@@ -824,6 +834,7 @@ export default function OrgPage() {
                                   depth={1}
                                   childrenMap={childrenMap}
                                   usersByOrg={usersByOrg}
+                                  directUsersByOrg={directUsersByOrg}
                                   specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
                                   expandedKeys={expandedKeys}
                                   onToggle={toggleExpanded}
