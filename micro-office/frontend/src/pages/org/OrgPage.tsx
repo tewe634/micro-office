@@ -40,18 +40,21 @@ const FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   总经办: ['杨筱辉'],
   产品支持体系: ['杨筱辉'],
   销售体系: ['杨筱辉'],
+  商务部: ['吴敏'],
 };
 const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   产品支持体系: ['杨筱辉'],
   销售体系: ['杨筱辉'],
   管理体系: ['王舟珍'],
   财务部: ['王舟珍'],
+  商务部: ['吴敏'],
   业务数字化: ['杨筱辉'],
   生产成套部: ['方俊锋'],
 };
+const HIDE_MEMBER_SECTION_ORG_NAMES = new Set(['商务部']);
 
-function shouldHideMemberSection(depth: number) {
-  return depth <= 2;
+function shouldHideMemberSection(depth: number, nodeName: string) {
+  return depth <= 2 || HIDE_MEMBER_SECTION_ORG_NAMES.has(nodeName);
 }
 
 function dedupeUsers(list: OrgUser[]) {
@@ -494,7 +497,7 @@ function OrgChartNode({
   const specialLeaderUserIds = specialLeaderUserIdsByOrg.get(node.id) || new Set<string>();
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
-  const showMemberSection = !shouldHideMemberSection(depth);
+  const showMemberSection = !shouldHideMemberSection(depth, node.name);
   const fixedLeaderNames = FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME[node.name] || [];
   const leaderSourceUsers = fixedLeaderNames.length > 0
     ? users.filter(user => fixedLeaderNames.includes(user.name))
