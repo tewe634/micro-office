@@ -41,6 +41,9 @@ const FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   产品支持体系: ['杨筱辉'],
   销售体系: ['杨筱辉'],
   商务部: ['吴敏'],
+  业务一部: ['严春南'],
+  业务二部: ['张巨根'],
+  业务三部: ['吕跃水'],
 };
 const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   产品支持体系: ['杨筱辉'],
@@ -48,10 +51,13 @@ const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   管理体系: ['王舟珍'],
   财务部: ['王舟珍'],
   商务部: ['吴敏'],
+  业务一部: ['严春南'],
+  业务二部: ['张巨根'],
+  业务三部: ['吕跃水'],
   业务数字化: ['杨筱辉'],
   生产成套部: ['方俊锋'],
 };
-const HIDE_MEMBER_SECTION_ORG_NAMES = new Set(['商务部']);
+const HIDE_MEMBER_SECTION_ORG_NAMES = new Set(['商务部', '业务一部', '业务二部', '业务三部']);
 
 function shouldHideMemberSection(depth: number, nodeName: string) {
   return depth <= 2 || HIDE_MEMBER_SECTION_ORG_NAMES.has(nodeName);
