@@ -455,7 +455,7 @@ function PersonCard({ user, onClick, showLeaderTag }: { user: OrgUser; onClick: 
     <button type="button" className="org-person-card" onClick={() => onClick(user)}>
       <div className="org-person-card__top">
         <span className="org-person-card__name">{user.name}</span>
-        {showLeaderTag || user.leaderCandidate ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
+        {showLeaderTag ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
       </div>
       <div className="org-person-card__meta">
         <span>主岗位：{user.primary_position_name || '-'}</span>
