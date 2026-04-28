@@ -44,6 +44,7 @@ const FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   业务一部: ['严春南'],
   业务二部: ['张巨根'],
   业务三部: ['吕跃水'],
+  技术支持: ['方俊锋'],
 };
 const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   产品支持体系: ['杨筱辉'],
@@ -55,6 +56,7 @@ const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   业务二部: ['张巨根'],
   业务三部: ['吕跃水'],
   业务数字化: ['杨筱辉'],
+  技术支持: ['方俊锋'],
   生产成套部: ['方俊锋'],
 };
 const HIDE_MEMBER_SECTION_ORG_NAMES = new Set(['商务部', '业务一部', '业务二部', '业务三部']);
