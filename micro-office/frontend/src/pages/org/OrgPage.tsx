@@ -36,6 +36,7 @@ type OrgPageTabKey = 'org' | 'users' | 'positions';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
+const ROOT_DISPLAY_LEADER_NAME = '杨筱辉';
 const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   管理体系: ['王舟珍'],
   财务部: ['王舟珍'],
@@ -488,12 +489,14 @@ function OrgChartNode({
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
   const showMemberSection = !shouldHideMemberSection(depth);
-  const leaderSourceUsers = isRoot || showMemberSection
-    ? users
-    : sortUsers(dedupeUsers([
-        ...directUsers,
-        ...users.filter(user => specialLeaderUserIds.has(user.id)),
-      ]));
+  const leaderSourceUsers = isRoot
+    ? users.filter(user => user.name === ROOT_DISPLAY_LEADER_NAME)
+    : showMemberSection
+      ? users
+      : sortUsers(dedupeUsers([
+          ...directUsers,
+          ...users.filter(user => specialLeaderUserIds.has(user.id)),
+        ]));
   const leaderUsers = dedupeUsers(leaderSourceUsers.filter(user => user.leaderCandidate || specialLeaderUserIds.has(user.id)));
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
