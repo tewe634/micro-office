@@ -43,8 +43,8 @@ const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   生产成套部: ['方俊锋'],
 };
 
-function shouldHideMemberSection(isRoot = false) {
-  return isRoot;
+function shouldHideMemberSection(depth: number) {
+  return depth <= 3;
 }
 
 function dedupeUsers(list: OrgUser[]) {
@@ -451,6 +451,7 @@ function PersonCard({ user, onClick, showLeaderTag }: { user: OrgUser; onClick: 
 function OrgChartNode({
   node,
   rootId,
+  depth,
   childrenMap,
   usersByOrg,
   specialLeaderUserIdsByOrg,
@@ -465,6 +466,7 @@ function OrgChartNode({
 }: {
   node: OrgItem;
   rootId?: string;
+  depth: number;
   childrenMap: Map<string | null, OrgItem[]>;
   usersByOrg: Map<string, OrgUser[]>;
   specialLeaderUserIdsByOrg: Map<string, Set<string>>;
@@ -485,7 +487,7 @@ function OrgChartNode({
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
-  const showMemberSection = !shouldHideMemberSection(isRoot);
+  const showMemberSection = !shouldHideMemberSection(depth);
 
   return (
     <div className="org-node-wrap">
@@ -560,6 +562,7 @@ function OrgChartNode({
               <OrgChartNode
                 node={child}
                 rootId={rootId}
+                depth={depth + 1}
                 childrenMap={childrenMap}
                 usersByOrg={usersByOrg}
                 specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
@@ -818,6 +821,7 @@ export default function OrgPage() {
                                 <OrgChartNode
                                   node={rootOrg}
                                   rootId={rootOrg.id}
+                                  depth={1}
                                   childrenMap={childrenMap}
                                   usersByOrg={usersByOrg}
                                   specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
