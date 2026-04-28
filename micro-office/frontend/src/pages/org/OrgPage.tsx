@@ -45,6 +45,7 @@ const FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   业务二部: ['张巨根'],
   业务三部: ['吕跃水'],
   技术支持: ['方俊锋'],
+  生产成套部: ['方俊锋'],
 };
 const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
   产品支持体系: ['杨筱辉'],
