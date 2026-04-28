@@ -19,15 +19,15 @@ import { buildAllowedMenus, canAccessMenu } from '../constants/routes';
 const { Header, Sider, Content } = Layout;
 
 const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
-  '/org': { icon: <TeamOutlined />, label: '组织架构' },
+  '/org': { icon: <TeamOutlined />, label: '人员&组织' },
   '/objects': { icon: <ContactsOutlined />, label: '客户&对象' },
   '/products': { icon: <ShoppingOutlined />, label: '产品&服务' },
   '/admin/permissions': { icon: <SettingOutlined />, label: '权限配置' },
 };
 
 const pageTitles: Record<string, string> = {
-  '/org': '组织架构',
-  '/users': '组织架构',
+  '/org': '人员&组织',
+  '/users': '人员&组织',
   '/objects': '客户&对象管理',
   '/products': '产品&服务',
   '/admin/permissions': '权限配置',
