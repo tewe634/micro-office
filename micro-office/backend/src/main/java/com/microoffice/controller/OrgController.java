@@ -36,7 +36,6 @@ public class OrgController {
             "LEFT JOIN position p ON p.id = su.primary_position_id " +
             "LEFT JOIN user_position up ON up.user_id = su.id " +
             "LEFT JOIN position p2 ON p2.id = up.position_id " +
-            "WHERE su.org_id IS NOT NULL " +
             "GROUP BY su.id, su.name, su.email, su.phone, su.emp_no, su.org_id, o.name, su.role, su.hired_at, su.primary_position_id, p.name " +
             "ORDER BY su.org_id, su.name"
         );
@@ -48,6 +47,7 @@ public class OrgController {
                 String role = user.get("role") == null ? null : String.valueOf(user.get("role"));
                 user.put("leaderCandidate", isLeaderCandidate(positionName, extraPositionNames, role));
             })
+            .filter(user -> user.get("org_id") != null)
             .collect(Collectors.groupingBy(row -> String.valueOf(row.get("org_id")), LinkedHashMap::new, Collectors.toList()));
 
         Map<String, Object> result = new LinkedHashMap<>();

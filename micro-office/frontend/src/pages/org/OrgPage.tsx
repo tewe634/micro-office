@@ -22,7 +22,7 @@ type OrgUser = {
   email?: string | null;
   phone?: string | null;
   emp_no?: string | null;
-  org_id: string;
+  org_id: string | null;
   org_name?: string | null;
   role?: string | null;
   hired_at?: string | null;
@@ -36,19 +36,15 @@ type OrgPageTabKey = 'org' | 'users' | 'positions';
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
-const FIXED_LEADER_NAME = '杨筱辉';
-const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['产品支持体系', '管理体系', '销售体系', '销售体系业务一部', '销售体系业务二部', '销售体系业务三部', '业务一部', '业务二部', '业务三部', '商务部']);
-const FIXED_LEADER_NODE_NAMES = new Set(['产品支持体系', '销售体系']);
+const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
+  管理体系: ['王舟珍'],
+  财务部: ['王舟珍'],
+  业务数字化: ['杨筱辉'],
+  生产成套部: ['方俊锋'],
+};
 
-function isBusinessSpecialist(user: OrgUser) {
-  return (user.primary_position_name || '').includes('商务专员') || (user.extra_position_names || '').includes('商务专员');
-}
-
-function shouldHideMemberSection(nodeName: string, isRoot = false) {
-  return isRoot
-    || HIDE_MEMBER_SECTION_NODE_NAMES.has(nodeName)
-    || /^销售体系业务[一二三123]部$/.test(nodeName)
-    || /^业务[一二三123]部$/.test(nodeName);
+function shouldHideMemberSection(isRoot = false) {
+  return isRoot;
 }
 
 function dedupeUsers(list: OrgUser[]) {
@@ -58,6 +54,70 @@ function dedupeUsers(list: OrgUser[]) {
     seen.add(user.id);
     return true;
   });
+}
+
+function sortUsers(list: OrgUser[]) {
+  return [...list].sort((a, b) => {
+    if (!!b.leaderCandidate !== !!a.leaderCandidate) {
+      return Number(b.leaderCandidate) - Number(a.leaderCandidate);
+    }
+    return a.name.localeCompare(b.name, 'zh-CN');
+  });
+}
+
+function collectSubtreeOrgIds(
+  orgId: string,
+  childrenMap: Map<string | null, OrgItem[]>,
+  cache: Map<string, string[]>,
+): string[] {
+  const cached = cache.get(orgId);
+  if (cached) {
+    return cached;
+  }
+
+  const ids = [orgId];
+  (childrenMap.get(orgId) || []).forEach(child => {
+    ids.push(...collectSubtreeOrgIds(child.id, childrenMap, cache));
+  });
+  cache.set(orgId, ids);
+  return ids;
+}
+
+function buildDisplayUsersByOrg(
+  orgs: OrgItem[],
+  orgUsers: OrgUser[],
+  rootId: string | undefined,
+  childrenMap: Map<string | null, OrgItem[]>,
+) {
+  const directUsersByOrg = new Map<string, OrgUser[]>();
+  const userByName = new Map<string, OrgUser>();
+  const subtreeCache = new Map<string, string[]>();
+
+  orgUsers.forEach(user => {
+    if (user.org_id) {
+      directUsersByOrg.set(user.org_id, [...(directUsersByOrg.get(user.org_id) || []), user]);
+    }
+    if (!userByName.has(user.name)) {
+      userByName.set(user.name, user);
+    }
+  });
+
+  const usersByOrg = new Map<string, OrgUser[]>();
+  const specialLeaderUserIdsByOrg = new Map<string, Set<string>>();
+
+  orgs.forEach(org => {
+    const specialUsers = (SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME[org.name] || [])
+      .map(userName => userByName.get(userName))
+      .filter((user): user is OrgUser => !!user);
+    const specialLeaderIds = new Set(specialUsers.map(user => user.id));
+    const baseUsers = org.id === rootId
+      ? orgUsers.filter(user => user.role === 'ADMIN')
+      : collectSubtreeOrgIds(org.id, childrenMap, subtreeCache).flatMap(orgNodeId => directUsersByOrg.get(orgNodeId) || []);
+    usersByOrg.set(org.id, sortUsers(dedupeUsers([...baseUsers, ...specialUsers])));
+    specialLeaderUserIdsByOrg.set(org.id, specialLeaderIds);
+  });
+
+  return { usersByOrg, specialLeaderUserIdsByOrg };
 }
 
 const orgChartStyles = `
@@ -393,6 +453,7 @@ function OrgChartNode({
   rootId,
   childrenMap,
   usersByOrg,
+  specialLeaderUserIdsByOrg,
   expandedKeys,
   onToggle,
   canManageOrg,
@@ -401,13 +462,12 @@ function OrgChartNode({
   onSelectUser,
   canAccessUserDirectory,
   onOpenUsers,
-  fixedLeaderUser,
-  businessDepartmentId,
 }: {
   node: OrgItem;
   rootId?: string;
   childrenMap: Map<string | null, OrgItem[]>;
   usersByOrg: Map<string, OrgUser[]>;
+  specialLeaderUserIdsByOrg: Map<string, Set<string>>;
   expandedKeys: string[];
   onToggle: (id: string) => void;
   canManageOrg: boolean;
@@ -416,28 +476,16 @@ function OrgChartNode({
   onSelectUser: (user: OrgUser) => void;
   canAccessUserDirectory: boolean;
   onOpenUsers: (orgId: string) => void;
-  fixedLeaderUser?: OrgUser | null;
-  businessDepartmentId?: string | null;
 }) {
   const children = childrenMap.get(node.id) || [];
-  const users = [...(usersByOrg.get(node.id) || [])].sort((a, b) => {
-    if (!!b.leaderCandidate !== !!a.leaderCandidate) return Number(b.leaderCandidate) - Number(a.leaderCandidate);
-    return a.name.localeCompare(b.name, 'zh-CN');
-  });
-  const defaultLeaderUsers = users.filter(user => user.leaderCandidate);
-  const businessGroupLeaders = node.parentId === businessDepartmentId
-    ? dedupeUsers(users.filter(isBusinessSpecialist))
-    : [];
-  const leaderUsers = FIXED_LEADER_NODE_NAMES.has(node.name) && fixedLeaderUser
-    ? [fixedLeaderUser]
-    : businessGroupLeaders.length > 0
-      ? dedupeUsers([...defaultLeaderUsers, ...businessGroupLeaders])
-      : defaultLeaderUsers;
+  const users = usersByOrg.get(node.id) || [];
+  const specialLeaderUserIds = specialLeaderUserIdsByOrg.get(node.id) || new Set<string>();
+  const leaderUsers = dedupeUsers(users.filter(user => user.leaderCandidate || specialLeaderUserIds.has(user.id)));
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
   const expanded = expandedKeys.includes(node.id);
   const isRoot = node.id === rootId;
-  const showMemberSection = !shouldHideMemberSection(node.name, isRoot);
+  const showMemberSection = !shouldHideMemberSection(isRoot);
 
   return (
     <div className="org-node-wrap">
@@ -514,6 +562,7 @@ function OrgChartNode({
                 rootId={rootId}
                 childrenMap={childrenMap}
                 usersByOrg={usersByOrg}
+                specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
                 expandedKeys={expandedKeys}
                 onToggle={onToggle}
                 canManageOrg={canManageOrg}
@@ -522,8 +571,6 @@ function OrgChartNode({
                 onSelectUser={onSelectUser}
                 canAccessUserDirectory={canAccessUserDirectory}
                 onOpenUsers={onOpenUsers}
-                fixedLeaderUser={fixedLeaderUser}
-                businessDepartmentId={businessDepartmentId}
               />
             </li>
           ))}
@@ -568,26 +615,13 @@ export default function OrgPage() {
     return map;
   }, [orgs]);
 
-  const usersByOrg = useMemo(() => {
-    const map = new Map<string, OrgUser[]>();
-    orgUsers.forEach(user => {
-      const key = String(user.org_id);
-      map.set(key, [...(map.get(key) || []), user]);
-    });
-    return map;
-  }, [orgUsers]);
-
   const rootOrg = useMemo(() => {
     return orgs.find(item => !item.parentId) || null;
   }, [orgs]);
 
-  const businessDepartmentId = useMemo(() => {
-    return orgs.find(item => item.name === '商务部')?.id || null;
-  }, [orgs]);
-
-  const fixedLeaderUser = useMemo(() => {
-    return orgUsers.find(user => user.name === FIXED_LEADER_NAME) || null;
-  }, [orgUsers]);
+  const { usersByOrg, specialLeaderUserIdsByOrg } = useMemo(() => {
+    return buildDisplayUsersByOrg(orgs, orgUsers, rootOrg?.id, childrenMap);
+  }, [childrenMap, orgUsers, orgs, rootOrg?.id]);
 
   const rawTab = searchParams.get('tab');
   const activeTab: OrgPageTabKey = useMemo(() => {
@@ -786,6 +820,7 @@ export default function OrgPage() {
                                   rootId={rootOrg.id}
                                   childrenMap={childrenMap}
                                   usersByOrg={usersByOrg}
+                                  specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
                                   expandedKeys={expandedKeys}
                                   onToggle={toggleExpanded}
                                   canManageOrg={canManageOrg}
@@ -794,8 +829,6 @@ export default function OrgPage() {
                                   onSelectUser={setSelectedUser}
                                   canAccessUserDirectory={canAccessUserDirectory}
                                   onOpenUsers={handleOpenUsers}
-                                  fixedLeaderUser={fixedLeaderUser}
-                                  businessDepartmentId={businessDepartmentId}
                                 />
                               </div>
                             ) : (
