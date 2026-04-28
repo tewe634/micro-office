@@ -840,7 +840,7 @@ public class PortalTemplateAdminController {
                 "  WHERE t.template_type = 'PERSON_ROLE' AND t.position_id = p.id " +
                 "  ORDER BY t.updated_at DESC, t.created_at DESC LIMIT 1" +
                 ") tpl ON TRUE " +
-                "ORDER BY p.name, p.id"
+                "ORDER BY COALESCE(p.sort_order, 0), p.name, p.id"
         );
         Map<String, Map<String, Object>> seedByRole = loadSeedTemplateByRole();
         List<Map<String, Object>> result = new ArrayList<>();

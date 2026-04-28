@@ -12,6 +12,7 @@ public class Position {
     private String name;
     private String code;
     private String parentId;
+    private Integer sortOrder;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

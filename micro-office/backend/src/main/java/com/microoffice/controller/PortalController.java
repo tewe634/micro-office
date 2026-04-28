@@ -1029,16 +1029,16 @@ public class PortalController {
     private List<PortalPosition> loadPortalPositions(SysUser user) {
         LinkedHashMap<String, PortalPosition> positions = new LinkedHashMap<>();
         jdbc.query(
-            "SELECT p.id, p.name, p.code, p.default_role, p.level, TRUE AS primary_flag " +
+            "SELECT p.id, p.name, p.code, p.default_role, p.level, COALESCE(p.sort_order, 0) AS sort_order, TRUE AS primary_flag " +
                 "FROM sys_user su " +
                 "JOIN position p ON p.id = su.primary_position_id " +
                 "WHERE su.id = ? " +
                 "UNION ALL " +
-                "SELECT p.id, p.name, p.code, p.default_role, p.level, FALSE AS primary_flag " +
+                "SELECT p.id, p.name, p.code, p.default_role, p.level, COALESCE(p.sort_order, 0) AS sort_order, FALSE AS primary_flag " +
                 "FROM user_position up " +
                 "JOIN position p ON p.id = up.position_id " +
                 "WHERE up.user_id = ? " +
-                "ORDER BY primary_flag DESC, name, id",
+                "ORDER BY primary_flag DESC, sort_order, name, id",
             rs -> {
                 String key = rs.getString("id");
                 positions.putIfAbsent(key, new PortalPosition(
