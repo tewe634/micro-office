@@ -5,6 +5,17 @@ import { useNavigate } from 'react-router-dom';
 import type { WorkflowTemplatePackageSummary, WorkflowTemplatePositionOption, WorkflowTemplateStatus } from '../../api';
 import { workflowTemplateApi } from '../../api';
 
+const positionLabel = (record: WorkflowTemplatePackageSummary) => {
+  const names = record.positionNames?.filter(Boolean) || [];
+  if (names.length > 0) {
+    return names.join('、');
+  }
+  if (record.positionName) {
+    return record.positionName;
+  }
+  return null;
+};
+
 export default function AdminWorkflowTemplatePage() {
   const nav = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -40,7 +51,7 @@ export default function AdminWorkflowTemplatePage() {
   const filteredPackages = useMemo(() => {
     return packages.filter((item) => {
       if (status && item.status !== status) return false;
-      if (positionId && item.positionId !== positionId) return false;
+      if (positionId && !(item.positionIds || []).includes(positionId)) return false;
       return true;
     });
   }, [packages, positionId, status]);
@@ -54,7 +65,7 @@ export default function AdminWorkflowTemplatePage() {
   const openCreateModal = () => {
     setEditingRecord(null);
     form.resetFields();
-    form.setFieldsValue({ sortOrder: 100 });
+    form.setFieldsValue({ sortOrder: 100, positionIds: [] });
     setModalOpen(true);
   };
 
@@ -62,7 +73,7 @@ export default function AdminWorkflowTemplatePage() {
     setEditingRecord(record);
     form.setFieldsValue({
       name: record.name,
-      positionId: record.positionId,
+      positionIds: record.positionIds || (record.positionId ? [record.positionId] : []),
       description: record.description,
       sortOrder: record.sortOrder ?? 100,
     });
@@ -76,7 +87,7 @@ export default function AdminWorkflowTemplatePage() {
       if (editingRecord) {
         await workflowTemplateApi.updatePackage(editingRecord.id, {
           name: values.name,
-          positionId: values.positionId,
+          positionIds: values.positionIds,
           description: values.description,
           sortOrder: values.sortOrder ?? 100,
         });
@@ -84,7 +95,7 @@ export default function AdminWorkflowTemplatePage() {
       } else {
         const response: any = await workflowTemplateApi.createPackage({
           name: values.name,
-          positionId: values.positionId,
+          positionIds: values.positionIds,
           description: values.description,
           sortOrder: values.sortOrder ?? 100,
         });
@@ -178,14 +189,14 @@ export default function AdminWorkflowTemplatePage() {
           loading={loading}
           dataSource={filteredPackages}
           pagination={{ pageSize: 10 }}
-          scroll={{ x: 1120 }}
+          scroll={{ x: 1180 }}
           columns={[
             { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true },
             {
               title: '关联岗位',
-              dataIndex: 'positionName',
-              width: 220,
-              render: (_: any, row: WorkflowTemplatePackageSummary) => row.positionName || <span style={{ color: '#999' }}>未绑定</span>,
+              dataIndex: 'positionNames',
+              width: 320,
+              render: (_: any, row: WorkflowTemplatePackageSummary) => positionLabel(row) || <span style={{ color: '#999' }}>未绑定</span>,
             },
             {
               title: '状态',
@@ -246,20 +257,25 @@ export default function AdminWorkflowTemplatePage() {
         onCancel={closeModal}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" initialValues={{ sortOrder: 100 }}>
+        <Form form={form} layout="vertical" initialValues={{ sortOrder: 100, positionIds: [] }}>
           <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入模板名称' }]}>
             <Input maxLength={64} placeholder="例如：销售经理跟单流" />
           </Form.Item>
-          <Form.Item name="positionId" label="关联岗位" rules={[{ required: true, message: '请选择岗位' }]}>
+          <Form.Item
+            name="positionIds"
+            label="关联岗位"
+            rules={[{ required: true, type: 'array', min: 1, message: '请至少选择一个岗位' }]}
+          >
             <Select
+              mode="multiple"
               showSearch
-              placeholder="选择这个模板面向的岗位"
+              placeholder="选择这个模板适用的岗位，可多选"
               optionFilterProp="label"
               options={positionOptions.map((item) => ({ value: item.id, label: item.name }))}
             />
           </Form.Item>
           <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} maxLength={300} placeholder="说明这个岗位适用的工作流模板" />
+            <Input.TextArea rows={3} maxLength={300} placeholder="说明这些岗位适用的工作流模板" />
           </Form.Item>
           <Form.Item name="sortOrder" label="排序">
             <InputNumber min={0} style={{ width: '100%' }} />

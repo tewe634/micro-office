@@ -110,7 +110,7 @@
 
 ### 3.5 运行时流程
 
-- 可用模板查询：`GET /api/workflows/template-packages`（默认按当前用户岗位过滤，可额外传 `positionId`）
+- 可用模板查询：`GET /api/workflows/template-packages`（默认按当前用户岗位过滤，可额外传 `positionId`；模板支持绑定多个岗位）
 - 模板实例化：`POST /api/workflows/from-template`
 
 ## 4. 契约边界
@@ -151,10 +151,12 @@
   - `CARD` 输出 `{ "entries": [] }` 或 `{ "blocks": [] }`
   - 空数据统一返回空数组容器，不返回 `null` 或裸数组
 - 工作流模板包状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
-- V1.1.12 起工作流模板主归类字段切换为 `mo_workflow_recommendation_packages.position_id`：
-  - 管理端创建/筛选岗位模板优先使用 `positionId`
-  - 运行时 `GET /api/workflows/template-packages` 默认只返回当前用户岗位可见模板（另保留 `position_id IS NULL` 的通用模板）
-  - `POST /api/workflows/from-template` 会校验模板岗位归属；用户不在该岗位下时返回 `403`
+- V1.1.12 起工作流模板主归类字段切换为岗位绑定：
+  - 管理端创建/筛选岗位模板优先使用 `positionIds`（兼容旧的单值 `positionId`）
+  - 多岗位绑定关系存于 `mo_workflow_recommendation_package_positions`
+  - `mo_workflow_recommendation_packages.position_id` 保留为兼容字段，记录首个岗位
+  - 运行时 `GET /api/workflows/template-packages` 默认只返回当前用户岗位可见模板（另保留未绑定岗位的通用模板）
+  - `POST /api/workflows/from-template` 会校验模板岗位归属；用户岗位与模板绑定岗位无交集时返回 `403`
   - `sceneCategory/scene_category` 退化为可空的推荐作用域兼容字段，不再作为模板主分类字段
 - `POST /api/workflows/from-template` 仅允许 `ACTIVE` 模板实例化；`DISABLED` 模板返回 `400` 明确拒绝。
 - 节点功能状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
