@@ -131,6 +131,28 @@ export interface DailyEntrySessionBindingPayload {
 
 export type WorkflowTemplateStatus = 'ACTIVE' | 'DISABLED';
 
+export interface WorkflowTemplatePositionOption {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface WorkflowTemplatePackageSummary {
+  id: string;
+  name: string;
+  positionId?: string | null;
+  positionName?: string | null;
+  sceneCategory?: string | null;
+  description?: string | null;
+  status: WorkflowTemplateStatus;
+  sortOrder?: number;
+  tags?: any[];
+  meta?: Record<string, any>;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type WorkflowRelationType = 'SEQUENCE' | 'PARALLEL';
 
 export type WorkflowNodeFeatureStatus = 'ACTIVE' | 'DISABLED';
@@ -283,26 +305,30 @@ export const portalApi = {
 };
 
 export const workflowTemplateApi = {
-  listPackages: (params?: { sceneCategory?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  listPackages: (params?: { positionId?: string; sceneCategory?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  listPositions: () => api.get('/admin/workflow-templates/positions'),
+  getPackage: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}`),
   createPackage: (data: {
     name: string;
-    scene_category: string;
+    positionId: string;
+    sceneCategory?: string;
     description?: string;
-    status: WorkflowTemplateStatus;
-    sort_order?: number;
+    sortOrder?: number;
     tags?: string[];
     meta?: Record<string, any>;
   }) => api.post('/admin/workflow-templates/packages', data),
   updatePackage: (id: string | number, data: {
     name: string;
-    scene_category: string;
+    positionId?: string | null;
+    sceneCategory?: string | null;
     description?: string;
-    sort_order?: number;
+    sortOrder?: number;
     tags?: string[];
     meta?: Record<string, any>;
   }) => api.put(`/admin/workflow-templates/packages/${id}`, data),
   updatePackageStatus: (id: string | number, status: WorkflowTemplateStatus) => api.put(`/admin/workflow-templates/packages/${id}/status`, { status }),
   copyPackage: (id: string | number, data?: { name?: string }) => api.post(`/admin/workflow-templates/packages/${id}/copy`, data),
+  listAvailablePackages: (params?: { positionId?: string }) => api.get('/workflows/template-packages', { params }),
   listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),
   saveNodes: (id: string | number, nodes: WorkflowTemplatePackageNodePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
   listModuleDefinitions: (params?: { nodeType?: string; roleKey?: string; positionKey?: string }) => api.get('/admin/workflow-templates/module-definitions', { params }),

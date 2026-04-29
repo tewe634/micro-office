@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -39,28 +40,34 @@ public class WorkflowTemplateService {
     private static final Set<String> SUBJECT_TYPES = Set.of("CUSTOMER_COMPANY", "DAILY_CATEGORY");
     private static final Set<String> NODE_PAYLOAD_ALLOWED_KEYS = Set.of("nodes");
     private static final Set<String> PACKAGE_FIELDS_IN_NODE_PAYLOAD = Set.of(
-        "name", "status", "sceneCategory", "scene_category", "sortOrder", "sort_order", "description", "tags", "meta", "version"
+        "name", "status", "sceneCategory", "scene_category", "positionId", "position_id", "sortOrder", "sort_order", "description", "tags", "meta", "version"
     );
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
-    public List<Map<String, Object>> listPackages(String sceneCategory, String status) {
+    public List<Map<String, Object>> listPackages(String positionId, String sceneCategory, String status) {
         List<Object> args = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-            "SELECT id, name, scene_category, description, status, sort_order, tags, meta, created_at, created_by, updated_at, updated_by, version " +
-                "FROM mo_workflow_recommendation_packages WHERE 1=1"
+            "SELECT p.id, p.name, p.position_id, pos.name AS position_name, p.scene_category, p.description, p.status, p.sort_order, p.tags, p.meta, p.created_at, p.created_by, p.updated_at, p.updated_by, p.version " +
+                "FROM mo_workflow_recommendation_packages p " +
+                "LEFT JOIN position pos ON pos.id = p.position_id WHERE 1=1"
         );
+        if (hasText(positionId)) {
+            String normalizedPositionId = normalizePositionId(positionId);
+            sql.append(" AND p.position_id = ?");
+            args.add(normalizedPositionId);
+        }
         if (hasText(sceneCategory)) {
-            sql.append(" AND scene_category = ?");
+            sql.append(" AND p.scene_category = ?");
             args.add(sceneCategory.trim());
         }
         if (hasText(status)) {
             String normalized = normalizeStatus(status);
-            sql.append(" AND status = ?");
+            sql.append(" AND p.status = ?");
             args.add(normalized);
         }
-        sql.append(" ORDER BY sort_order, updated_at DESC, created_at DESC");
+        sql.append(" ORDER BY CASE WHEN p.position_id IS NULL THEN 1 ELSE 0 END, p.sort_order, p.updated_at DESC, p.created_at DESC");
 
         List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
         List<Map<String, Object>> result = new ArrayList<>();
@@ -74,19 +81,37 @@ public class WorkflowTemplateService {
         return loadPackageOrThrow(id);
     }
 
+    public List<Map<String, Object>> listTemplatePositions() {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT id, name, code FROM position ORDER BY sort_order NULLS LAST, name, id"
+        );
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", asString(row.get("id")));
+            item.put("name", asString(row.get("name")));
+            item.put("code", asString(row.get("code")));
+            result.add(item);
+        }
+        return result;
+    }
+
     @Transactional
     public Map<String, Object> createPackage(WorkflowTemplatePackageSaveRequest request, String userId) {
         String id = UUID.randomUUID().toString();
+        String positionId = normalizePositionId(request == null ? null : request.getPositionId());
+        String sceneCategory = blankToNull(request == null ? null : request.getSceneCategory());
         jdbc.update(
-            "INSERT INTO mo_workflow_recommendation_packages (id, name, scene_category, description, status, sort_order, tags, meta, created_by, updated_by) " +
-                "VALUES (?, ?, ?, ?, 'DISABLED', ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?)",
+            "INSERT INTO mo_workflow_recommendation_packages (id, name, position_id, scene_category, description, status, sort_order, tags, meta, created_by, updated_by) " +
+                "VALUES (?, ?, ?, ?, ?, 'DISABLED', ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?)",
             id,
-            requireText(request.getName(), "模板名称不能为空"),
-            requireText(request.getSceneCategory(), "场景分类不能为空"),
-            blankToNull(request.getDescription()),
-            normalizeSortOrder(request.getSortOrder()),
-            toJson(normalizeTags(request.getTags())),
-            toJson(asMap(request.getMeta())),
+            requireText(request == null ? null : request.getName(), "模板名称不能为空"),
+            positionId,
+            sceneCategory,
+            blankToNull(request == null ? null : request.getDescription()),
+            normalizeSortOrder(request == null ? null : request.getSortOrder()),
+            toJson(normalizeTags(request == null ? null : request.getTags())),
+            toJson(asMap(request == null ? null : request.getMeta())),
             userId,
             userId
         );
@@ -96,14 +121,17 @@ public class WorkflowTemplateService {
     @Transactional
     public Map<String, Object> updatePackageInfo(String id, WorkflowTemplatePackageSaveRequest request, String userId) {
         loadPackageOrThrow(id);
+        String positionId = normalizePositionId(request == null ? null : request.getPositionId());
+        String sceneCategory = blankToNull(request == null ? null : request.getSceneCategory());
         jdbc.update(
-            "UPDATE mo_workflow_recommendation_packages SET name = ?, scene_category = ?, description = ?, sort_order = ?, tags = CAST(? AS jsonb), meta = CAST(? AS jsonb), updated_at = NOW(), updated_by = ? WHERE id = ?",
-            requireText(request.getName(), "模板名称不能为空"),
-            requireText(request.getSceneCategory(), "场景分类不能为空"),
-            blankToNull(request.getDescription()),
-            normalizeSortOrder(request.getSortOrder()),
-            toJson(normalizeTags(request.getTags())),
-            toJson(asMap(request.getMeta())),
+            "UPDATE mo_workflow_recommendation_packages SET name = ?, position_id = ?, scene_category = ?, description = ?, sort_order = ?, tags = CAST(? AS jsonb), meta = CAST(? AS jsonb), updated_at = NOW(), updated_by = ? WHERE id = ?",
+            requireText(request == null ? null : request.getName(), "模板名称不能为空"),
+            positionId,
+            sceneCategory,
+            blankToNull(request == null ? null : request.getDescription()),
+            normalizeSortOrder(request == null ? null : request.getSortOrder()),
+            toJson(normalizeTags(request == null ? null : request.getTags())),
+            toJson(asMap(request == null ? null : request.getMeta())),
             userId,
             id
         );
@@ -132,10 +160,11 @@ public class WorkflowTemplateService {
         String copiedName = asString(source.get("name")) + "（复制）";
 
         jdbc.update(
-            "INSERT INTO mo_workflow_recommendation_packages (id, name, scene_category, description, status, sort_order, tags, meta, created_by, updated_by) " +
-                "VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?)",
+            "INSERT INTO mo_workflow_recommendation_packages (id, name, position_id, scene_category, description, status, sort_order, tags, meta, created_by, updated_by) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?)",
             copiedId,
             copiedName,
+            asString(source.get("positionId")),
             asString(source.get("sceneCategory")),
             asString(source.get("description")),
             asString(source.get("status")),
@@ -336,6 +365,43 @@ public class WorkflowTemplateService {
         return result;
     }
 
+    public List<Map<String, Object>> listAvailablePackages(String userId, String requestedPositionId) {
+        Set<String> userPositionIds = resolveUserPositionIds(userId);
+        String normalizedRequestedPositionId = normalizePositionId(requestedPositionId);
+        if (hasText(normalizedRequestedPositionId) && !userPositionIds.contains(normalizedRequestedPositionId)) {
+            throw new ResponseStatusException(FORBIDDEN, "当前用户无权查看该岗位下的工作流模板");
+        }
+
+        List<Object> args = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+            "SELECT p.id, p.name, p.position_id, pos.name AS position_name, p.scene_category, p.description, p.status, p.sort_order, p.tags, p.meta, p.created_at, p.created_by, p.updated_at, p.updated_by, p.version " +
+                "FROM mo_workflow_recommendation_packages p " +
+                "LEFT JOIN position pos ON pos.id = p.position_id " +
+                "WHERE p.status = 'ACTIVE'"
+        );
+
+        if (hasText(normalizedRequestedPositionId)) {
+            sql.append(" AND (p.position_id = ? OR p.position_id IS NULL)");
+            args.add(normalizedRequestedPositionId);
+        } else if (!userPositionIds.isEmpty()) {
+            sql.append(" AND (p.position_id IS NULL OR p.position_id IN (");
+            appendPlaceholders(sql, userPositionIds.size());
+            sql.append("))");
+            args.addAll(userPositionIds);
+        } else {
+            sql.append(" AND p.position_id IS NULL");
+        }
+
+        sql.append(" ORDER BY CASE WHEN p.position_id IS NULL THEN 1 ELSE 0 END, p.sort_order, p.updated_at DESC, p.created_at DESC");
+
+        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            result.add(toPackageMap(row));
+        }
+        return result;
+    }
+
     @Transactional
     public WorkflowInstantiationResponse instantiateWorkflow(WorkflowFromTemplateRequest request, String userId) {
         String packageId = requireText(request.getTemplatePackageId(), "templatePackageId 不能为空");
@@ -343,6 +409,7 @@ public class WorkflowTemplateService {
         if (!"ACTIVE".equals(asString(pkg.get("status")))) {
             throw new ResponseStatusException(BAD_REQUEST, "仅 ACTIVE 模板可实例化");
         }
+        ensureUserCanUsePackage(userId, pkg);
 
         List<Map<String, Object>> packageNodes = listPackageNodes(packageId);
         if (packageNodes.isEmpty()) {
@@ -364,6 +431,8 @@ public class WorkflowTemplateService {
         workflowMeta.put("templatePackageId", packageId);
         workflowMeta.put("templatePackageName", asString(pkg.get("name")));
         workflowMeta.put("sceneCategory", asString(pkg.get("sceneCategory")));
+        workflowMeta.put("positionId", asString(pkg.get("positionId")));
+        workflowMeta.put("positionName", asString(pkg.get("positionName")));
         workflowMeta.put("bizContext", request.getBizContext() == null ? Map.of() : request.getBizContext());
 
         jdbc.update(
@@ -780,6 +849,8 @@ public class WorkflowTemplateService {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", asString(row.get("id")));
         item.put("name", asString(row.get("name")));
+        item.put("positionId", asString(row.get("position_id")));
+        item.put("positionName", asString(row.get("position_name")));
         item.put("sceneCategory", asString(row.get("scene_category")));
         item.put("description", asString(row.get("description")));
         item.put("status", asString(row.get("status")));
@@ -837,8 +908,9 @@ public class WorkflowTemplateService {
     private Map<String, Object> loadPackageOrThrow(String id) {
         try {
             Map<String, Object> row = jdbc.queryForMap(
-                "SELECT id, name, scene_category, description, status, sort_order, tags, meta, created_at, created_by, updated_at, updated_by, version " +
-                    "FROM mo_workflow_recommendation_packages WHERE id = ?",
+                "SELECT p.id, p.name, p.position_id, pos.name AS position_name, p.scene_category, p.description, p.status, p.sort_order, p.tags, p.meta, p.created_at, p.created_by, p.updated_at, p.updated_by, p.version " +
+                    "FROM mo_workflow_recommendation_packages p " +
+                    "LEFT JOIN position pos ON pos.id = p.position_id WHERE p.id = ?",
                 id
             );
             return toPackageMap(row);
@@ -856,6 +928,51 @@ public class WorkflowTemplateService {
         if (count == null || count == 0) {
             throw new ResponseStatusException(NOT_FOUND, "模板包不存在");
         }
+    }
+
+    private void ensureUserCanUsePackage(String userId, Map<String, Object> pkg) {
+        String positionId = asString(pkg.get("positionId"));
+        if (!hasText(positionId)) {
+            return;
+        }
+        Set<String> userPositionIds = resolveUserPositionIds(userId);
+        if (!userPositionIds.contains(positionId)) {
+            throw new ResponseStatusException(FORBIDDEN, "当前用户无权使用该岗位下的工作流模板");
+        }
+    }
+
+    private String normalizePositionId(String positionId) {
+        String normalized = blankToNull(positionId);
+        if (!hasText(normalized)) {
+            return null;
+        }
+        validatePositionExists(normalized);
+        return normalized;
+    }
+
+    private void validatePositionExists(String positionId) {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM position WHERE id = ?",
+            Integer.class,
+            positionId
+        );
+        if (count == null || count == 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "关联岗位不存在");
+        }
+    }
+
+    private Set<String> resolveUserPositionIds(String userId) {
+        List<String> rows = jdbc.queryForList(
+            "SELECT DISTINCT position_id FROM (" +
+                "SELECT primary_position_id AS position_id FROM sys_user WHERE id = ? AND primary_position_id IS NOT NULL " +
+                "UNION ALL " +
+                "SELECT position_id FROM user_position WHERE user_id = ?" +
+                ") positions WHERE position_id IS NOT NULL",
+            String.class,
+            userId,
+            userId
+        );
+        return new LinkedHashSet<>(rows);
     }
 
     private void ensureModuleDefinitionExists(String moduleDefinitionId) {
@@ -887,6 +1004,15 @@ public class WorkflowTemplateService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void appendPlaceholders(StringBuilder sql, int count) {
+        for (int i = 0; i < count; i += 1) {
+            if (i > 0) {
+                sql.append(", ");
+            }
+            sql.append("?");
+        }
     }
 
     @SuppressWarnings("unchecked")

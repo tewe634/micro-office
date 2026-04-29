@@ -30,11 +30,21 @@ public class AdminWorkflowTemplateController {
      * 查询模板包列表。
      */
     @GetMapping("/packages")
-    public ApiResponse<List<Map<String, Object>>> listPackages(@RequestParam(required = false) String sceneCategory,
+    public ApiResponse<List<Map<String, Object>>> listPackages(@RequestParam(required = false) String positionId,
+                                                               @RequestParam(required = false) String sceneCategory,
                                                                @RequestParam(required = false) String status,
                                                                Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listPackages(sceneCategory, status));
+        return ApiResponse.ok(workflowTemplateService.listPackages(positionId, sceneCategory, status));
+    }
+
+    /**
+     * 查询模板包关联岗位选项。
+     */
+    @GetMapping("/positions")
+    public ApiResponse<List<Map<String, Object>>> listPositions(Authentication auth) {
+        requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.listTemplatePositions());
     }
 
     /**

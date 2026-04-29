@@ -71,6 +71,7 @@
   - `PUT /api/admin/daily-entry-chat-policies/{dailyEntryId}/session-bindings`
 - 工作流模板：
   - `GET /api/admin/workflow-templates/packages`
+  - `GET /api/admin/workflow-templates/positions`（模板岗位选项）
   - `GET /api/admin/workflow-templates/packages/{id}`
   - `POST /api/admin/workflow-templates/packages`
   - `PUT /api/admin/workflow-templates/packages/{id}`（仅更新 package 基本信息）
@@ -108,6 +109,7 @@
 
 ### 3.5 运行时流程
 
+- 可用模板查询：`GET /api/workflows/template-packages`（默认按当前用户岗位过滤，可额外传 `positionId`）
 - 模板实例化：`POST /api/workflows/from-template`
 
 ## 4. 契约边界
@@ -148,11 +150,16 @@
   - `CARD` 输出 `{ "entries": [] }` 或 `{ "blocks": [] }`
   - 空数据统一返回空数组容器，不返回 `null` 或裸数组
 - 工作流模板包状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
+- V1.1.12 起工作流模板主归类字段切换为 `mo_workflow_recommendation_packages.position_id`：
+  - 管理端创建/筛选岗位模板优先使用 `positionId`
+  - 运行时 `GET /api/workflows/template-packages` 默认只返回当前用户岗位可见模板（另保留 `position_id IS NULL` 的通用模板）
+  - `POST /api/workflows/from-template` 会校验模板岗位归属；用户不在该岗位下时返回 `403`
+  - `sceneCategory/scene_category` 退化为可空的推荐作用域兼容字段，不再作为模板主分类字段
 - `POST /api/workflows/from-template` 仅允许 `ACTIVE` 模板实例化；`DISABLED` 模板返回 `400` 明确拒绝。
 - 节点功能状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
 - 模板节点绑定 `DISABLED` 节点功能会被明确拦截并返回可展示错误信息。
 - 行为配置解析链路固定为：`POSITION -> ROLE -> DEFAULT`（岗位优先，角色兜底）。
-- V1.1.5 起：`PUT /packages/{id}/nodes` 若携带 package 字段（如 `name/status/scene_category/sort_order`）返回 `400`。
+- V1.1.5 起：`PUT /packages/{id}/nodes` 若携带 package 字段（如 `name/status/scene_category/position_id/sort_order`）返回 `400`。
 
 ## 7. OpenAPI（V1.1.4）
 

@@ -11,6 +11,8 @@ public class WorkflowTemplatePackageSaveRequest {
     private String name;
     @JsonAlias("scene_category")
     private String sceneCategory;
+    @JsonAlias("position_id")
+    private String positionId;
     private String description;
     @JsonAlias("sort_order")
     private Integer sortOrder;
