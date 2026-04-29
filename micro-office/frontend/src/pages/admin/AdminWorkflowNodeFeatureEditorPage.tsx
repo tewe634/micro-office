@@ -23,6 +23,7 @@ type FieldItem = {
   id?: string;
   fieldKey: string;
   label: string;
+  description: string;
   dataType: string;
   required: boolean;
   fieldScope: 'INPUT' | 'OUTPUT';
@@ -130,6 +131,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
         id: item.id,
         fieldKey: item.fieldKey || '',
         label: item.label || '',
+        description: item.schemaMeta?.description || '',
         dataType: item.dataType || 'string',
         required: Boolean(item.required),
         fieldScope: item.fieldScope === 'OUTPUT' ? 'OUTPUT' : 'INPUT',
@@ -204,6 +206,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
       sortOrder: Number(item.sortOrder || 100),
       defaultValue: item.defaultValueText.trim() ? JSON.parse(item.defaultValueText) : null,
       schemaMeta: {
+        description: item.description.trim() || undefined,
         validators: item.validatorsText.trim() ? JSON.parse(item.validatorsText) : [],
       },
     }));
@@ -277,6 +280,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
       {
         fieldKey: '',
         label: '',
+        description: '',
         dataType: 'string',
         required: false,
         fieldScope,
@@ -468,6 +472,14 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
                         render: (_: unknown, row: FieldItem) => {
                           const index = fields.indexOf(row);
                           return <Input value={row.label} onChange={(e) => updateField(index, (item) => ({ ...item, label: e.target.value }))} />;
+                        },
+                      },
+                      {
+                        title: '描述',
+                        width: 220,
+                        render: (_: unknown, row: FieldItem) => {
+                          const index = fields.indexOf(row);
+                          return <Input value={row.description} placeholder="说明这个产出字段的用途" onChange={(e) => updateField(index, (item) => ({ ...item, description: e.target.value }))} />;
                         },
                       },
                       {
