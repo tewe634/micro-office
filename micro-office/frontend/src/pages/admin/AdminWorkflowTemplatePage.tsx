@@ -202,7 +202,7 @@ export default function AdminWorkflowTemplatePage() {
               title: '状态',
               dataIndex: 'status',
               width: 110,
-              render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value}</Tag>,
+              render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value === 'ACTIVE' ? '启用' : '停用'}</Tag>,
             },
             { title: '排序值', dataIndex: 'sortOrder', width: 100 },
             {
