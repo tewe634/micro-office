@@ -178,7 +178,7 @@ export default function AdminWorkflowTemplatePage() {
           loading={loading}
           dataSource={filteredPackages}
           pagination={{ pageSize: 10 }}
-          scroll={{ x: 1260 }}
+          scroll={{ x: 1120 }}
           columns={[
             { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true },
             {
@@ -187,7 +187,6 @@ export default function AdminWorkflowTemplatePage() {
               width: 220,
               render: (_: any, row: WorkflowTemplatePackageSummary) => row.positionName || <span style={{ color: '#999' }}>未绑定</span>,
             },
-            { title: '描述', dataIndex: 'description', ellipsis: true },
             {
               title: '状态',
               dataIndex: 'status',
