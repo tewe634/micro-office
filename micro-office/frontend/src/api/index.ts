@@ -327,6 +327,7 @@ export const workflowTemplateApi = {
     meta?: Record<string, any>;
   }) => api.put(`/admin/workflow-templates/packages/${id}`, data),
   updatePackageStatus: (id: string | number, status: WorkflowTemplateStatus) => api.put(`/admin/workflow-templates/packages/${id}/status`, { status }),
+  deletePackage: (id: string | number) => api.delete(`/admin/workflow-templates/packages/${id}`),
   copyPackage: (id: string | number, data?: { name?: string }) => api.post(`/admin/workflow-templates/packages/${id}/copy`, data),
   listAvailablePackages: (params?: { positionId?: string }) => api.get('/workflows/template-packages', { params }),
   listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),

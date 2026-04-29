@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from 'antd';
-import { CopyOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { WorkflowTemplatePackageSummary, WorkflowTemplatePositionOption, WorkflowTemplateStatus } from '../../api';
 import { workflowTemplateApi } from '../../api';
@@ -12,7 +12,8 @@ export default function AdminWorkflowTemplatePage() {
   const [positionOptions, setPositionOptions] = useState<WorkflowTemplatePositionOption[]>([]);
   const [status, setStatus] = useState<WorkflowTemplateStatus | undefined>(undefined);
   const [positionId, setPositionId] = useState<string | undefined>(undefined);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<WorkflowTemplatePackageSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
 
@@ -44,26 +45,59 @@ export default function AdminWorkflowTemplatePage() {
     });
   }, [packages, positionId, status]);
 
-  const handleCreate = async () => {
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingRecord(null);
+    form.resetFields();
+  };
+
+  const openCreateModal = () => {
+    setEditingRecord(null);
+    form.resetFields();
+    form.setFieldsValue({ sortOrder: 100 });
+    setModalOpen(true);
+  };
+
+  const openEditModal = (record: WorkflowTemplatePackageSummary) => {
+    setEditingRecord(record);
+    form.setFieldsValue({
+      name: record.name,
+      positionId: record.positionId,
+      description: record.description,
+      sortOrder: record.sortOrder ?? 100,
+    });
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setSaving(true);
-      const response: any = await workflowTemplateApi.createPackage({
-        name: values.name,
-        positionId: values.positionId,
-        description: values.description,
-        sortOrder: values.sortOrder ?? 100,
-      });
-      message.success('模板包已创建（默认停用）');
-      setCreateOpen(false);
-      form.resetFields();
-      await loadPage();
-      if (response.data?.id) {
-        nav(`/admin/workflow-templates/${response.data.id}`);
+      if (editingRecord) {
+        await workflowTemplateApi.updatePackage(editingRecord.id, {
+          name: values.name,
+          positionId: values.positionId,
+          description: values.description,
+          sortOrder: values.sortOrder ?? 100,
+        });
+        message.success('模板包基础信息已更新');
+      } else {
+        const response: any = await workflowTemplateApi.createPackage({
+          name: values.name,
+          positionId: values.positionId,
+          description: values.description,
+          sortOrder: values.sortOrder ?? 100,
+        });
+        message.success('模板包已创建（默认停用）');
+        if (response.data?.id) {
+          nav(`/admin/workflow-templates/${response.data.id}`);
+        }
       }
+      closeModal();
+      await loadPage();
     } catch (error: any) {
       if (error?.errorFields) return;
-      message.error(error?.response?.data?.message || '模板包创建失败');
+      message.error(error?.response?.data?.message || (editingRecord ? '模板包更新失败' : '模板包创建失败'));
     } finally {
       setSaving(false);
     }
@@ -92,6 +126,16 @@ export default function AdminWorkflowTemplatePage() {
     }
   };
 
+  const handleDelete = async (record: WorkflowTemplatePackageSummary) => {
+    try {
+      await workflowTemplateApi.deletePackage(record.id);
+      message.success(`模板包“${record.name}”已删除`);
+      await loadPage();
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '模板包删除失败');
+    }
+  };
+
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
       <Card
@@ -101,15 +145,7 @@ export default function AdminWorkflowTemplatePage() {
             <Button icon={<ReloadOutlined />} onClick={() => void loadPage()}>
               刷新
             </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                form.resetFields();
-                form.setFieldsValue({ sortOrder: 100 });
-                setCreateOpen(true);
-              }}
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
               新建模板包
             </Button>
           </Space>
@@ -142,7 +178,7 @@ export default function AdminWorkflowTemplatePage() {
           loading={loading}
           dataSource={filteredPackages}
           pagination={{ pageSize: 10 }}
-          scroll={{ x: 940 }}
+          scroll={{ x: 1260 }}
           columns={[
             { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true },
             {
@@ -162,16 +198,31 @@ export default function AdminWorkflowTemplatePage() {
             {
               title: '操作',
               key: 'action',
-              width: 260,
+              width: 380,
               fixed: 'right',
               render: (_: any, row: WorkflowTemplatePackageSummary) => (
                 <Space wrap>
-                  <Button type="link" icon={<EditOutlined />} onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>
+                  <Button type="link" onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>
                     编排
+                  </Button>
+                  <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
+                    编辑
                   </Button>
                   <Button type="link" icon={<CopyOutlined />} onClick={() => void handleCopy(row)}>
                     复制
                   </Button>
+                  <Popconfirm
+                    title="删除模板包"
+                    description={`确定删除“${row.name}”吗？对应节点编排也会一起删除。`}
+                    okText="删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => void handleDelete(row)}
+                  >
+                    <Button type="link" danger icon={<DeleteOutlined />}>
+                      删除
+                    </Button>
+                  </Popconfirm>
                   {row.status === 'ACTIVE' ? (
                     <Button type="link" danger onClick={() => void handleUpdateStatus(row, 'DISABLED')}>
                       停用
@@ -189,11 +240,11 @@ export default function AdminWorkflowTemplatePage() {
       </Card>
 
       <Modal
-        title="新建工作流模板包"
-        open={createOpen}
+        title={editingRecord ? '编辑模板包' : '新建工作流模板包'}
+        open={modalOpen}
         confirmLoading={saving}
-        onOk={() => void handleCreate()}
-        onCancel={() => setCreateOpen(false)}
+        onOk={() => void handleSubmit()}
+        onCancel={closeModal}
         destroyOnClose
       >
         <Form form={form} layout="vertical" initialValues={{ sortOrder: 100 }}>

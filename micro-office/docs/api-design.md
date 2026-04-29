@@ -75,6 +75,7 @@
   - `GET /api/admin/workflow-templates/packages/{id}`
   - `POST /api/admin/workflow-templates/packages`
   - `PUT /api/admin/workflow-templates/packages/{id}`（仅更新 package 基本信息）
+  - `DELETE /api/admin/workflow-templates/packages/{id}`
   - `PUT /api/admin/workflow-templates/packages/{id}/status`（仅 `ACTIVE|DISABLED`）
   - `POST /api/admin/workflow-templates/packages/{id}/copy`
   - `GET /api/admin/workflow-templates/packages/{id}/nodes`

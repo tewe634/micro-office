@@ -154,6 +154,23 @@ public class WorkflowTemplateService {
     }
 
     @Transactional
+    public Map<String, Object> deletePackage(String id, String userId) {
+        Map<String, Object> source = loadPackageOrThrow(id);
+        int deleted = jdbc.update(
+            "DELETE FROM mo_workflow_recommendation_packages WHERE id = ?",
+            id
+        );
+        if (deleted == 0) {
+            throw new ResponseStatusException(NOT_FOUND, "模板包不存在");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", id);
+        result.put("name", asString(source.get("name")));
+        result.put("deletedBy", userId);
+        return result;
+    }
+
+    @Transactional
     public Map<String, Object> copyPackage(String id, String userId) {
         Map<String, Object> source = loadPackageOrThrow(id);
         String copiedId = UUID.randomUUID().toString();

@@ -7,6 +7,7 @@ import com.microoffice.service.MenuPermissionService;
 import com.microoffice.service.WorkflowTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -85,6 +86,15 @@ public class AdminWorkflowTemplateController {
                                                                 Authentication auth) {
         String userId = requireAdmin(auth);
         return ApiResponse.ok(workflowTemplateService.updatePackageStatus(id, body == null ? null : body.getStatus(), userId));
+    }
+
+    /**
+     * 删除模板包及其节点编排。
+     */
+    @DeleteMapping("/packages/{id}")
+    public ApiResponse<Map<String, Object>> deletePackage(@PathVariable String id, Authentication auth) {
+        String userId = requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.deletePackage(id, userId));
     }
 
     /**
