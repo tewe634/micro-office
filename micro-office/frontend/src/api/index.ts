@@ -141,7 +141,9 @@ export interface WorkflowTemplatePackageSummary {
   id: string;
   name: string;
   positionId?: string | null;
+  positionIds?: string[];
   positionName?: string | null;
+  positionNames?: string[];
   sceneCategory?: string | null;
   description?: string | null;
   status: WorkflowTemplateStatus;
@@ -310,7 +312,7 @@ export const workflowTemplateApi = {
   getPackage: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}`),
   createPackage: (data: {
     name: string;
-    positionId: string;
+    positionIds: string[];
     sceneCategory?: string;
     description?: string;
     sortOrder?: number;
@@ -319,7 +321,7 @@ export const workflowTemplateApi = {
   }) => api.post('/admin/workflow-templates/packages', data),
   updatePackage: (id: string | number, data: {
     name: string;
-    positionId?: string | null;
+    positionIds?: string[];
     sceneCategory?: string | null;
     description?: string;
     sortOrder?: number;
