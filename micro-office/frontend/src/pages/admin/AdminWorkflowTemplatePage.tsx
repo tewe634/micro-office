@@ -49,11 +49,17 @@ export default function AdminWorkflowTemplatePage() {
   }, []);
 
   const filteredPackages = useMemo(() => {
-    return packages.filter((item) => {
-      if (status && item.status !== status) return false;
-      if (positionId && !(item.positionIds || []).includes(positionId)) return false;
-      return true;
-    });
+    return [...packages]
+      .filter((item) => {
+        if (status && item.status !== status) return false;
+        if (positionId && !(item.positionIds || []).includes(positionId)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const sortDiff = (a.sortOrder ?? 100) - (b.sortOrder ?? 100);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '', 'zh-CN');
+      });
   }, [packages, positionId, status]);
 
   const closeModal = () => {
