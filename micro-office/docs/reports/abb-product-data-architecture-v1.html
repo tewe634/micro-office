@@ -490,8 +490,8 @@
     <section class="cover">
       <div class="title-card">
         <span class="eyebrow">产品数据架构 · 可视化汇报 v1</span>
-        <h1>ABB 产品<br/>扁平化数据架构</h1>
-        <p class="subtitle">围绕 micro-office 现有产品元数据，建立一套面向后续系统建设的产品主数据架构视角。</p>
+        <h1>ABB 产品<br/>数据架构方案</h1>
+        <p class="subtitle">基于 micro-office 现有 ABB 产品数据，给出可调整、可落地的产品分类路径、字段架构与汇总口径。</p>
         <div class="meta-row">
           <span class="pill blue">聚焦 ABB</span>
           <span class="pill green">不改代码/数据库</span>
@@ -519,13 +519,13 @@
             <div class="label">多维度汇总与分发</div>
           </div>
         </div>
-        <div class="note">核心价值：先把产品数据结构讲清楚，为后续产品列表、产品门户、销售、采购、库存、经营分析等系统建设打基础。</div>
+        <div class="note">核心价值：把现有 ABB 产品数据先整理成一套明确的数据架构方案，老板可直接在此基础上判断是否调整分类口径。</div>
       </div>
     </section>
 
     <section class="slide" data-page="01">
       <span class="eyebrow">01 · 现状</span>
-      <h2>现在不是缺产品，而是缺统一的产品数据架构视角</h2>
+      <h2>基于现有数据，先形成 ABB 产品架构底稿</h2>
       <div class="problem-grid">
         <div class="diagram-card">
           <h3>现有产品数据字段</h3>
@@ -538,13 +538,13 @@
           </div>
         </div>
         <div class="diagram-card">
-          <h3>当前汇报要解决的事</h3>
+          <h3>本方案要交付的实际结果</h3>
           <div class="visual-flow" style="grid-template-columns: 1fr; gap: 14px; margin-top: 12px;">
-            <div class="field-box"><span>看清 ABB 产品主结构</span><small>从产品线到 SKU</small></div>
+            <div class="field-box"><span>确定 ABB 产品主路径</span><small>ABB → 六大类 → 二级/三级 → SKU</small></div>
             <div class="arrow-down"></div>
-            <div class="field-box"><span>保留已有元数据三级类别</span><small>不浪费已有分类</small></div>
+            <div class="field-box"><span>给出分类矩阵和数量分布</span><small>让老板基于真实数据调整</small></div>
             <div class="arrow-down"></div>
-            <div class="field-box"><span>形成可汇总、可分发的数据宽表视角</span><small>支撑后续系统建设</small></div>
+            <div class="field-box"><span>定义产品宽表字段和汇总口径</span><small>作为后续系统建设依据</small></div>
           </div>
         </div>
       </div>
@@ -613,7 +613,7 @@
 
     <section class="slide" data-page="03">
       <span class="eyebrow">03 · ABB 主结构</span>
-      <h2>第一阶段只聚焦 ABB，沿用当前六大业务分类</h2>
+      <h2>ABB 当前六大类与真实数据分布</h2>
       <div class="tree-wrap">
         <div class="root-node">
           <div class="main">ABB</div>
@@ -652,7 +652,20 @@
           </div>
         </div>
       </div>
-      <div class="note">本版不展示 INVEX；第一阶段把 ABB 结构先讲清楚，后续再按同样方法扩展其他产品线。</div>
+      <div class="wide-table" style="margin-top: 28px;">
+        <table>
+          <thead><tr><th>一级分类</th><th>产品数</th><th>二级分类数</th><th>元数据三级类别数</th><th>架构判断</th></tr></thead>
+          <tbody>
+            <tr><td><strong>低压</strong></td><td>25,074</td><td>1</td><td>3</td><td>数量最大，第一版保持现状，后续建议确认后续细化</td></tr>
+            <tr><td><strong>DP</strong></td><td>5,482</td><td>20</td><td>36</td><td>结构较完整，可直接作为传动产品主结构</td></tr>
+            <tr><td><strong>SE</strong></td><td>4,673</td><td>4</td><td>19</td><td>按服务类产品单独管理</td></tr>
+            <tr><td><strong>成套</strong></td><td>2,067</td><td>1</td><td>5</td><td>先保留，后续按成套产品/物料细化</td></tr>
+            <tr><td><strong>HP</strong></td><td>1,903</td><td>8</td><td>15</td><td>结构较完整，可作为高功率传动主结构</td></tr>
+            <tr><td><strong>电机</strong></td><td>1,029</td><td>2</td><td>16</td><td>按高压/低压电机管理</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">本版不展示 INVEX；第一阶段把 ABB 现有 40,232 条产品先形成可调整的数据架构底稿。</div>
     </section>
 
     <section class="slide" data-page="04">
@@ -802,43 +815,65 @@
       </div>
     </section>
 
+
     <section class="slide" data-page="08">
-      <span class="eyebrow">08 · 后续系统建设路线</span>
-      <h2>先讲清结构，再逐步落地到系统能力</h2>
+      <span class="eyebrow">08 · 实际架构矩阵</span>
+      <h2>ABB 产品数据架构底稿：分类路径、重点类别、处理策略</h2>
+      <div class="wide-table">
+        <table>
+          <thead>
+            <tr><th>一级分类</th><th>主二级分类/类别</th><th>代表元数据三级类别</th><th>第一版处理策略</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>DP</strong></td><td>ACS880、ACS580、ACS530、Servo、AC500、External Options</td><td>ACS880-01、ACS580-01、ACS530、ACS550</td><td>作为传动主结构，直接按现有二级分类汇总</td></tr>
+            <tr><td><strong>HP</strong></td><td>ACS800/880 MD、ACS880-07、DC Drive、ACS580MV</td><td>ACS800/860/880 MD、DCS800、ACS580MV</td><td>作为高功率传动主结构，保留现有二级分类</td></tr>
+            <tr><td><strong>SE</strong></td><td>服务产品、服务业务、电机服务、保内服务</td><td>LV Spare Parts & service、总部维修、维修材料</td><td>归为服务类产品，和实物产品分开汇总</td></tr>
+            <tr><td><strong>电机</strong></td><td>低压电机、高压电机</td><td>M2BAX、M2BAF、QABP、M3BP、ABB高压电机</td><td>按高压/低压电机路径管理</td></tr>
+            <tr><td><strong>低压</strong></td><td>二级为空</td><td>ABB低压产品、其它外购产品、低压开关</td><td>第一版保持为空，不强行拆；后续作为专题细化</td></tr>
+            <tr><td><strong>成套</strong></td><td>二级为空</td><td>成套原材料、ABB变频器成套、其他</td><td>第一版保持为空，后续按成套产品/成套物料细化</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">这页是老板最需要看的“实际方案”：不是讲概念，而是把 ABB 现有数据按架构路径摆出来，让老板判断哪些分类需要调整。</div>
+    </section>
+
+    <section class="slide" data-page="09">
+      <span class="eyebrow">09 · 确认事项</span>
+      <h2>老板需要确认/调整的重点</h2>
       <div class="roadmap">
         <div class="stage">
           <div class="stage-num">1</div>
-          <h3>确认 ABB 主结构</h3>
-          <p>固定 ABB → 六大分类 → 二级分类/元数据三级类别 → SKU 的主路径。</p>
+          <h3>确认主结构</h3>
+          <p>是否认可 ABB → 六大类 → 二级分类 → 元数据三级 → SKU 作为主路径。</p>
         </div>
         <div class="stage">
           <div class="stage-num">2</div>
-          <h3>形成宽表视角</h3>
-          <p>把产品线、业务结构、元数据三级类别、SKU 身份、服务属性统一展开。</p>
+          <h3>确认宽表字段</h3>
+          <p>是否认可产品线、一级/二级、元数据三级、SKU、服务属性作为核心字段。</p>
         </div>
         <div class="stage">
           <div class="stage-num">3</div>
-          <h3>建设汇总视图</h3>
-          <p>按 DP/HP/SE/电机/低压/成套和元数据三级类别形成产品汇总。</p>
+          <h3>确认汇总口径</h3>
+          <p>是否先按 ABB 六大类、二级分类、元数据三级类别做汇总。</p>
         </div>
         <div class="stage">
           <div class="stage-num">4</div>
-          <h3>专题细化</h3>
-          <p>后续再做低压、成套等大类的细分专题，不在第一阶段强行补全。</p>
+          <h3>确认后续细化</h3>
+          <p>低压、成套是否下一阶段再做细分；第一版不强行补二级。</p>
         </div>
       </div>
       <div class="summary-band">
         <div class="summary-item">
           <strong>当前汇报</strong>
-          <span>解释 ABB 产品数据架构思路</span>
+          <span>给老板看实际架构底稿</span>
         </div>
         <div class="summary-item">
           <strong>后续建设</strong>
-          <span>支撑产品列表、产品门户、销售/采购/库存/经营分析</span>
+          <span>老板确认后作为后续系统建设依据</span>
         </div>
         <div class="summary-item">
           <strong>核心原则</strong>
-          <span>不推翻现有结构，先建立可汇总、可分发的扁平化主数据视角</span>
+          <span>基于真实 ABB 数据，先确定主路径、字段和汇总口径</span>
         </div>
       </div>
     </section>
