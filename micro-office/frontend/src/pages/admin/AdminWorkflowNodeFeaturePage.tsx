@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Input, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
-import { CopyOutlined, PlusOutlined } from '@ant-design/icons';
+import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowNodeFeatureApi, type WorkflowNodeFeatureStatus } from '../../api';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
@@ -139,6 +139,16 @@ export default function AdminWorkflowNodeFeaturePage() {
     }
   };
 
+  const deleteRecord = async (record: any) => {
+    try {
+      await workflowNodeFeatureApi.delete(record.id);
+      message.success(`节点功能“${record.name}”已删除`);
+      await load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '节点功能删除失败');
+    }
+  };
+
   return (
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
@@ -239,7 +249,7 @@ export default function AdminWorkflowNodeFeaturePage() {
                 { title: '版本', dataIndex: 'version', width: 80 },
                 {
                   title: '操作',
-                  width: 220,
+                  width: 290,
                   render: (_: unknown, row: any) => (
                     <Space size={6} wrap>
                       <Button size="small" onClick={() => nav(`/admin/workflow-node-features/${row.id}`)}>
@@ -259,6 +269,18 @@ export default function AdminWorkflowNodeFeaturePage() {
                           </Button>
                         </Popconfirm>
                       )}
+                      <Popconfirm
+                        title="删除节点功能"
+                        description={`确定删除“${row.name}”吗？字段契约与行为配置会一并删除，且不可恢复。`}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => void deleteRecord(row)}
+                      >
+                        <Button size="small" danger icon={<DeleteOutlined />}>
+                          删除
+                        </Button>
+                      </Popconfirm>
                     </Space>
                   ),
                 },
