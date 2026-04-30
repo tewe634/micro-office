@@ -438,6 +438,7 @@ export const workflowNodeFeatureApi = {
     roleKey?: string;
   }) => api.put(`/admin/workflow-node-features/${id}`, data),
   updateStatus: (id: string | number, status: WorkflowNodeFeatureStatus) => api.put(`/admin/workflow-node-features/${id}/status`, { status }),
+  delete: (id: string | number) => api.delete(`/admin/workflow-node-features/${id}`),
   copy: (id: string | number) => api.post(`/admin/workflow-node-features/${id}/copy`),
   listFields: (id: string | number) => api.get(`/admin/workflow-node-features/${id}/fields`),
   saveFields: (id: string | number, fields: any[]) => api.put(`/admin/workflow-node-features/${id}/fields`, { fields }),
