@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ABB 产品数据架构可视化汇报 v1</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #dbe3f0;
+      --blue: #2563eb;
+      --blue-2: #dbeafe;
+      --cyan: #0891b2;
+      --cyan-2: #cffafe;
+      --green: #16a34a;
+      --green-2: #dcfce7;
+      --orange: #ea580c;
+      --orange-2: #ffedd5;
+      --purple: #7c3aed;
+      --purple-2: #ede9fe;
+      --red: #dc2626;
+      --red-2: #fee2e2;
+      --gray-2: #f3f4f6;
+      --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      --radius: 26px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 34%),
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.12), transparent 32%),
+        var(--bg);
+    }
+
+    .deck {
+      width: min(1280px, 96vw);
+      margin: 0 auto;
+      padding: 34px 0 80px;
+    }
+
+    .cover {
+      min-height: 720px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 34px;
+      align-items: stretch;
+    }
+
+    .slide {
+      min-height: 720px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(219, 227, 240, 0.88);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin: 34px 0;
+      padding: 38px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slide::after {
+      content: attr(data-page);
+      position: absolute;
+      right: 30px;
+      bottom: 22px;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .title-card, .cover-visual {
+      min-height: 720px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(219, 227, 240, 0.88);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 44px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .title-card::before {
+      content: "";
+      position: absolute;
+      inset: auto -80px -120px auto;
+      width: 320px;
+      height: 320px;
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(124, 58, 237, 0.18));
+      border-radius: 999px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 13px;
+      color: var(--blue);
+      background: var(--blue-2);
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-size: 56px;
+      line-height: 1.08;
+      margin: 34px 0 20px;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      font-size: 36px;
+      line-height: 1.16;
+      margin: 0 0 26px;
+      letter-spacing: -0.03em;
+    }
+
+    h3 {
+      font-size: 22px;
+      margin: 0 0 14px;
+    }
+
+    p { color: var(--muted); line-height: 1.72; }
+
+    .subtitle {
+      font-size: 22px;
+      line-height: 1.62;
+      color: #4b5563;
+      max-width: 720px;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 44px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--gray-2);
+      color: #374151;
+      font-weight: 800;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .pill.blue { background: var(--blue-2); color: var(--blue); }
+    .pill.green { background: var(--green-2); color: var(--green); }
+    .pill.orange { background: var(--orange-2); color: var(--orange); }
+    .pill.purple { background: var(--purple-2); color: var(--purple); }
+    .pill.red { background: var(--red-2); color: var(--red); }
+    .pill.cyan { background: var(--cyan-2); color: var(--cyan); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+      margin-top: 26px;
+    }
+
+    .kpi {
+      background: linear-gradient(180deg, #fff, #f8fafc);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 24px;
+    }
+
+    .kpi .num {
+      font-size: 42px;
+      font-weight: 900;
+      color: var(--blue);
+      letter-spacing: -0.04em;
+    }
+
+    .kpi .label {
+      color: var(--muted);
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .diagram-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 28px;
+      align-items: stretch;
+      margin-top: 18px;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .field-box {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 20px;
+      background: #fff;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .field-box small { color: var(--muted); font-weight: 700; }
+
+    .arrow-down {
+      width: 2px;
+      height: 32px;
+      background: var(--line);
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .arrow-down::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -5px;
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid var(--line);
+      border-bottom: 2px solid var(--line);
+      transform: translateX(-50%) rotate(45deg);
+    }
+
+    .wide-table {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      background: #fff;
+      margin-top: 24px;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 16px 14px; text-align: left; border-bottom: 1px solid #eef2f7; font-size: 15px; }
+    th { background: #f8fafc; color: #475569; font-size: 13px; letter-spacing: 0.03em; }
+    tr:last-child td { border-bottom: 0; }
+    td strong { color: var(--ink); }
+
+    .path {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 32px 0;
+    }
+
+    .path-node {
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: #fff;
+      border: 2px solid var(--line);
+      font-weight: 900;
+      min-width: 132px;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    }
+
+    .path-node.blue { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+    .path-node.purple { border-color: #c4b5fd; background: #f5f3ff; color: #6d28d9; }
+    .path-node.green { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+    .path-node.orange { border-color: #fdba74; background: #fff7ed; color: #c2410c; }
+    .path-node.cyan { border-color: #67e8f9; background: #ecfeff; color: #0e7490; }
+
+    .path-arrow { font-weight: 900; color: #94a3b8; font-size: 24px; }
+
+    .tree-wrap {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .root-node {
+      height: 150px;
+      border-radius: 32px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      box-shadow: 0 22px 45px rgba(37, 99, 235, 0.28);
+    }
+
+    .root-node .main { font-size: 48px; font-weight: 1000; letter-spacing: -0.04em; }
+    .root-node .sub { opacity: 0.88; font-weight: 800; margin-top: 6px; }
+
+    .branch-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .branch {
+      min-height: 154px;
+      border-radius: 24px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      background: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .branch::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 7px;
+      background: var(--blue);
+    }
+
+    .branch.dp::before { background: var(--blue); }
+    .branch.hp::before { background: var(--purple); }
+    .branch.se::before { background: var(--green); }
+    .branch.motor::before { background: var(--orange); }
+    .branch.lv::before { background: var(--cyan); }
+    .branch.cabinet::before { background: var(--red); }
+
+    .branch-title { font-size: 24px; font-weight: 1000; margin-bottom: 8px; }
+    .branch-desc { color: var(--muted); line-height: 1.5; font-size: 14px; }
+    .branch-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .tag-mini { padding: 6px 9px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 800; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 22px;
+    }
+
+    .visual-flow {
+      display: grid;
+      grid-template-columns: 1fr 70px 1fr 70px 1fr;
+      gap: 10px;
+      align-items: stretch;
+      margin-top: 30px;
+    }
+
+    .flow-box {
+      border-radius: 26px;
+      padding: 28px 24px;
+      background: #fff;
+      border: 1px solid var(--line);
+      min-height: 250px;
+    }
+
+    .flow-icon {
+      font-size: 38px;
+      line-height: 1;
+      margin-bottom: 18px;
+    }
+
+    .flow-title { font-size: 26px; font-weight: 1000; margin-bottom: 16px; }
+    .flow-list { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    .big-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 34px;
+      font-weight: 1000;
+    }
+
+    .example-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-top: 26px;
+    }
+
+    .example {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 22px;
+      min-height: 360px;
+    }
+
+    .example .headline { font-size: 22px; font-weight: 1000; margin-bottom: 18px; }
+    .mini-path { display: flex; flex-direction: column; gap: 10px; }
+    .mini-node { padding: 12px 14px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 800; }
+    .mini-arrow { text-align: center; color: #94a3b8; font-weight: 900; }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-top: 40px;
+    }
+
+    .stage {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+      min-height: 250px;
+      position: relative;
+    }
+
+    .stage-num {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 1000;
+      margin-bottom: 18px;
+    }
+
+    .stage h3 { font-size: 22px; }
+    .stage p { font-size: 15px; margin: 0; }
+
+    .note {
+      margin-top: 22px;
+      padding: 16px 18px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      color: #475569;
+      border-radius: 18px;
+      font-weight: 700;
+      line-height: 1.65;
+    }
+
+    .summary-band {
+      margin-top: 34px;
+      border-radius: 28px;
+      padding: 30px;
+      background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+
+    .summary-item {
+      background: rgba(255,255,255,0.13);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 20px;
+      padding: 20px;
+    }
+
+    .summary-item strong { display: block; font-size: 22px; margin-bottom: 8px; }
+    .summary-item span { opacity: 0.88; line-height: 1.5; }
+
+    @media print {
+      body { background: #fff; }
+      .deck { width: 100%; padding: 0; }
+      .cover { display: block; }
+      .title-card, .cover-visual, .slide {
+        box-shadow: none;
+        border-radius: 0;
+        min-height: 100vh;
+        page-break-after: always;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck">
+    <section class="cover">
+      <div class="title-card">
+        <span class="eyebrow">产品数据架构 · 可视化汇报 v1</span>
+        <h1>ABB 产品<br/>扁平化数据架构</h1>
+        <p class="subtitle">围绕 micro-office 现有产品元数据，建立一套面向后续系统建设的产品主数据架构视角。</p>
+        <div class="meta-row">
+          <span class="pill blue">聚焦 ABB</span>
+          <span class="pill green">不改代码/数据库</span>
+          <span class="pill purple">老板/管理层视角</span>
+          <span class="pill orange">少文字 · 多图示</span>
+        </div>
+      </div>
+      <div class="cover-visual">
+        <h2>汇报目标</h2>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="num">1</div>
+            <div class="label">形成 ABB 产品主路径</div>
+          </div>
+          <div class="kpi">
+            <div class="num">6</div>
+            <div class="label">保留现有六大业务分类</div>
+          </div>
+          <div class="kpi">
+            <div class="num">SKU</div>
+            <div class="label">一行一个产品/服务物料</div>
+          </div>
+          <div class="kpi">
+            <div class="num">N</div>
+            <div class="label">多维度汇总与分发</div>
+          </div>
+        </div>
+        <div class="note">核心价值：先把产品数据结构讲清楚，为后续产品列表、产品门户、销售、采购、库存、经营分析等系统建设打基础。</div>
+      </div>
+    </section>
+
+    <section class="slide" data-page="01">
+      <span class="eyebrow">01 · 现状</span>
+      <h2>现在不是缺产品，而是缺统一的产品数据架构视角</h2>
+      <div class="problem-grid">
+        <div class="diagram-card">
+          <h3>现有产品数据字段</h3>
+          <div class="stack">
+            <div class="field-box">物料号 / 名称 / 规格 <small>SKU 身份</small></div>
+            <div class="field-box">产品线 ABB <small>主范围</small></div>
+            <div class="field-box">DP / HP / SE / 电机 / 低压 / 成套 <small>页面业务结构</small></div>
+            <div class="field-box">元数据一级 / 二级 / 三级类别 <small>来源分类</small></div>
+            <div class="field-box">面价 <small>价格基础</small></div>
+          </div>
+        </div>
+        <div class="diagram-card">
+          <h3>当前汇报要解决的事</h3>
+          <div class="visual-flow" style="grid-template-columns: 1fr; gap: 14px; margin-top: 12px;">
+            <div class="field-box"><span>看清 ABB 产品主结构</span><small>从产品线到 SKU</small></div>
+            <div class="arrow-down"></div>
+            <div class="field-box"><span>保留已有元数据三级类别</span><small>不浪费已有分类</small></div>
+            <div class="arrow-down"></div>
+            <div class="field-box"><span>形成可汇总、可分发的数据宽表视角</span><small>支撑后续系统建设</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-page="02">
+      <span class="eyebrow">02 · 扁平化理念</span>
+      <h2>一行一个 SKU，一列一个稳定业务维度</h2>
+      <div class="path">
+        <div class="path-node blue">产品线</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node purple">业务一级</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node green">业务二级</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node orange">元数据三级</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node cyan">SKU</div>
+      </div>
+      <div class="wide-table">
+        <table>
+          <thead>
+            <tr>
+              <th>产品线</th>
+              <th>业务一级</th>
+              <th>业务二级</th>
+              <th>元数据三级</th>
+              <th>物料号</th>
+              <th>名称/规格</th>
+              <th>产品形态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ABB</strong></td>
+              <td>DP</td>
+              <td>ACS580-01/04</td>
+              <td>ACS580-01(R0-R8)</td>
+              <td>SKU</td>
+              <td>变频器 / 规格</td>
+              <td>实物产品</td>
+            </tr>
+            <tr>
+              <td><strong>ABB</strong></td>
+              <td>SE</td>
+              <td>服务业务</td>
+              <td>维修业务</td>
+              <td>SKU</td>
+              <td>维修费 / 服务</td>
+              <td>服务产品</td>
+            </tr>
+            <tr>
+              <td><strong>ABB</strong></td>
+              <td>低压</td>
+              <td>—</td>
+              <td>ABB低压产品</td>
+              <td>SKU</td>
+              <td>塑壳 / 微断 / 接触器</td>
+              <td>实物产品</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">扁平化不是弱化结构，而是把每个可汇总、可分发的维度展开在同一张产品主数据视角里。</div>
+    </section>
+
+    <section class="slide" data-page="03">
+      <span class="eyebrow">03 · ABB 主结构</span>
+      <h2>第一阶段只聚焦 ABB，沿用当前六大业务分类</h2>
+      <div class="tree-wrap">
+        <div class="root-node">
+          <div class="main">ABB</div>
+          <div class="sub">产品线主范围</div>
+        </div>
+        <div class="branch-grid">
+          <div class="branch dp">
+            <div class="branch-title">DP</div>
+            <div class="branch-desc">低功率传动与自动化相关产品</div>
+            <div class="branch-tags"><span class="tag-mini">ACS580</span><span class="tag-mini">ACS880</span><span class="tag-mini">AC500</span></div>
+          </div>
+          <div class="branch hp">
+            <div class="branch-title">HP</div>
+            <div class="branch-desc">高功率传动产品</div>
+            <div class="branch-tags"><span class="tag-mini">ACS800/880</span><span class="tag-mini">DC Drive</span></div>
+          </div>
+          <div class="branch se">
+            <div class="branch-title">SE</div>
+            <div class="branch-desc">服务产品与服务业务</div>
+            <div class="branch-tags"><span class="tag-mini">服务产品</span><span class="tag-mini">服务业务</span></div>
+          </div>
+          <div class="branch motor">
+            <div class="branch-title">电机</div>
+            <div class="branch-desc">ABB 电机相关产品</div>
+            <div class="branch-tags"><span class="tag-mini">低压电机</span><span class="tag-mini">高压电机</span></div>
+          </div>
+          <div class="branch lv">
+            <div class="branch-title">低压</div>
+            <div class="branch-desc">ABB 低压电气产品</div>
+            <div class="branch-tags"><span class="tag-mini">塑壳</span><span class="tag-mini">微断</span><span class="tag-mini">接触器</span></div>
+          </div>
+          <div class="branch cabinet">
+            <div class="branch-title">成套</div>
+            <div class="branch-desc">成套产品与成套物料</div>
+            <div class="branch-tags"><span class="tag-mini">变频柜</span><span class="tag-mini">成套原材料</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="note">本版不展示 INVEX；第一阶段把 ABB 结构先讲清楚，后续再按同样方法扩展其他产品线。</div>
+    </section>
+
+    <section class="slide" data-page="04">
+      <span class="eyebrow">04 · 主路径</span>
+      <h2>产品主路径：页面业务结构 + 元数据三级类别 + SKU</h2>
+      <div class="path">
+        <div class="path-node blue">ABB</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node purple">structure_level1</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node green">structure_level2</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node orange">category_level3</div>
+        <div class="path-arrow">→</div>
+        <div class="path-node cyan">SKU</div>
+      </div>
+      <div class="two-col">
+        <div class="diagram-card">
+          <h3>有二级分类时</h3>
+          <div class="mini-path">
+            <div class="mini-node">ABB</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">DP</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">ACS580-01/04</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">ACS580-01(R0-R8)</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">具体物料 SKU</div>
+          </div>
+        </div>
+        <div class="diagram-card">
+          <h3>二级为空时</h3>
+          <div class="mini-path">
+            <div class="mini-node">ABB</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">低压 / 成套</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">category_level3</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">具体物料 SKU</div>
+          </div>
+          <div class="note" style="margin-top: 18px;">第一阶段不强行补空二级，先尊重现有结构。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-page="05">
+      <span class="eyebrow">05 · 服务类</span>
+      <h2>服务不剥离产品体系，而是作为服务类产品单独归类</h2>
+      <div class="two-col">
+        <div class="diagram-card">
+          <h3>实物产品</h3>
+          <div class="stack">
+            <div class="field-box">DP <small>传动/自动化</small></div>
+            <div class="field-box">HP <small>高功率传动</small></div>
+            <div class="field-box">电机 <small>电机产品</small></div>
+            <div class="field-box">低压 <small>低压电气</small></div>
+            <div class="field-box">成套 <small>成套产品/物料</small></div>
+          </div>
+        </div>
+        <div class="diagram-card">
+          <h3>服务产品</h3>
+          <div class="stack">
+            <div class="field-box">SE <small>服务大类</small></div>
+            <div class="field-box">服务产品 <small>备件/服务产品</small></div>
+            <div class="field-box">服务业务 <small>维修/保外等业务</small></div>
+            <div class="field-box">电机服务 <small>电机相关服务</small></div>
+            <div class="field-box">保内服务 <small>保内服务物料</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="note">管理口径上建议区分“实物产品 / 服务产品”，但服务仍然在产品主数据体系中统一管理。</div>
+    </section>
+
+    <section class="slide" data-page="06">
+      <span class="eyebrow">06 · 汇总与分发</span>
+      <h2>先归类，再汇总，最后分发到业务系统</h2>
+      <div class="visual-flow">
+        <div class="flow-box">
+          <div class="flow-icon">①</div>
+          <div class="flow-title">归类</div>
+          <div class="flow-list">
+            <span class="pill blue">ABB</span>
+            <span class="pill purple">DP / HP / SE</span>
+            <span class="pill green">电机 / 低压 / 成套</span>
+            <span class="pill orange">元数据三级类别</span>
+            <span class="pill cyan">实物 / 服务</span>
+          </div>
+        </div>
+        <div class="big-arrow">→</div>
+        <div class="flow-box">
+          <div class="flow-icon">②</div>
+          <div class="flow-title">汇总</div>
+          <div class="flow-list">
+            <span class="pill blue">产品数量</span>
+            <span class="pill purple">系列结构</span>
+            <span class="pill green">服务占比</span>
+            <span class="pill orange">报价/销售机会</span>
+            <span class="pill cyan">库存/采购需求</span>
+          </div>
+        </div>
+        <div class="big-arrow">→</div>
+        <div class="flow-box">
+          <div class="flow-icon">③</div>
+          <div class="flow-title">分发</div>
+          <div class="flow-list">
+            <span class="pill blue">产品列表</span>
+            <span class="pill purple">产品门户</span>
+            <span class="pill green">销售</span>
+            <span class="pill orange">采购</span>
+            <span class="pill cyan">库存</span>
+            <span class="pill red">经营分析</span>
+          </div>
+        </div>
+      </div>
+      <div class="note">这就是“按面值归类，再汇总分发”的产品版本：产品 SKU 先归到稳定维度，再服务后续系统建设。</div>
+    </section>
+
+    <section class="slide" data-page="07">
+      <span class="eyebrow">07 · 示例</span>
+      <h2>三个例子，看懂一条 SKU 如何进入架构</h2>
+      <div class="example-grid">
+        <div class="example">
+          <div class="headline">DP 变频器</div>
+          <div class="mini-path">
+            <div class="mini-node">ABB</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">DP</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">ACS580-01/04</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">ACS580-01(R0-R8)</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">物料号 / 规格</div>
+          </div>
+        </div>
+        <div class="example">
+          <div class="headline">SE 服务</div>
+          <div class="mini-path">
+            <div class="mini-node">ABB</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">SE</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">服务业务</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">维修 / 保外 / 保内</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">服务物料 SKU</div>
+          </div>
+        </div>
+        <div class="example">
+          <div class="headline">低压产品</div>
+          <div class="mini-path">
+            <div class="mini-node">ABB</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">低压</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">二级为空，保持为空</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">ABB低压产品</div><div class="mini-arrow">↓</div>
+            <div class="mini-node">物料号 / 名称 / 规格</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-page="08">
+      <span class="eyebrow">08 · 后续系统建设路线</span>
+      <h2>先讲清结构，再逐步落地到系统能力</h2>
+      <div class="roadmap">
+        <div class="stage">
+          <div class="stage-num">1</div>
+          <h3>确认 ABB 主结构</h3>
+          <p>固定 ABB → 六大分类 → 二级分类/元数据三级类别 → SKU 的主路径。</p>
+        </div>
+        <div class="stage">
+          <div class="stage-num">2</div>
+          <h3>形成宽表视角</h3>
+          <p>把产品线、业务结构、元数据三级类别、SKU 身份、服务属性统一展开。</p>
+        </div>
+        <div class="stage">
+          <div class="stage-num">3</div>
+          <h3>建设汇总视图</h3>
+          <p>按 DP/HP/SE/电机/低压/成套和元数据三级类别形成产品汇总。</p>
+        </div>
+        <div class="stage">
+          <div class="stage-num">4</div>
+          <h3>专题细化</h3>
+          <p>后续再做低压、成套等大类的细分专题，不在第一阶段强行补全。</p>
+        </div>
+      </div>
+      <div class="summary-band">
+        <div class="summary-item">
+          <strong>当前汇报</strong>
+          <span>解释 ABB 产品数据架构思路</span>
+        </div>
+        <div class="summary-item">
+          <strong>后续建设</strong>
+          <span>支撑产品列表、产品门户、销售/采购/库存/经营分析</span>
+        </div>
+        <div class="summary-item">
+          <strong>核心原则</strong>
+          <span>不推翻现有结构，先建立可汇总、可分发的扁平化主数据视角</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
