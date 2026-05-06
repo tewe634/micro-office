@@ -2,7 +2,6 @@ import { Layout, Menu, Button, Dropdown, Modal, Form, Input, Space, message } fr
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   TeamOutlined,
-  UserOutlined,
   ContactsOutlined,
   ShoppingOutlined,
   SettingOutlined,
@@ -20,18 +19,17 @@ import { buildAllowedMenus, canAccessMenu } from '../constants/routes';
 const { Header, Sider, Content } = Layout;
 
 const menuDefs: Record<string, { icon: React.ReactNode; label: string }> = {
-  '/org': { icon: <TeamOutlined />, label: '组织架构' },
-  '/users': { icon: <UserOutlined />, label: '人员管理' },
-  '/objects': { icon: <ContactsOutlined />, label: '外部对象' },
-  '/products': { icon: <ShoppingOutlined />, label: '产品服务' },
+  '/org': { icon: <TeamOutlined />, label: '人员&组织' },
+  '/objects': { icon: <ContactsOutlined />, label: '客户&对象' },
+  '/products': { icon: <ShoppingOutlined />, label: '产品&服务' },
   '/admin/permissions': { icon: <SettingOutlined />, label: '权限配置' },
 };
 
 const pageTitles: Record<string, string> = {
-  '/org': '公司整体组织架构',
-  '/users': '人员管理',
-  '/objects': '外部对象管理',
-  '/products': '产品与服务',
+  '/org': '人员&组织',
+  '/users': '人员&组织',
+  '/objects': '客户&对象管理',
+  '/products': '产品&服务',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
   '/admin/workflow-node-features': '工作节点模版管理',
@@ -41,7 +39,7 @@ const pageTitles: Record<string, string> = {
   '/admin/portal-templates': '门户管理',
 };
 
-const menuOrder = ['/org', '/users', '/objects', '/products'];
+const menuOrder = ['/org', '/objects', '/products'];
 
 const adminChildren = [
   { key: '/admin/permissions', label: '权限配置' },
@@ -62,7 +60,7 @@ function resolveSelectedKey(pathname: string) {
   if (pathname.startsWith('/admin/sales-collab')) return '/admin/sales-collab';
   if (pathname.startsWith('/admin/permissions')) return '/admin/permissions';
   if (pathname.startsWith('/admin')) return '/admin';
-  if (pathname.startsWith('/users')) return '/users';
+  if (pathname.startsWith('/users')) return '/org';
   if (pathname.startsWith('/objects')) return '/objects';
   if (pathname.startsWith('/products')) return '/products';
   if (pathname.startsWith('/org')) return '/org';
@@ -70,9 +68,7 @@ function resolveSelectedKey(pathname: string) {
 }
 
 function resolvePageTitle(pathname: string) {
-  if (/^\/users\/[^/]+\/portal\/details\/[^/]+$/.test(pathname)) return '人员门户详情';
-  if (/^\/users\/[^/]+\/portal$/.test(pathname)) return '人员门户';
-  if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '外部对象门户';
+  if (/^\/objects\/[^/]+\/portal$/.test(pathname)) return '客户&对象门户';
   if (/^\/products\/[^/]+\/portal$/.test(pathname)) return '产品门户';
   if (/^\/admin\/portal-templates\/[^/]+\/preview$/.test(pathname)) return '预览门户模板';
   if (/^\/admin\/portal-templates\/[^/]+$/.test(pathname)) return '门户管理';

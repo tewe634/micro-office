@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Input, InputNumber, Popconfirm, Select, Space, Spin, Switch, Tag, message } from 'antd';
+import { Button, Card, Empty, Input, Popconfirm, Select, Space, Spin, Tag, message } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   portalBlockTemplateAdminApi,
   portalTemplateAdminApi,
-  type PortalBlockTemplateActionFormFieldPayload,
   type PortalBlockTemplateActionPayload,
   type PortalBlockTemplatePayload,
   type PortalBlockTemplateStatus,
@@ -13,30 +12,12 @@ import {
 
 const { TextArea } = Input;
 
-type EditorActionField = {
-  id: string;
-  fieldKey: string;
-  label: string;
-  inputType: string;
-  required: boolean;
-  placeholder?: string;
-  defaultValue?: string;
-  maxLength?: number;
-  sortOrder: number;
-  status: 'ACTIVE' | 'INACTIVE';
-  metaText: string;
-};
-
 type EditorAction = {
   id: string;
   actionType: string;
   targetSubjectType?: string;
   targetIdPath?: string;
   sessionType?: string;
-  requiresPreActionForm: boolean;
-  preActionFormTitle?: string;
-  preActionFormSubmitLabel?: string;
-  preActionFields: EditorActionField[];
   metaText: string;
 };
 
@@ -70,39 +51,13 @@ function parseJson(text: string, label: string) {
   }
 }
 
-function normalizeActionField(field: any, index: number): EditorActionField {
-  return {
-    id: field?.id || localId('action-field'),
-    fieldKey: field?.fieldKey || field?.field_key || '',
-    label: field?.label || '',
-    inputType: field?.inputType || field?.input_type || 'TEXT',
-    required: field?.required === true,
-    placeholder: field?.placeholder || undefined,
-    defaultValue: field?.defaultValue || field?.default_value || undefined,
-    maxLength: typeof field?.maxLength === 'number' ? field.maxLength : typeof field?.max_length === 'number' ? field.max_length : undefined,
-    sortOrder: typeof field?.sortOrder === 'number' ? field.sortOrder : typeof field?.sort_order === 'number' ? field.sort_order : index,
-    status: field?.status || 'ACTIVE',
-    metaText: prettyJson(field?.meta),
-  };
-}
-
 function normalizeAction(action: any): EditorAction {
-  const rawFields = Array.isArray(action?.preActionFields)
-    ? action.preActionFields
-    : Array.isArray(action?.pre_action_fields)
-      ? action.pre_action_fields
-      : [];
-
   return {
     id: action?.id || localId('action'),
-    actionType: action?.actionType || action?.action_type || 'open_workbench_session',
-    targetSubjectType: action?.targetSubjectType || action?.target_subject_type || undefined,
-    targetIdPath: action?.targetIdPath || action?.target_id_path || undefined,
-    sessionType: action?.sessionType || action?.session_type || undefined,
-    requiresPreActionForm: action?.requiresPreActionForm === true || action?.requires_pre_action_form === true,
-    preActionFormTitle: action?.preActionFormTitle || action?.pre_action_form_title || undefined,
-    preActionFormSubmitLabel: action?.preActionFormSubmitLabel || action?.pre_action_form_submit_label || undefined,
-    preActionFields: rawFields.map(normalizeActionField),
+    actionType: action?.actionType || 'open_workbench_session',
+    targetSubjectType: action?.targetSubjectType || undefined,
+    targetIdPath: action?.targetIdPath || undefined,
+    sessionType: action?.sessionType || undefined,
     metaText: prettyJson(action?.meta),
   };
 }
@@ -121,22 +76,6 @@ function normalizeTemplate(detail?: any): EditorBlockTemplate {
   };
 }
 
-function createEmptyPreActionField(index: number): EditorActionField {
-  return {
-    id: localId('action-field'),
-    fieldKey: '',
-    label: '',
-    inputType: 'TEXT',
-    required: false,
-    placeholder: undefined,
-    defaultValue: undefined,
-    maxLength: undefined,
-    sortOrder: index,
-    status: 'ACTIVE',
-    metaText: prettyJson({}),
-  };
-}
-
 function createEmptyAction(): EditorAction {
   return {
     id: localId('action'),
@@ -144,10 +83,6 @@ function createEmptyAction(): EditorAction {
     targetSubjectType: undefined,
     targetIdPath: undefined,
     sessionType: undefined,
-    requiresPreActionForm: false,
-    preActionFormTitle: undefined,
-    preActionFormSubmitLabel: undefined,
-    preActionFields: [],
     metaText: prettyJson({}),
   };
 }
@@ -167,22 +102,6 @@ function buildPayload(detail: EditorBlockTemplate): PortalBlockTemplatePayload {
       targetSubjectType: action.targetSubjectType || null,
       targetIdPath: action.targetIdPath || null,
       sessionType: action.sessionType || null,
-      requiresPreActionForm: action.requiresPreActionForm,
-      preActionFormTitle: action.preActionFormTitle?.trim() || null,
-      preActionFormSubmitLabel: action.preActionFormSubmitLabel?.trim() || null,
-      preActionFields: action.preActionFields.map((field, index): PortalBlockTemplateActionFormFieldPayload => ({
-        id: field.id.startsWith('tmp-') ? undefined : field.id,
-        fieldKey: field.fieldKey.trim(),
-        label: field.label.trim(),
-        inputType: field.inputType,
-        required: field.required,
-        placeholder: field.placeholder?.trim() || null,
-        defaultValue: field.defaultValue?.trim() || null,
-        maxLength: typeof field.maxLength === 'number' ? field.maxLength : null,
-        sortOrder: field.sortOrder ?? index,
-        status: field.status,
-        meta: parseJson(field.metaText, `动作字段 ${field.label || field.fieldKey || field.id} meta`),
-      })),
       meta: parseJson(action.metaText, `动作 ${action.actionType || action.id} meta`),
     })),
   };
@@ -202,16 +121,6 @@ export default function AdminPortalBlockTemplateEditorPage() {
   const actionTypeOptions = useMemo(() => meta.actionTypes || [], [meta]);
   const subjectTypeOptions = useMemo(() => meta.subjectTypes || [], [meta]);
   const sessionTypeOptions = useMemo(() => meta.sessionTypes || [], [meta]);
-  const actionFieldTypeOptions = useMemo(() => ([
-    { value: 'TEXT', label: 'TEXT' },
-    { value: 'TEXTAREA', label: 'TEXTAREA' },
-    { value: 'NUMBER', label: 'NUMBER' },
-    { value: 'SELECT', label: 'SELECT' },
-  ]), []);
-  const fieldStatusOptions = useMemo(() => ([
-    { value: 'ACTIVE', label: 'ACTIVE' },
-    { value: 'INACTIVE', label: 'INACTIVE' },
-  ]), []);
   const statusOptions = useMemo(() => ([
     { value: 'DRAFT', label: 'DRAFT' },
     { value: 'ACTIVE', label: 'ACTIVE' },
@@ -248,20 +157,6 @@ export default function AdminPortalBlockTemplateEditorPage() {
 
   const updateDetail = (updater: (prev: EditorBlockTemplate) => EditorBlockTemplate) => {
     setDetail((prev) => (prev ? updater(prev) : prev));
-  };
-
-  const updateAction = (actionIndex: number, updater: (prev: EditorAction) => EditorAction) => {
-    updateDetail((prev) => ({
-      ...prev,
-      actions: prev.actions.map((item, index) => (index === actionIndex ? updater(item) : item)),
-    }));
-  };
-
-  const updateActionField = (actionIndex: number, fieldIndex: number, updater: (prev: EditorActionField) => EditorActionField) => {
-    updateAction(actionIndex, (action) => ({
-      ...action,
-      preActionFields: action.preActionFields.map((item, index) => (index === fieldIndex ? updater(item) : item)),
-    }));
   };
 
   const save = async () => {
@@ -368,151 +263,64 @@ export default function AdminPortalBlockTemplateEditorPage() {
                       </Popconfirm>
                     )}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                        <div>
-                          <div style={{ marginBottom: 6 }}>动作类型</div>
-                          <Select
-                            style={{ width: '100%' }}
-                            value={action.actionType}
-                            options={actionTypeOptions}
-                            onChange={(value) => updateAction(index, (prev) => ({ ...prev, actionType: value }))}
-                          />
-                        </div>
-                        <div>
-                          <div style={{ marginBottom: 6 }}>目标主体类型</div>
-                          <Select
-                            style={{ width: '100%' }}
-                            allowClear
-                            value={action.targetSubjectType}
-                            options={subjectTypeOptions}
-                            onChange={(value) => updateAction(index, (prev) => ({ ...prev, targetSubjectType: value }))}
-                          />
-                        </div>
-                        <div>
-                          <div style={{ marginBottom: 6 }}>目标 ID 路径</div>
-                          <Input
-                            value={action.targetIdPath}
-                            onChange={(e) => updateAction(index, (prev) => ({ ...prev, targetIdPath: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <div style={{ marginBottom: 6 }}>会话类型</div>
-                          <Select
-                            style={{ width: '100%' }}
-                            allowClear
-                            value={action.sessionType}
-                            options={sessionTypeOptions}
-                            onChange={(value) => updateAction(index, (prev) => ({ ...prev, sessionType: value }))}
-                          />
-                        </div>
-                      </div>
-
-                      <Card type="inner" size="small" title="前置弹窗参数">
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>启用前置弹窗</div>
-                            <Switch checked={action.requiresPreActionForm} onChange={(checked) => updateAction(index, (prev) => ({ ...prev, requiresPreActionForm: checked }))} />
-                          </div>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>弹窗标题</div>
-                            <Input
-                              value={action.preActionFormTitle}
-                              placeholder="例如：填写群聊主题"
-                              onChange={(e) => updateAction(index, (prev) => ({ ...prev, preActionFormTitle: e.target.value }))}
-                            />
-                          </div>
-                          <div>
-                            <div style={{ marginBottom: 6 }}>确认按钮文案</div>
-                            <Input
-                              value={action.preActionFormSubmitLabel}
-                              placeholder="例如：创建群聊"
-                              onChange={(e) => updateAction(index, (prev) => ({ ...prev, preActionFormSubmitLabel: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-
-                        {action.requiresPreActionForm ? (
-                          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ color: '#475569' }}>弹窗字段按 `sortOrder` 渲染，当前至少支持文本输入与必填校验。</div>
-                              <Button size="small" icon={<PlusOutlined />} onClick={() => updateAction(index, (prev) => ({ ...prev, preActionFields: [...prev.preActionFields, createEmptyPreActionField(prev.preActionFields.length)] }))}>新增字段</Button>
-                            </div>
-
-                            {!action.preActionFields.length ? (
-                              <Empty description="当前动作尚未配置前置字段" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                            ) : action.preActionFields.map((field, fieldIndex) => (
-                              <Card
-                                key={field.id}
-                                type="inner"
-                                size="small"
-                                title={`字段 ${fieldIndex + 1}`}
-                                extra={(
-                                  <Popconfirm
-                                    title="确认删除该字段？"
-                                    okText="确认删除"
-                                    cancelText="取消"
-                                    okButtonProps={{ danger: true }}
-                                    onConfirm={() => updateAction(index, (prev) => ({ ...prev, preActionFields: prev.preActionFields.filter((_, currentIndex) => currentIndex !== fieldIndex) }))}
-                                  >
-                                    <Button danger size="small" icon={<DeleteOutlined />}>删除</Button>
-                                  </Popconfirm>
-                                )}
-                              >
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>字段 Key</div>
-                                    <Input value={field.fieldKey} onChange={(e) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, fieldKey: e.target.value }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>字段标签</div>
-                                    <Input value={field.label} onChange={(e) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, label: e.target.value }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>输入类型</div>
-                                    <Select style={{ width: '100%' }} value={field.inputType} options={actionFieldTypeOptions} onChange={(value) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, inputType: value }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>状态</div>
-                                    <Select style={{ width: '100%' }} value={field.status} options={fieldStatusOptions} onChange={(value) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, status: value }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>占位提示</div>
-                                    <Input value={field.placeholder} onChange={(e) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, placeholder: e.target.value }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>默认值</div>
-                                    <Input value={field.defaultValue} onChange={(e) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, defaultValue: e.target.value }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>最大长度</div>
-                                    <InputNumber style={{ width: '100%' }} min={1} value={field.maxLength} onChange={(value) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, maxLength: typeof value === 'number' ? value : undefined }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>排序</div>
-                                    <InputNumber style={{ width: '100%' }} min={0} value={field.sortOrder} onChange={(value) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, sortOrder: typeof value === 'number' ? value : 0 }))} />
-                                  </div>
-                                  <div>
-                                    <div style={{ marginBottom: 6 }}>必填</div>
-                                    <Switch checked={field.required} onChange={(checked) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, required: checked }))} />
-                                  </div>
-                                  <div style={{ gridColumn: '1 / -1' }}>
-                                    <div style={{ marginBottom: 6 }}>字段 Meta(JSON)</div>
-                                    <TextArea rows={4} value={field.metaText} onChange={(e) => updateActionField(index, fieldIndex, (prev) => ({ ...prev, metaText: e.target.value }))} />
-                                  </div>
-                                </div>
-                              </Card>
-                            ))}
-                          </div>
-                        ) : null}
-                      </Card>
-
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
                       <div>
+                        <div style={{ marginBottom: 6 }}>动作类型</div>
+                        <Select
+                          style={{ width: '100%' }}
+                          value={action.actionType}
+                          options={actionTypeOptions}
+                          onChange={(value) => updateDetail((prev) => ({
+                            ...prev,
+                            actions: prev.actions.map((item, actionIndex) => (actionIndex === index ? { ...item, actionType: value } : item)),
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ marginBottom: 6 }}>目标主体类型</div>
+                        <Select
+                          style={{ width: '100%' }}
+                          allowClear
+                          value={action.targetSubjectType}
+                          options={subjectTypeOptions}
+                          onChange={(value) => updateDetail((prev) => ({
+                            ...prev,
+                            actions: prev.actions.map((item, actionIndex) => (actionIndex === index ? { ...item, targetSubjectType: value } : item)),
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ marginBottom: 6 }}>目标 ID 路径</div>
+                        <Input
+                          value={action.targetIdPath}
+                          onChange={(e) => updateDetail((prev) => ({
+                            ...prev,
+                            actions: prev.actions.map((item, actionIndex) => (actionIndex === index ? { ...item, targetIdPath: e.target.value } : item)),
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ marginBottom: 6 }}>会话类型</div>
+                        <Select
+                          style={{ width: '100%' }}
+                          allowClear
+                          value={action.sessionType}
+                          options={sessionTypeOptions}
+                          onChange={(value) => updateDetail((prev) => ({
+                            ...prev,
+                            actions: prev.actions.map((item, actionIndex) => (actionIndex === index ? { ...item, sessionType: value } : item)),
+                          }))}
+                        />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
                         <div style={{ marginBottom: 6 }}>动作 Meta(JSON)</div>
                         <TextArea
                           rows={4}
                           value={action.metaText}
-                          onChange={(e) => updateAction(index, (prev) => ({ ...prev, metaText: e.target.value }))}
+                          onChange={(e) => updateDetail((prev) => ({
+                            ...prev,
+                            actions: prev.actions.map((item, actionIndex) => (actionIndex === index ? { ...item, metaText: e.target.value } : item)),
+                          }))}
                         />
                       </div>
                     </div>

@@ -56,8 +56,6 @@
   - `POST /api/admin/daily-entries`
   - `PUT /api/admin/daily-entries/{id}`
   - `PUT /api/admin/daily-entries/{id}/status`
-  - `GET /api/admin/daily-entries/{id}/behavior`
-  - `PUT /api/admin/daily-entries/{id}/behavior`
   - `GET /api/admin/daily-entries/{id}/targets`
   - `PUT /api/admin/daily-entries/{id}/targets`
   - 兼容旧路径：
@@ -71,16 +69,13 @@
   - `PUT /api/admin/daily-entry-chat-policies/{dailyEntryId}`
   - `GET /api/admin/daily-entry-chat-policies/{dailyEntryId}/session-bindings`
   - `PUT /api/admin/daily-entry-chat-policies/{dailyEntryId}/session-bindings`
-- 人员外部账号绑定：
-  - `GET /api/admin/user-external-accounts`
-  - `GET /api/admin/users/{userId}/external-accounts`
-  - `PUT /api/admin/users/{userId}/external-accounts`
-  - `PUT /api/admin/users/{userId}/external-accounts/unbind`
 - 工作流模板：
   - `GET /api/admin/workflow-templates/packages`
+  - `GET /api/admin/workflow-templates/positions`（模板岗位选项）
   - `GET /api/admin/workflow-templates/packages/{id}`
   - `POST /api/admin/workflow-templates/packages`
   - `PUT /api/admin/workflow-templates/packages/{id}`（仅更新 package 基本信息）
+  - `DELETE /api/admin/workflow-templates/packages/{id}`
   - `PUT /api/admin/workflow-templates/packages/{id}/status`（仅 `ACTIVE|DISABLED`）
   - `POST /api/admin/workflow-templates/packages/{id}/copy`
   - `GET /api/admin/workflow-templates/packages/{id}/nodes`
@@ -115,6 +110,7 @@
 
 ### 3.5 运行时流程
 
+- 可用模板查询：`GET /api/workflows/template-packages`（默认按当前用户岗位过滤，可额外传 `positionId`；模板支持绑定多个岗位）
 - 模板实例化：`POST /api/workflows/from-template`
 
 ## 4. 契约边界
@@ -145,46 +141,28 @@
 - V1.1.9 起岗位模板关系仅认 `mo_portal_templates.position_id`；岗位模板查询、生成与运行时解析不再读取 `meta.positionId`，角色种子模板以 `position_id IS NULL` 识别。
 - V1.1.10 起运行时数据集采用 `dataKey -> provider` 白名单注册；未注册 `dataKey` 返回 `400`，不再走默认 `switch/null` 降级。
 - V1.1.10 起 `POST /api/portal-runtime/open-workbench-session` 成为 `open_workbench_session` 的统一后端入口；`sessionType=DAILY_ENTRY` 仅按 `mo_daily_entry_chat_policies` + `mo_daily_entry_session_bindings` 解析，不再回退其他事实源。
-- V1.1.12 起 `open_workbench_session` 动作可携带结构化前置弹窗配置：动作响应新增 `requiresPreActionForm`、`preActionFormTitle`、`preActionFormSubmitLabel`、`preActionFields[]` 与 `preActionForm`；其中 `preActionForm.fields` 为同源嵌套镜像，前端必须按动作配置决定是否先收集参数，不得按条目名称硬编码。
-- V1.1.12 起 `POST /api/portal-runtime/open-workbench-session` 支持扩展请求体：
-  - `actionId`：可选；传入后后端会按动作配置校验前置参数与执行模式。
-  - `actionParams`：可选；结构化动作参数对象，当前首个场景至少支持 `session_title`。
-  - `formData` / `params`：短期兼容别名，后端会归并为 `actionParams`。
-- V1.1.12 起 `open_workbench_session(sessionType=DAILY_ENTRY)` 兼容两条链路：
-  - 旧链路：无 `actionId` 时继续按聊天策略 + 会话绑定解析并打开既有会话。
-  - 新链路：若动作配置 `meta.executionMode=CREATE_SESSION` 且声明前置字段，则按 `actionParams` 创建新会话并返回。
-- V1.1.12 起统一执行结果增加：
-  - `actionResultType`：`OPEN_EXISTING_SESSION | CREATED_SESSION`
-  - `sessionId`
-  - `sessionTitle`
-  - `sessionStatus`
-  - `sessionMeta`
-  - `actionId`（若本次按动作配置执行）
 - V1.1.11 起“日常条目管理”主接口写入 `mo_daily_categories`；适用范围、聊天策略、会话绑定分别走 `mo_daily_entry_targets`、`mo_daily_entry_chat_policies`、`mo_daily_entry_session_bindings`，不再把 `mo_daily_entries` 作为新版主写入表。
 - V1.1.11 起 `daily_list` 仅从新版条目管理数据装配：读取 ACTIVE 条目并按 ACTIVE 目标范围过滤；若条目无 ACTIVE 目标记录则视为全局可见，不回退旧销售卡片拼装。
 - V1.1.11 日常条目状态最终枚举为 `ACTIVE|INACTIVE`；后端短期兼容 `DISABLED -> INACTIVE`，兼容计划保留到 `V1.1.12`。
 - V1.1.11 `PUT /api/admin/daily-entries/{id}/targets` 与 `PUT /api/admin/daily-entry-chat-policies/{dailyEntryId}/session-bindings` 标准 body 为数组；后端短期兼容对象包装体 `{ "targets": [...] }` 与 `{ "bindings": [...] }`，兼容计划保留到 `V1.1.12`。
 - V1.1.11 旧路径 `/api/admin/daily-entries/{id}/chat-policy` 与 `/api/admin/daily-entries/{id}/session-bindings` 为短期兼容入口，内部转发到新聊天配置服务，兼容计划保留到 `V1.1.12`。
-- V1.1.13 起日常条目行为配置正式归属 `daily-entries`：新增 `GET/PUT /api/admin/daily-entries/{id}/behavior`，配置结构以 `actionType/sessionType/executionMode/requiresPreActionForm/preActionFormTitle/preActionFormSubmitLabel/preActionFields[]` 为主，不再以 block 动作为日常条目行为主来源。
-- V1.1.13 起 `daily_list` 运行时条目在存在 ACTIVE 行为配置时返回 `behavior` 摘要；前端应按条目行为决定是否先弹窗，不得按“会议”等名称硬编码。
-- V1.1.13 起 `POST /api/portal-runtime/open-workbench-session` 在 `sessionType=DAILY_ENTRY` 时优先读取日常条目 ACTIVE 行为配置：
-  - 若 `executionMode=CREATE_SESSION`，则按 `preActionFields[]` 校验 `actionParams` 后创建新会话并返回 `CREATED_SESSION`
-  - 若无 ACTIVE 行为配置，或行为配置未声明创建新会话，则继续走既有聊天策略 + 会话绑定解析并返回 `OPEN_EXISTING_SESSION`
-- V1.1.15 起人员外部账号绑定正式走 `mo_user_external_accounts`：
-  - 管理主路径为 `GET /api/admin/user-external-accounts` 与 `GET/PUT /api/admin/users/{userId}/external-accounts`
-  - 绑定关系正式挂在 `user_id`，不得引入 `position_id` 主路径
-  - `PUT /api/admin/users/{userId}/external-accounts` 唯一约束冲突需返回明确错误：`该外部账号已绑定其他用户` 或 `当前用户在该平台企业下已存在绑定`
-  - `PUT /api/admin/users/{userId}/external-accounts/unbind` 采用状态解绑，状态更新为 `UNBOUND`，不默认物理删除
 - `data.blocks` 容器约定：
   - `LIST` 输出 `{ "items": [] }`
   - `CARD` 输出 `{ "entries": [] }` 或 `{ "blocks": [] }`
   - 空数据统一返回空数组容器，不返回 `null` 或裸数组
 - 工作流模板包状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
+- V1.1.12 起工作流模板主归类字段切换为岗位绑定：
+  - 管理端创建/筛选岗位模板优先使用 `positionIds`（兼容旧的单值 `positionId`）
+  - 多岗位绑定关系存于 `mo_workflow_recommendation_package_positions`
+  - `mo_workflow_recommendation_packages.position_id` 保留为兼容字段，记录首个岗位
+  - 运行时 `GET /api/workflows/template-packages` 默认只返回当前用户岗位可见模板（另保留未绑定岗位的通用模板）
+  - `POST /api/workflows/from-template` 会校验模板岗位归属；用户岗位与模板绑定岗位无交集时返回 `403`
+  - `sceneCategory/scene_category` 退化为可空的推荐作用域兼容字段，不再作为模板主分类字段
 - `POST /api/workflows/from-template` 仅允许 `ACTIVE` 模板实例化；`DISABLED` 模板返回 `400` 明确拒绝。
 - 节点功能状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
 - 模板节点绑定 `DISABLED` 节点功能会被明确拦截并返回可展示错误信息。
 - 行为配置解析链路固定为：`POSITION -> ROLE -> DEFAULT`（岗位优先，角色兜底）。
-- V1.1.5 起：`PUT /packages/{id}/nodes` 若携带 package 字段（如 `name/status/scene_category/sort_order`）返回 `400`。
+- V1.1.5 起：`PUT /packages/{id}/nodes` 若携带 package 字段（如 `name/status/scene_category/position_id/sort_order`）返回 `400`。
 
 ## 7. OpenAPI（V1.1.4）
 

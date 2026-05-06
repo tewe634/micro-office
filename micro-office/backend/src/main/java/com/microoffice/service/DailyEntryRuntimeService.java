@@ -20,7 +20,6 @@ public class DailyEntryRuntimeService {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
-    private final DailyEntryBehaviorService dailyEntryBehaviorService;
 
     public List<Map<String, Object>> buildDailyList(Map<String, Object> runtimePayload) {
         String viewerId = asNullableString(asMap(runtimePayload.get("header")).get("id"));
@@ -44,9 +43,6 @@ public class DailyEntryRuntimeService {
         );
         Map<String, List<Map<String, Object>>> targetsByEntryId = targetRows.stream()
             .collect(Collectors.groupingBy(row -> asString(row.get("daily_entry_id")), LinkedHashMap::new, Collectors.toList()));
-        Map<String, Map<String, Object>> behaviorsByEntryId = dailyEntryBehaviorService.loadRuntimeBehaviors(
-            categories.stream().map(row -> asString(row.get("id"))).toList()
-        );
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : categories) {
@@ -67,10 +63,6 @@ public class DailyEntryRuntimeService {
             item.put("hint", firstNonBlank(asNullableString(meta.get("description")), asNullableString(meta.get("hint"))));
             item.put("icon", asNullableString(meta.get("icon")));
             item.put("meta", meta);
-            Map<String, Object> behavior = behaviorsByEntryId.get(dailyEntryId);
-            if (behavior != null) {
-                item.put("behavior", behavior);
-            }
             result.add(item);
         }
         return result;

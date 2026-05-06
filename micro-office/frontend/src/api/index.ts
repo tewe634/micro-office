@@ -67,22 +67,6 @@ export interface PortalTemplatePreviewParams {
 }
 
 export type PortalBlockTemplateStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
-export type PortalActionFormFieldInputType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'SELECT' | (string & {});
-export type PortalActionFormFieldStatus = 'ACTIVE' | 'INACTIVE';
-
-export interface PortalBlockTemplateActionFormFieldPayload {
-  id?: string;
-  fieldKey: string;
-  label: string;
-  inputType: PortalActionFormFieldInputType;
-  required?: boolean;
-  placeholder?: string | null;
-  defaultValue?: string | null;
-  maxLength?: number | null;
-  sortOrder?: number;
-  status?: PortalActionFormFieldStatus;
-  meta?: Record<string, any>;
-}
 
 export interface PortalBlockTemplateActionPayload {
   id?: string;
@@ -90,10 +74,6 @@ export interface PortalBlockTemplateActionPayload {
   targetSubjectType?: string | null;
   targetIdPath?: string | null;
   sessionType?: string | null;
-  requiresPreActionForm?: boolean;
-  preActionFormTitle?: string | null;
-  preActionFormSubmitLabel?: string | null;
-  preActionFields?: PortalBlockTemplateActionFormFieldPayload[];
   meta?: Record<string, any>;
 }
 
@@ -108,76 +88,16 @@ export interface PortalBlockTemplatePayload {
   actions?: PortalBlockTemplateActionPayload[];
 }
 
-export interface PortalRuntimeResolvePayload {
-  entityType: string;
-  entityId: string;
-  templateId?: string;
-  context?: Record<string, any>;
-  contracts?: Array<Record<string, any>>;
-}
-
-export interface PortalRuntimeOpenWorkbenchSessionPayload {
-  sessionType: string;
-  targetId?: string;
-  dailyEntryId?: string;
-  actionId?: string;
-  actionParams?: Record<string, any>;
-  formData?: Record<string, any>;
-  params?: Record<string, any>;
-  context?: Record<string, any>;
-  [key: string]: any;
-}
-
-export interface PortalRuntimeOpenWorkbenchSessionResult {
-  actionResultType?: string;
-  redirectUrl?: string;
-  sessionId?: string;
-  sessionTitle?: string;
-  sessionType?: string;
-  targetId?: string;
-  [key: string]: any;
-}
-
 export type DailyEntryStatus = 'ACTIVE' | 'INACTIVE';
 export type DailyEntryTargetType = 'ORG' | 'USER';
 export type DailyEntrySessionResolveStrategy = 'BY_ENTRY_ONLY' | 'BY_ENTRY_AND_USER';
 export type DailyEntryBindingScope = 'SHARED' | 'PERSONAL';
-export type DailyEntryBehaviorActionType = 'OPEN_WORKBENCH_SESSION' | (string & {});
-export type DailyEntryBehaviorExecutionMode = 'OPEN_EXISTING' | 'CREATE_SESSION' | (string & {});
-export type UserExternalAccountProvider = 'DINGTALK' | (string & {});
-export type UserExternalAccountStatus = 'ACTIVE' | 'UNBOUND' | 'INACTIVE' | (string & {});
-
-export interface UserExternalAccountBindingPayload {
-  id?: string;
-  userId: string | number;
-  provider: UserExternalAccountProvider;
-  corpId: string;
-  externalUserId: string;
-  status: UserExternalAccountStatus;
-  boundAt?: string | null;
-  meta?: Record<string, any>;
-  version?: number;
-}
-
-export interface DailyEntryBehaviorPayload {
-  actionId?: string;
-  enabled?: boolean;
-  actionType: DailyEntryBehaviorActionType;
-  sessionType?: string | null;
-  executionMode?: DailyEntryBehaviorExecutionMode | null;
-  requiresPreActionForm?: boolean;
-  preActionFormTitle?: string | null;
-  preActionFormSubmitLabel?: string | null;
-  preActionFields?: PortalBlockTemplateActionFormFieldPayload[];
-  meta?: Record<string, any>;
-}
 
 export interface DailyEntryPayload {
   code: string;
   name: string;
   sortOrder?: number;
   status: DailyEntryStatus;
-  behaviorConfig?: DailyEntryBehaviorPayload | null;
   meta?: Record<string, any>;
 }
 
@@ -211,6 +131,30 @@ export interface DailyEntrySessionBindingPayload {
 
 export type WorkflowTemplateStatus = 'ACTIVE' | 'DISABLED';
 
+export interface WorkflowTemplatePositionOption {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface WorkflowTemplatePackageSummary {
+  id: string;
+  name: string;
+  positionId?: string | null;
+  positionIds?: string[];
+  positionName?: string | null;
+  positionNames?: string[];
+  sceneCategory?: string | null;
+  description?: string | null;
+  status: WorkflowTemplateStatus;
+  sortOrder?: number;
+  tags?: any[];
+  meta?: Record<string, any>;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type WorkflowRelationType = 'SEQUENCE' | 'PARALLEL';
 
 export type WorkflowNodeFeatureStatus = 'ACTIVE' | 'DISABLED';
@@ -231,7 +175,7 @@ export interface WorkflowTemplatePackageNodePayload {
 }
 
 export const authApi = {
-  login: (data: { email: string; password: string }) => api.post('/auth/login', data),
+  login: (data: { email?: string; login?: string; password: string }) => api.post('/auth/login', data),
   register: (data: any) => api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
 };
@@ -348,8 +292,6 @@ export const dailyEntryAdminApi = {
   createEntry: (data: DailyEntryPayload) => api.post('/admin/daily-entries', data),
   updateEntry: (id: string | number, data: DailyEntryPayload) => api.put(`/admin/daily-entries/${id}`, data),
   updateEntryStatus: (id: string | number, status: DailyEntryStatus) => api.put(`/admin/daily-entries/${id}/status`, { status }),
-  getBehavior: (id: string | number) => api.get(`/admin/daily-entries/${id}/behavior`),
-  saveBehavior: (id: string | number, data: DailyEntryBehaviorPayload | null) => api.put(`/admin/daily-entries/${id}/behavior`, data),
   listTargets: (id: string | number) => api.get(`/admin/daily-entries/${id}/targets`),
   saveTargets: (id: string | number, targets: DailyEntryTargetPayload[]) => api.put(`/admin/daily-entries/${id}/targets`, targets),
   getChatPolicy: (id: string | number) => api.get(`/admin/daily-entry-chat-policies/${id}`),
@@ -358,45 +300,38 @@ export const dailyEntryAdminApi = {
   saveSessionBindings: (id: string | number, bindings: DailyEntrySessionBindingPayload[]) => api.put(`/admin/daily-entry-chat-policies/${id}/session-bindings`, bindings),
 };
 
-export const userExternalAccountAdminApi = {
-  list: (params?: { keyword?: string; status?: UserExternalAccountStatus; provider?: UserExternalAccountProvider }) => api.get('/admin/user-external-accounts', { params }),
-  get: (userId: string | number) => api.get(`/admin/users/${userId}/external-accounts`),
-  save: (userId: string | number, data: UserExternalAccountBindingPayload) => api.put(`/admin/users/${userId}/external-accounts`, data),
-  unbind: (userId: string | number, data?: { reason?: string }) => api.put(`/admin/users/${userId}/external-accounts/unbind`, data || {}),
-};
-
 export const portalApi = {
   user: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/users/${id}`, { params }),
   object: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/objects/${id}`, { params }),
   product: (id: string | number, params?: PortalRequestParams) => api.get(`/portal/products/${id}`, { params }),
 };
 
-export const portalRuntimeApi = {
-  resolve: (data: PortalRuntimeResolvePayload) => api.post('/portal-runtime/resolve', data),
-  openWorkbenchSession: (data: PortalRuntimeOpenWorkbenchSessionPayload) => api.post('/portal-runtime/open-workbench-session', data),
-};
-
 export const workflowTemplateApi = {
-  listPackages: (params?: { sceneCategory?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  listPackages: (params?: { positionId?: string; sceneCategory?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  listPositions: () => api.get('/admin/workflow-templates/positions'),
+  getPackage: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}`),
   createPackage: (data: {
     name: string;
-    scene_category: string;
+    positionIds: string[];
+    sceneCategory?: string;
     description?: string;
-    status: WorkflowTemplateStatus;
-    sort_order?: number;
+    sortOrder?: number;
     tags?: string[];
     meta?: Record<string, any>;
   }) => api.post('/admin/workflow-templates/packages', data),
   updatePackage: (id: string | number, data: {
     name: string;
-    scene_category: string;
+    positionIds?: string[];
+    sceneCategory?: string | null;
     description?: string;
-    sort_order?: number;
+    sortOrder?: number;
     tags?: string[];
     meta?: Record<string, any>;
   }) => api.put(`/admin/workflow-templates/packages/${id}`, data),
   updatePackageStatus: (id: string | number, status: WorkflowTemplateStatus) => api.put(`/admin/workflow-templates/packages/${id}/status`, { status }),
+  deletePackage: (id: string | number) => api.delete(`/admin/workflow-templates/packages/${id}`),
   copyPackage: (id: string | number, data?: { name?: string }) => api.post(`/admin/workflow-templates/packages/${id}/copy`, data),
+  listAvailablePackages: (params?: { positionId?: string }) => api.get('/workflows/template-packages', { params }),
   listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),
   saveNodes: (id: string | number, nodes: WorkflowTemplatePackageNodePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
   listModuleDefinitions: (params?: { nodeType?: string; roleKey?: string; positionKey?: string }) => api.get('/admin/workflow-templates/module-definitions', { params }),

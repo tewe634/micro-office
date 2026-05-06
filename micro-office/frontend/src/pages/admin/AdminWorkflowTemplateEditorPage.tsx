@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Input, Modal, Space, Tag, message } from 'antd';
 import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { WorkflowRelationType, WorkflowTemplatePackageNodePayload, WorkflowTemplateStatus } from '../../api';
+import type { WorkflowRelationType, WorkflowTemplatePackageNodePayload, WorkflowTemplatePackageSummary, WorkflowTemplateStatus } from '../../api';
 import { workflowNodeFeatureApi, workflowTemplateApi } from '../../api';
 
 type NodeItem = {
@@ -133,7 +133,7 @@ export default function AdminWorkflowTemplateEditorPage() {
   const packageId = String(id || '');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [packageDetail, setPackageDetail] = useState<any>(null);
+  const [packageDetail, setPackageDetail] = useState<WorkflowTemplatePackageSummary | null>(null);
   const [nodes, setNodes] = useState<NodeItem[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [moduleKeyword, setModuleKeyword] = useState('');
@@ -209,9 +209,8 @@ export default function AdminWorkflowTemplateEditorPage() {
 
   const loadPackageDetail = async () => {
     if (!packageId) return;
-    const response: any = await workflowTemplateApi.listPackages();
-    const records = response.data || [];
-    const detail = records.find((item: any) => String(item.id) === packageId);
+    const response: any = await workflowTemplateApi.getPackage(packageId);
+    const detail = response.data;
     if (!detail) {
       throw new Error('模板包不存在');
     }
@@ -269,7 +268,7 @@ export default function AdminWorkflowTemplateEditorPage() {
     }
     const moduleDef = moduleDefinitionMap.get(selectedNode.module_definition_id);
     const response: any = await workflowTemplateApi.listRecommendations({
-      sceneCategory: packageDetail.scene_category,
+      sceneCategory: packageDetail.sceneCategory || undefined,
       currentModuleDefinitionId: selectedNode.module_definition_id || undefined,
       currentNodeType: moduleDef?.node_type || selectedNode.node_type || undefined,
     });
@@ -306,7 +305,7 @@ export default function AdminWorkflowTemplateEditorPage() {
   useEffect(() => {
     void loadModuleFields(selectedNode?.module_definition_id);
     void loadRecommendations();
-  }, [selectedNode?.id, selectedNode?.module_definition_id, packageDetail?.scene_category, moduleDefinitionMap]);
+  }, [selectedNode?.id, selectedNode?.module_definition_id, packageDetail?.sceneCategory, moduleDefinitionMap]);
 
   useEffect(() => {
     const run = async () => {

@@ -1,21 +1,6 @@
-import { useState } from 'react';
-import { Button, Card, Empty, Input, List, Space, Statistic, Typography, message } from 'antd';
+import { Button, Card, Empty, Input, List, Space, Statistic, Typography } from 'antd';
 import { MessageOutlined, SwapOutlined } from '@ant-design/icons';
-import { portalRuntimeApi, type DailyEntryBehaviorPayload, type PortalBlockTemplateActionPayload, type PortalRuntimeOpenWorkbenchSessionResult, type PortalTemplatePreviewPayload } from '../../api';
-import PortalActionFormModal from './PortalActionFormModal';
-import {
-  buildDailyEntryOpenSessionPayload,
-  consumeDailyEntrySessionResult,
-  normalizeDailyEntryBehavior,
-  requiresDailyEntryPreActionForm,
-} from './dailyEntryBehaviorRuntime';
-import {
-  buildOpenWorkbenchSessionPayload,
-  consumeWorkbenchSessionResult,
-  getActionType,
-  requiresPreActionForm,
-  type PortalActionExecutionContext,
-} from './portalActionRuntime';
+import type { PortalTemplatePreviewPayload } from '../../api';
 
 const { Paragraph, Text } = Typography;
 
@@ -33,7 +18,7 @@ type BlockModel = {
   title: string;
   dataKey: string;
   displayType: string;
-  actions: PortalBlockTemplateActionPayload[];
+  actions: Array<Record<string, any>>;
 };
 
 type ModuleModel = {
@@ -41,7 +26,7 @@ type ModuleModel = {
   title: string;
   displayType: string;
   dataKey: string;
-  actions: PortalBlockTemplateActionPayload[];
+  actions: Array<Record<string, any>>;
 };
 
 type StatItem = {
@@ -123,38 +108,11 @@ function summarizeObject(value: Record<string, any>) {
   return parts.join('；') || '-';
 }
 
-function normalizeAction(raw: Record<string, any>): PortalBlockTemplateActionPayload {
-  return {
-    id: asText(raw.id),
-    actionType: asText(raw.actionType || raw.action_type) || 'open_workbench_session',
-    targetSubjectType: asText(raw.targetSubjectType || raw.target_subject_type) || null,
-    targetIdPath: asText(raw.targetIdPath || raw.target_id_path) || null,
-    sessionType: asText(raw.sessionType || raw.session_type) || null,
-    requiresPreActionForm: raw.requiresPreActionForm === true || raw.requires_pre_action_form === true,
-    preActionFormTitle: asText(raw.preActionFormTitle || raw.pre_action_form_title) || null,
-    preActionFormSubmitLabel: asText(raw.preActionFormSubmitLabel || raw.pre_action_form_submit_label || raw.pre_action_form_submit_text) || null,
-    preActionFields: asArray<Record<string, any>>(raw.preActionFields || raw.pre_action_fields).map((field, index) => ({
-      id: asText(field.id),
-      fieldKey: asText(field.fieldKey || field.field_key) || `field-${index}`,
-      label: asText(field.label) || `字段${index + 1}`,
-      inputType: asText(field.inputType || field.input_type) || 'TEXT',
-      required: field.required === true,
-      placeholder: asText(field.placeholder) || null,
-      defaultValue: asText(field.defaultValue || field.default_value) || null,
-      maxLength: typeof field.maxLength === 'number' ? field.maxLength : typeof field.max_length === 'number' ? field.max_length : null,
-      sortOrder: typeof field.sortOrder === 'number' ? field.sortOrder : typeof field.sort_order === 'number' ? field.sort_order : index,
-      status: (asText(field.status) || 'ACTIVE') === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
-      meta: asObject(field.meta),
-    })),
-    meta: asObject(raw.meta),
-  };
-}
-
 function normalizeActionList(raw: RawBlock) {
   const direct = asArray<Record<string, any>>(raw.actions);
-  if (direct.length) return direct.map(normalizeAction);
+  if (direct.length) return direct;
   const metaActions = asArray<Record<string, any>>(asObject(raw.meta).actions);
-  return metaActions.map(normalizeAction);
+  return metaActions;
 }
 
 function normalizeBlock(raw: RawBlock): BlockModel {
@@ -180,7 +138,7 @@ function normalizeSection(raw: RawSection): SectionModel {
   };
 }
 
-function findBlockPayload(block: BlockModel | ModuleModel, blocksData: Record<string, any>) {
+function findBlockPayload(block: BlockModel, blocksData: Record<string, any>) {
   return blocksData[block.dataKey] ?? blocksData[block.key] ?? null;
 }
 
@@ -201,50 +159,19 @@ function extractCardItems(payload: unknown) {
   return [];
 }
 
-function actionIcon(actionType: string) {
-  if (actionType === 'switch_subject') return <SwapOutlined />;
-  if (actionType === 'open_workbench_session') return <MessageOutlined />;
-  return undefined;
-}
-
-function actionLabel(action: PortalBlockTemplateActionPayload) {
-  const actionType = getActionType(action);
-  if (actionType === 'switch_subject') return '切换';
-  if (actionType === 'open_workbench_session') return '会话';
-  return action.actionType;
-}
-
-function renderActionButtons(
-  items: PortalBlockTemplateActionPayload[],
-  sourceRecord: Record<string, any> | null,
-  onActionClick: (action: PortalBlockTemplateActionPayload, context: PortalActionExecutionContext) => void,
-  preview: PortalTemplatePreviewPayload | null,
-) {
-  if (!items.length) return null;
+function actionButton(items: Array<Record<string, any>>) {
+  const hasSwitch = items.some(action => asText(action.actionType || action.action_type) === 'switch_subject');
+  const hasSession = items.some(action => asText(action.actionType || action.action_type) === 'open_workbench_session');
+  if (!hasSwitch && !hasSession) return null;
   return (
-    <Space size={8} wrap>
-      {items.map((action, index) => (
-        <Button
-          key={action.id || `${action.actionType}-${index}`}
-          size="small"
-          className="portal-preview-action-btn"
-          icon={actionIcon(getActionType(action) || '')}
-          onClick={() => onActionClick(action, { sourceRecord, templatePreview: preview })}
-        >
-          {actionLabel(action)}
-        </Button>
-      ))}
+    <Space size={8}>
+      {hasSwitch ? <Button size="small" className="portal-preview-action-btn" icon={<SwapOutlined />}>切换</Button> : null}
+      {hasSession ? <Button size="small" className="portal-preview-action-btn" icon={<MessageOutlined />}>会话</Button> : null}
     </Space>
   );
 }
 
-function renderListBlock(
-  block: BlockModel,
-  payload: unknown,
-  preview: PortalTemplatePreviewPayload | null,
-  onActionClick: (action: PortalBlockTemplateActionPayload, context: PortalActionExecutionContext) => void,
-  onDailyEntryBehaviorClick: (entry: Record<string, any>, behavior: DailyEntryBehaviorPayload) => void,
-) {
+function renderListBlock(block: BlockModel, payload: unknown) {
   const rows = extractListItems(payload);
   if (!rows.length) return null;
   return (
@@ -256,7 +183,6 @@ function renderListBlock(
         const ownerName = asText(row.owner_name) || asText(row.ownerName) || '-';
         const customerStatus = asText(row.customer_status) || asText(row.customerStatus);
         const subtitle = [ownerName, customerStatus].filter(Boolean).join(' · ');
-        const dailyEntryBehavior = normalizeDailyEntryBehavior(row);
         return (
           <List.Item style={{ padding: 0, marginBottom: 8 }}>
             <Card size="small" className="portal-preview-inner-card portal-preview-inner-card--list" style={{ width: '100%' }}>
@@ -265,16 +191,7 @@ function renderListBlock(
                   <div className="portal-preview-list-row__title">{customerName}</div>
                   <Text className="portal-preview-muted-text">{subtitle || '-'}</Text>
                 </div>
-                {dailyEntryBehavior?.enabled ? (
-                  <Button
-                    size="small"
-                    className="portal-preview-action-btn"
-                    icon={<MessageOutlined />}
-                    onClick={() => onDailyEntryBehaviorClick(row, dailyEntryBehavior)}
-                  >
-                    会话
-                  </Button>
-                ) : renderActionButtons(block.actions, row, onActionClick, preview)}
+                {actionButton(block.actions)}
               </div>
             </Card>
           </List.Item>
@@ -389,14 +306,8 @@ function renderTextBlock(payload: unknown) {
   return <Paragraph className="portal-preview-summary-text" style={{ marginBottom: 0 }}>{formatValue(payload)}</Paragraph>;
 }
 
-function renderBlock(
-  block: BlockModel,
-  payload: unknown,
-  preview: PortalTemplatePreviewPayload | null,
-  onActionClick: (action: PortalBlockTemplateActionPayload, context: PortalActionExecutionContext) => void,
-  onDailyEntryBehaviorClick: (entry: Record<string, any>, behavior: DailyEntryBehaviorPayload) => void,
-) {
-  if (block.displayType === 'LIST') return renderListBlock(block, payload, preview, onActionClick, onDailyEntryBehaviorClick);
+function renderBlock(block: BlockModel, payload: unknown) {
+  if (block.displayType === 'LIST') return renderListBlock(block, payload);
   if (block.displayType === 'STAT') return renderStatBlock(payload);
   if (block.displayType === 'TEXT') return renderTextBlock(payload);
   return renderCardBlock(block, payload);
@@ -424,13 +335,7 @@ function collectModules(sections: SectionModel[]): ModuleModel[] {
   return modules;
 }
 
-function renderModule(
-  module: ModuleModel,
-  blocksData: Record<string, any>,
-  preview: PortalTemplatePreviewPayload | null,
-  onActionClick: (action: PortalBlockTemplateActionPayload, context: PortalActionExecutionContext) => void,
-  onDailyEntryBehaviorClick: (entry: Record<string, any>, behavior: DailyEntryBehaviorPayload) => void,
-) {
+function renderModule(module: ModuleModel, blocksData: Record<string, any>) {
   const payload = findBlockPayload(module, blocksData);
   const block: BlockModel = {
     key: module.key,
@@ -441,14 +346,11 @@ function renderModule(
   };
   return (
     <Card key={module.key} size="small" className="portal-preview-module-card" title={module.title}>
-      <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        {payload !== null && payload !== undefined ? (
-          renderBlock(block, payload, preview, onActionClick, onDailyEntryBehaviorClick)
-        ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无展示数据" />
-        )}
-        {block.displayType !== 'LIST' ? renderActionButtons(module.actions, asObject(payload), onActionClick, preview) : null}
-      </Space>
+      {payload !== null && payload !== undefined ? (
+        renderBlock(block, payload)
+      ) : (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无展示数据" />
+      )}
     </Card>
   );
 }
@@ -464,161 +366,25 @@ export default function PortalTemplatePreviewRenderer({ preview }: { preview: Po
   const globalSearch = asObject(asObject(template.meta).globalSearch);
   const globalSearchEnabled = globalSearch.enabled === true;
   const globalSearchPlaceholder = asText(globalSearch.placeholder) || '搜索全局相关内容';
-  const [pendingAction, setPendingAction] = useState<PortalBlockTemplateActionPayload | null>(null);
-  const [pendingContext, setPendingContext] = useState<PortalActionExecutionContext | null>(null);
-  const [pendingEntryBehavior, setPendingEntryBehavior] = useState<DailyEntryBehaviorPayload | null>(null);
-  const [pendingEntryRecord, setPendingEntryRecord] = useState<Record<string, any> | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-
-  const clearPendingAction = () => {
-    setPendingAction(null);
-    setPendingContext(null);
-    setPendingEntryBehavior(null);
-    setPendingEntryRecord(null);
-    setModalOpen(false);
-  };
-
-  const executeAction = async (
-    action: PortalBlockTemplateActionPayload,
-    context: PortalActionExecutionContext,
-    formValues?: Record<string, any>,
-  ) => {
-    const actionType = getActionType(action);
-    if (!actionType) {
-      message.warning('动作类型缺失，无法执行');
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      if (actionType === 'open_workbench_session') {
-        const payload = buildOpenWorkbenchSessionPayload(action, context, formValues);
-        if (!payload.targetId) {
-          message.warning('当前记录缺少 targetId，无法打开会话');
-          return;
-        }
-        const resp: any = await portalRuntimeApi.openWorkbenchSession(payload);
-        const result = (resp?.data || resp || {}) as PortalRuntimeOpenWorkbenchSessionResult;
-        if (!consumeWorkbenchSessionResult(result)) {
-          message.success(result.sessionTitle ? `会话已处理：${result.sessionTitle}` : '动作执行成功');
-        }
-        return;
-      }
-
-      if (actionType === 'switch_subject') {
-        message.info('预览模式暂不模拟主体切换');
-        return;
-      }
-
-      message.info(`预览模式暂未接入动作：${action.actionType}`);
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || error?.message || '动作执行失败');
-      throw error;
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleActionClick = (action: PortalBlockTemplateActionPayload, context: PortalActionExecutionContext) => {
-    if (requiresPreActionForm(action)) {
-      setPendingAction(action);
-      setPendingContext(context);
-      setModalOpen(true);
-      return;
-    }
-    void executeAction(action, context);
-  };
-
-  const executeDailyEntryBehavior = async (
-    entry: Record<string, any>,
-    behavior: DailyEntryBehaviorPayload,
-    formValues?: Record<string, any>,
-  ) => {
-    try {
-      setActionLoading(true);
-      if (behavior.actionType !== 'OPEN_WORKBENCH_SESSION') {
-        message.info(`预览模式暂未接入条目行为：${behavior.actionType}`);
-        return;
-      }
-      const payload = buildDailyEntryOpenSessionPayload(entry, behavior, {
-        entityType: asText(preview?.entityType),
-        entityId: asText(preview?.entityId),
-        positionId: asText(asObject(preview?.portalContext).positionId),
-        scope: asText(asObject(preview?.portalContext).scope),
-      }, formValues);
-      if (!payload.dailyEntryId) {
-        message.warning('当前条目缺少 id，无法执行行为');
-        return;
-      }
-      const resp: any = await portalRuntimeApi.openWorkbenchSession(payload);
-      const result = (resp?.data || resp || {}) as PortalRuntimeOpenWorkbenchSessionResult;
-      if (!consumeDailyEntrySessionResult(result)) {
-        message.success(result.sessionTitle ? `会话已处理：${result.sessionTitle}` : '条目行为执行成功');
-      }
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || error?.message || '条目行为执行失败');
-      throw error;
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDailyEntryBehaviorClick = (entry: Record<string, any>, behavior: DailyEntryBehaviorPayload) => {
-    if (requiresDailyEntryPreActionForm(behavior)) {
-      setPendingEntryRecord(entry);
-      setPendingEntryBehavior(behavior);
-      setModalOpen(true);
-      return;
-    }
-    void executeDailyEntryBehavior(entry, behavior);
-  };
 
   if (!modules.length) {
     return <Empty description="当前模板暂无可预览结构" />;
   }
 
   return (
-    <>
-      <div className="portal-preview-cockpit">
-        <div className="portal-preview-cockpit__glow portal-preview-cockpit__glow--a" />
-        <div className="portal-preview-cockpit__glow portal-preview-cockpit__glow--b" />
-        <div className="portal-preview-cockpit__body">
-          {globalSearchEnabled ? (
-            <div className="portal-preview-search-shell">
-              <Input.Search disabled enterButton="检索" placeholder={globalSearchPlaceholder} />
-            </div>
-          ) : null}
-          <div className="portal-preview-module-grid">
-            {modules.map(module => renderModule(module, blocksData, preview, handleActionClick, handleDailyEntryBehaviorClick))}
+    <div className="portal-preview-cockpit">
+      <div className="portal-preview-cockpit__glow portal-preview-cockpit__glow--a" />
+      <div className="portal-preview-cockpit__glow portal-preview-cockpit__glow--b" />
+      <div className="portal-preview-cockpit__body">
+        {globalSearchEnabled ? (
+          <div className="portal-preview-search-shell">
+            <Input.Search disabled enterButton="检索" placeholder={globalSearchPlaceholder} />
           </div>
+        ) : null}
+        <div className="portal-preview-module-grid">
+          {modules.map(module => renderModule(module, blocksData))}
         </div>
       </div>
-
-      <PortalActionFormModal
-        open={modalOpen}
-        formConfig={pendingEntryBehavior ? {
-          title: pendingEntryBehavior.preActionFormTitle,
-          submitLabel: pendingEntryBehavior.preActionFormSubmitLabel,
-          fields: pendingEntryBehavior.preActionFields,
-        } : pendingAction ? {
-          title: pendingAction.preActionFormTitle,
-          submitLabel: pendingAction.preActionFormSubmitLabel,
-          fields: pendingAction.preActionFields,
-        } : null}
-        loading={actionLoading}
-        onCancel={() => clearPendingAction()}
-        onSubmit={async (values) => {
-          if (pendingEntryBehavior && pendingEntryRecord) {
-            await executeDailyEntryBehavior(pendingEntryRecord, pendingEntryBehavior, values);
-            clearPendingAction();
-            return;
-          }
-          if (!pendingAction || !pendingContext) return;
-          await executeAction(pendingAction, pendingContext, values);
-          clearPendingAction();
-        }}
-      />
-    </>
+    </div>
   );
 }

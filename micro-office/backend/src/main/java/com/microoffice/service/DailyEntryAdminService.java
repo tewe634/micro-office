@@ -40,10 +40,10 @@ public class DailyEntryAdminService {
         long normalizedSize = normalizePageSize(size);
         String normalizedStatus = normalizeStatus(status, true, "条目状态不合法，仅支持 ACTIVE 或 INACTIVE");
         String normalizedKeyword = blankToNull(keyword);
+
         String selectSql = "SELECT c.id, c.code, c.name, c.sort_order, c.status, c.meta, c.version, c.created_at, c.created_by, c.updated_at, c.updated_by, " +
             "COALESCE((SELECT COUNT(*) FROM mo_daily_entry_targets t WHERE t.daily_entry_id = c.id AND t.status = 'ACTIVE'), 0) AS active_target_count, " +
-            "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy, " +
-            "EXISTS(SELECT 1 FROM mo_daily_entry_behaviors b WHERE b.daily_entry_id = c.id AND b.status = 'ACTIVE') AS has_behavior " +
+            "EXISTS(SELECT 1 FROM mo_daily_entry_chat_policies p WHERE p.daily_entry_id = c.id) AS has_chat_policy " +
             "FROM mo_daily_categories c";
         String countSql = "SELECT COUNT(*) FROM mo_daily_categories c";
 
@@ -82,7 +82,6 @@ public class DailyEntryAdminService {
             Map<String, Object> item = toEntry(row);
             item.put("activeTargetCount", asInt(row.get("active_target_count"), 0));
             item.put("hasChatPolicy", Boolean.TRUE.equals(row.get("has_chat_policy")));
-            item.put("hasBehavior", Boolean.TRUE.equals(row.get("has_behavior")));
             result.add(item);
         }
         page.setRecords(result);

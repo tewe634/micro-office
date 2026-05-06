@@ -247,9 +247,45 @@ function sectionNameLinkedBlockId(section: EditorSection, templates: BlockTempla
   const matched = templates.find(item => blockTemplateLabel(item) === section.name || item.name === section.name || item.label === section.name);
   return matched?.id;
 }
+
 function findOptionLabel(options: OptionItem[], value?: string) {
   if (!value) return '-';
   return options.find(item => item.value === value)?.label || value;
+}
+
+function isCeoTemplateDefinition(template?: Pick<EditorTemplate, 'code' | 'meta'> | null) {
+  if (!template) return false;
+  const meta = asObject(template.meta);
+  const layoutMode = String(meta.layout_mode || '').trim().toLowerCase();
+  const designIntent = String(meta.designIntent || '').trim().toLowerCase();
+  const code = String(template.code || '').toUpperCase();
+  return layoutMode === 'ceo-dashboard-v1'
+    || designIntent === 'executive-decision-dashboard'
+    || code.includes('CEO');
+}
+
+function blockTemplateCompatibilityError(template: EditorTemplate, blockTemplate?: BlockTemplateSummary) {
+  if (!blockTemplate) return null;
+  const dataKey = String(blockTemplate.dataKey || '').trim();
+  if (!dataKey) return null;
+  if (dataKey.toLowerCase().startsWith('ceo.') && !isCeoTemplateDefinition(template)) {
+    return `块「${blockTemplateLabel(blockTemplate)}」(${dataKey}) 仅允许 CEO 模板引用`;
+  }
+  return null;
+}
+
+function collectBlockCompatibilityIssues(template: EditorTemplate, templates: BlockTemplateSummary[]) {
+  const issues: string[] = [];
+  template.sections.forEach(section => {
+    section.blockRefs.forEach(blockRef => {
+      if (!blockRef.enabled) return;
+      const blockTemplate = blockRef.blockTemplate || templates.find(item => item.id === blockRef.blockTemplateId);
+      const error = blockTemplateCompatibilityError(template, blockTemplate);
+      if (!error) return;
+      issues.push(`分区「${section.name || section.code || '未命名分区'}」：${error}`);
+    });
+  });
+  return issues;
 }
 
 export default function AdminPortalTemplateEditorPage() {
@@ -269,9 +305,13 @@ export default function AdminPortalTemplateEditorPage() {
   const roleOptions: OptionItem[] = meta.roleKeys || [];
   const statusOptions: OptionItem[] = meta.statusOptions || [];
   const previewEntity = useMemo(() => readPreviewEntity(detail?.meta || {}), [detail?.meta]);
-  const expectedPreviewEntityType = useMemo(
-    () => (detail ? previewEntityByTemplateType[detail.templateType] : undefined),
-    [detail],
+  const blockCompatibilityIssues = useMemo(
+    () => (detail ? collectBlockCompatibilityIssues(detail, availableBlockTemplates) : []),
+    [detail, availableBlockTemplates],
+  );
+  const compatibleBlockTemplates = useMemo(
+    () => (detail ? availableBlockTemplates.filter(item => !blockTemplateCompatibilityError(detail, item)) : availableBlockTemplates),
+    [detail, availableBlockTemplates],
   );
 
   const validatePreviewEntityConsistency = (template: EditorTemplate) => {
@@ -373,6 +413,11 @@ export default function AdminPortalTemplateEditorPage() {
 
   const saveTemplate = async () => {
     if (!detail?.id) return;
+    const compatibilityError = blockCompatibilityIssues[0];
+    if (compatibilityError) {
+      message.error(compatibilityError);
+      return;
+    }
     const consistencyError = validatePreviewEntityConsistency(detail);
     if (consistencyError) {
       message.error(consistencyError);
@@ -399,6 +444,11 @@ export default function AdminPortalTemplateEditorPage() {
 
   const handleGoPreview = () => {
     if (!detail?.id) return;
+    const compatibilityError = blockCompatibilityIssues[0];
+    if (compatibilityError) {
+      message.error(compatibilityError);
+      return;
+    }
     const consistencyError = validatePreviewEntityConsistency(detail);
     if (consistencyError) {
       message.error(consistencyError);
@@ -441,15 +491,16 @@ export default function AdminPortalTemplateEditorPage() {
     });
   };
 
-  const availableBlockOptions = useMemo(() => availableBlockTemplates.map(item => ({
+  const availableBlockOptions = useMemo(() => compatibleBlockTemplates.map(item => ({
     value: item.id,
     label: blockTemplateLabel(item),
-  })), [availableBlockTemplates]);
+  })), [compatibleBlockTemplates]);
 
-  const sectionNameOptions = useMemo(() => availableBlockTemplates.map(item => ({
+  const sectionNameOptions = useMemo(() => compatibleBlockTemplates.map(item => ({
     value: item.id,
     label: blockTemplateLabel(item),
-  })), [availableBlockTemplates]);
+  })), [compatibleBlockTemplates]);
+
   const templateTypeLabel = useMemo(
     () => findOptionLabel(templateTypeOptions, detail?.templateType),
     [detail?.templateType, templateTypeOptions],
@@ -511,14 +562,21 @@ export default function AdminPortalTemplateEditorPage() {
               {contractIssues.map(issue => (
                 <Alert key={issue} type="warning" showIcon message="检测到旧结构残留" description={issue} />
               ))}
+              {blockCompatibilityIssues.length > 0 ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="检测到不兼容块引用，请先停用或移除后再保存"
+                  description={(
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {blockCompatibilityIssues.map(issue => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  )}
+                />
+              ) : null}
 
-              <Alert
-                type="info"
-                showIcon
-                message="当前页面只负责装配块引用"
-                description="主路径为：新增分区、选择 ACTIVE 卡片块、排序、启停、分区装配。人员模板按岗位装配，对象模板按对象类型装配；块的 dataKey、displayType、actions 请到“卡片块定义”维护。"
-                action={<Button size="small" onClick={() => nav('/admin/portal-block-templates')}>进入卡片块定义</Button>}
-              />
               <Card type="inner" title="模板基础信息">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
                   <div>
@@ -581,14 +639,6 @@ export default function AdminPortalTemplateEditorPage() {
                       onChange={value => setPreviewMeta({ entityId: value })}
                     />
                   </div>
-                  <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
-                    {detail.positionId
-                      ? '岗位模板仍按岗位设计；预览对象可在这里手工指定。'
-                      : '对象模板与角色种子模板保留当前设计主体，同时允许手工指定预览主体。'}
-                  </div>
-                  <div style={{ gridColumn: '1 / -1', color: '#64748b', fontSize: 12 }}>
-                    {expectedPreviewEntityType ? `当前模板类型仅允许预览主体类型：${expectedPreviewEntityType}` : '当前模板类型未配置预览主体映射'}
-                  </div>
                 </div>
               </Card>
 
@@ -601,7 +651,7 @@ export default function AdminPortalTemplateEditorPage() {
                   <Empty description="当前模板还没有分区，请先新增分区并引用卡片块" />
                 ) : detail.sections.map((section, sectionIndex) => {
                   const blockPickerValue = blockPickerBySection[section.id];
-                  const linkedSectionNameBlockId = sectionNameLinkedBlockId(section, availableBlockTemplates);
+                  const linkedSectionNameBlockId = sectionNameLinkedBlockId(section, compatibleBlockTemplates);
                   const sectionNameSelectValue = linkedSectionNameBlockId || (section.name ? `__current__:${section.id}` : undefined);
                   const sectionNameSelectOptions = linkedSectionNameBlockId || !section.name
                     ? sectionNameOptions
@@ -720,7 +770,7 @@ export default function AdminPortalTemplateEditorPage() {
                             icon={<PlusOutlined />}
                             disabled={!blockPickerValue}
                             onClick={() => {
-                              const chosen = availableBlockTemplates.find(item => item.id === blockPickerValue);
+                              const chosen = compatibleBlockTemplates.find(item => item.id === blockPickerValue);
                               if (!chosen) return;
                               updateDetail(prev => ({
                                 ...prev,
@@ -753,6 +803,7 @@ export default function AdminPortalTemplateEditorPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                           {section.blockRefs.map((blockRef, blockIndex) => {
                             const blockTemplate = blockRef.blockTemplate || availableBlockTemplates.find(item => item.id === blockRef.blockTemplateId);
+                            const compatibilityError = detail ? blockTemplateCompatibilityError(detail, blockTemplate) : null;
                             return (
                               <Card key={blockRef.id} size="small" className="portal-block-ref-card">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -763,6 +814,7 @@ export default function AdminPortalTemplateEditorPage() {
                                     <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>
                                       {blockTemplateLabel(blockTemplate)}
                                     </div>
+                                    {compatibilityError ? <Text type="danger">{compatibilityError}</Text> : null}
                                   </div>
 
                                   <Space wrap align="center">
@@ -770,6 +822,7 @@ export default function AdminPortalTemplateEditorPage() {
                                     <Switch
                                       size="small"
                                       checked={blockRef.enabled}
+                                      disabled={Boolean(compatibilityError) && !blockRef.enabled}
                                       onChange={checked => updateDetail(prev => ({
                                         ...prev,
                                         sections: prev.sections.map((item, index) => index === sectionIndex ? {

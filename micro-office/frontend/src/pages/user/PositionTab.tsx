@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Pagination } from 'antd';
+import { Table, Button, Modal, Form, Input, InputNumber, Space, message, Popconfirm, Pagination } from 'antd';
 import { positionApi } from '../../api';
 import { formatPaginationTotal, paginationLocale, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
@@ -28,8 +28,9 @@ export default function PositionTab() {
   }, []);
 
   const save = async (values: any) => {
-    if (edit) await positionApi.update(edit.id, values);
-    else await positionApi.create(values);
+    const payload = { ...values, sortOrder: Number(values.sortOrder ?? 0) };
+    if (edit) await positionApi.update(edit.id, payload);
+    else await positionApi.create(payload);
     message.success('保存成功');
     setModal(false);
     setEdit(null);
@@ -37,11 +38,24 @@ export default function PositionTab() {
     load(current, size);
   };
 
+  const openCreate = () => {
+    setEdit(null);
+    form.resetFields();
+    form.setFieldsValue({ sortOrder: 0 });
+    setModal(true);
+  };
+
+  const openEdit = (record: any) => {
+    setEdit(record);
+    form.setFieldsValue({ ...record, sortOrder: record.sortOrder ?? 0 });
+    setModal(true);
+  };
+
   return (
     <>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="page-toolbar-right">
-          {canManagePersonnel ? <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button> : null}
+          {canManagePersonnel ? <Button type="primary" onClick={openCreate}>新增</Button> : null}
         </div>
 
         <div
@@ -66,12 +80,13 @@ export default function PositionTab() {
               columns={[
                 { title: '序号', key: 'index', width: 70, render: (_: any, __: any, index: number) => (current - 1) * size + index + 1 },
                 { title: '岗位名称', dataIndex: 'name', ellipsis: true },
+                { title: '排序', dataIndex: 'sortOrder', width: 90, render: (value: any) => value ?? 0 },
                 ...(canManagePersonnel ? [{
                   title: '操作',
                   width: 140,
                   render: (_: any, r: any) => (
                     <Space>
-                      <Button size="small" onClick={() => { setEdit(r); form.setFieldsValue(r); setModal(true); }}>编辑</Button>
+                      <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
                       <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await positionApi.delete(r.id); message.success('已删除'); const nextCurrent = current > 1 && data.length === 1 ? current - 1 : current; load(nextCurrent, size); }}>
                         <Button size="small" danger>删除</Button>
                       </Popconfirm>
@@ -109,6 +124,9 @@ export default function PositionTab() {
         <Form form={form} onFinish={save} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="code" label="编码" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="sortOrder" label="排序">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
         </Form>
       </Modal> : null}
     </>

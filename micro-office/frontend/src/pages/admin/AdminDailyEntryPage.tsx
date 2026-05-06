@@ -13,7 +13,6 @@ import {
   Popconfirm,
   Select,
   Space,
-  Switch,
   Table,
   Tag,
   Typography,
@@ -24,16 +23,13 @@ import {
   dailyEntryAdminApi,
   orgApi,
   userApi,
-  type DailyEntryBehaviorPayload,
   type DailyEntryBindingScope,
   type DailyEntryChatPolicyPayload,
-  type DailyEntryPayload,
   type DailyEntrySessionBindingPayload,
   type DailyEntrySessionResolveStrategy,
   type DailyEntryStatus,
   type DailyEntryTargetPayload,
   type DailyEntryTargetType,
-  type PortalBlockTemplateActionFormFieldPayload,
 } from '../../api';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
@@ -49,34 +45,8 @@ type DailyEntryRecord = {
   meta?: Record<string, any>;
   updatedAt?: string;
   targets?: DailyEntryTargetPayload[];
-  behaviorConfig?: DailyEntryBehaviorPayload | null;
   chatPolicy?: DailyEntryChatPolicyPayload | null;
   sessionBindings?: DailyEntrySessionBindingPayload[];
-};
-
-type BehaviorFieldEditor = {
-  id: string;
-  fieldKey: string;
-  label: string;
-  inputType: string;
-  required: boolean;
-  placeholder?: string;
-  defaultValue?: string;
-  maxLength?: number;
-  sortOrder: number;
-  status: 'ACTIVE' | 'INACTIVE';
-};
-
-type BehaviorConfigEditor = {
-  actionId?: string;
-  enabled: boolean;
-  actionType: string;
-  sessionType?: string;
-  requiresPreActionForm: boolean;
-  preActionFormTitle?: string;
-  preActionFormSubmitLabel?: string;
-  preActionFields: BehaviorFieldEditor[];
-  metaText: string;
 };
 
 const statusOptions: Array<{ value: DailyEntryStatus; label: string }> = [
@@ -98,25 +68,6 @@ const bindingScopeOptions: Array<{ value: DailyEntryBindingScope; label: string 
   { value: 'SHARED', label: '共享群' },
   { value: 'PERSONAL', label: '个人群' },
 ];
-
-const behaviorActionTypeOptions = [
-  { value: 'OPEN_WORKBENCH_SESSION', label: '打开工作台会话' },
-];
-
-const behaviorFieldTypeOptions = [
-  { value: 'TEXT', label: 'TEXT' },
-  { value: 'TEXTAREA', label: 'TEXTAREA' },
-  { value: 'NUMBER', label: 'NUMBER' },
-];
-
-const behaviorFieldStatusOptions = [
-  { value: 'ACTIVE', label: 'ACTIVE' },
-  { value: 'INACTIVE', label: 'INACTIVE' },
-];
-
-function localId(prefix: string) {
-  return `tmp-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 function statusColor(status?: string) {
   return status === 'ACTIVE' ? 'green' : 'default';
@@ -140,118 +91,6 @@ function prettyJson(value: any) {
   return JSON.stringify(value || {}, null, 2);
 }
 
-function normalizeBehaviorField(field: any, index: number): BehaviorFieldEditor {
-  return {
-    id: field?.id || localId('behavior-field'),
-    fieldKey: field?.fieldKey || field?.field_key || '',
-    label: field?.label || '',
-    inputType: field?.inputType || field?.input_type || 'TEXT',
-    required: field?.required === true,
-    placeholder: field?.placeholder || undefined,
-    defaultValue: field?.defaultValue || field?.default_value || undefined,
-    maxLength: typeof field?.maxLength === 'number' ? field.maxLength : typeof field?.max_length === 'number' ? field.max_length : undefined,
-    sortOrder: typeof field?.sortOrder === 'number' ? field.sortOrder : typeof field?.sort_order === 'number' ? field.sort_order : index,
-    status: field?.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
-  };
-}
-
-function normalizeBehaviorConfig(raw: any): DailyEntryBehaviorPayload | null {
-  const behavior = raw?.behaviorConfig || raw?.behavior_config || null;
-  if (!behavior || typeof behavior !== 'object') {
-    return null;
-  }
-  const fields = Array.isArray(behavior.preActionFields)
-    ? behavior.preActionFields
-    : Array.isArray(behavior.pre_action_fields)
-      ? behavior.pre_action_fields
-      : [];
-
-  return {
-    actionId: behavior.actionId || behavior.action_id || undefined,
-    enabled: behavior.enabled !== false,
-    actionType: behavior.actionType || behavior.action_type || 'OPEN_WORKBENCH_SESSION',
-    sessionType: behavior.sessionType || behavior.session_type || 'DAILY_ENTRY',
-    requiresPreActionForm: behavior.requiresPreActionForm === true || behavior.requires_pre_action_form === true,
-    preActionFormTitle: behavior.preActionFormTitle || behavior.pre_action_form_title || null,
-    preActionFormSubmitLabel: behavior.preActionFormSubmitLabel || behavior.pre_action_form_submit_label || null,
-    preActionFields: fields.map(normalizeBehaviorField),
-    meta: behavior.meta || {},
-  };
-}
-
-function normalizeBehaviorEditor(raw: any): BehaviorConfigEditor {
-  const behavior = normalizeBehaviorConfig(raw);
-  return {
-    actionId: behavior?.actionId,
-    enabled: behavior?.enabled === true,
-    actionType: behavior?.actionType || 'OPEN_WORKBENCH_SESSION',
-    sessionType: behavior?.sessionType || 'DAILY_ENTRY',
-    requiresPreActionForm: behavior?.requiresPreActionForm === true,
-    preActionFormTitle: behavior?.preActionFormTitle || undefined,
-    preActionFormSubmitLabel: behavior?.preActionFormSubmitLabel || undefined,
-    preActionFields: (behavior?.preActionFields || []).map((field, index) => normalizeBehaviorField(field, index)),
-    metaText: prettyJson(behavior?.meta),
-  };
-}
-
-function createEmptyBehaviorField(index: number): BehaviorFieldEditor {
-  return {
-    id: localId('behavior-field'),
-    fieldKey: '',
-    label: '',
-    inputType: 'TEXT',
-    required: false,
-    placeholder: undefined,
-    defaultValue: undefined,
-    maxLength: undefined,
-    sortOrder: index,
-    status: 'ACTIVE',
-  };
-}
-
-function createDefaultBehaviorEditor(): BehaviorConfigEditor {
-  return {
-    actionId: undefined,
-    enabled: false,
-    actionType: 'OPEN_WORKBENCH_SESSION',
-    sessionType: 'DAILY_ENTRY',
-    requiresPreActionForm: false,
-    preActionFormTitle: undefined,
-    preActionFormSubmitLabel: undefined,
-    preActionFields: [],
-    metaText: prettyJson({}),
-  };
-}
-
-function buildBehaviorPayload(behavior: BehaviorConfigEditor): DailyEntryBehaviorPayload | null {
-  if (!behavior.enabled) {
-    return null;
-  }
-  return {
-    actionId: behavior.actionId?.trim() || undefined,
-    enabled: true,
-    actionType: behavior.actionType,
-    sessionType: behavior.sessionType?.trim() || 'DAILY_ENTRY',
-    requiresPreActionForm: behavior.requiresPreActionForm,
-    preActionFormTitle: behavior.preActionFormTitle?.trim() || null,
-    preActionFormSubmitLabel: behavior.preActionFormSubmitLabel?.trim() || null,
-    preActionFields: behavior.preActionFields.map((field, index): PortalBlockTemplateActionFormFieldPayload => ({
-      id: field.id.startsWith('tmp-') ? undefined : field.id,
-      fieldKey: field.fieldKey.trim(),
-      label: field.label.trim(),
-      inputType: field.inputType,
-      required: field.required,
-      placeholder: field.placeholder?.trim() || null,
-      defaultValue: field.defaultValue?.trim() || null,
-      maxLength: typeof field.maxLength === 'number' ? field.maxLength : null,
-      sortOrder: field.sortOrder ?? index,
-      status: field.status,
-      meta: {},
-    })),
-    meta: safeJsonParse(behavior.metaText, '行为配置 Meta'),
-  };
-}
-
 function normalizeEntry(item: any): DailyEntryRecord {
   return {
     id: String(item?.id || ''),
@@ -261,7 +100,6 @@ function normalizeEntry(item: any): DailyEntryRecord {
     status: (item?.status || 'INACTIVE') as DailyEntryStatus,
     meta: item?.meta || {},
     updatedAt: item?.updatedAt || item?.updated_at || undefined,
-    behaviorConfig: normalizeBehaviorConfig(item),
     targets: Array.isArray(item?.targets)
       ? item.targets.map((target: any) => ({
           id: target?.id,
@@ -313,15 +151,6 @@ function policySummary(policy?: DailyEntryChatPolicyPayload | null) {
   return `${policy.sessionResolveStrategy || '-'} / ${policy.providerKey || '-'}`;
 }
 
-function behaviorSummary(behavior?: DailyEntryBehaviorPayload | null) {
-  if (!behavior || behavior.enabled !== true) return '未配置';
-  const fieldCount = (behavior.preActionFields || []).filter((item) => (item.status || 'ACTIVE') === 'ACTIVE').length;
-  if (behavior.requiresPreActionForm) {
-    return `${behavior.actionType} / 前置弹窗 ${fieldCount} 字段`;
-  }
-  return `${behavior.actionType} / 直接执行`;
-}
-
 function normalizePolicyPayload(raw: any, dailyEntryId: string): DailyEntryChatPolicyPayload | null {
   const policy = raw?.policy ?? raw;
   if (!policy) return null;
@@ -348,7 +177,6 @@ export default function AdminDailyEntryPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [editing, setEditing] = useState<DailyEntryRecord | null>(null);
   const [targets, setTargets] = useState<DailyEntryTargetPayload[]>([]);
-  const [behaviorConfig, setBehaviorConfig] = useState<BehaviorConfigEditor>(createDefaultBehaviorEditor());
   const [chatPolicy, setChatPolicy] = useState<DailyEntryChatPolicyPayload | null>(null);
   const [sessionBindings, setSessionBindings] = useState<DailyEntrySessionBindingPayload[]>([]);
   const [orgOptions, setOrgOptions] = useState<Array<{ value: string; label: string }>>([]);
@@ -434,7 +262,6 @@ export default function AdminDailyEntryPage() {
         status: item.status || 'ACTIVE',
         sortOrder: typeof item.sortOrder === 'number' ? item.sortOrder : Number(item.sortOrder || 0),
       })));
-      setBehaviorConfig(normalizeBehaviorEditor(entryResp.data));
       const nextPolicy = normalizePolicyPayload(policyResp.data, id);
       setChatPolicy(nextPolicy ?? {
         sessionResolveStrategy: 'BY_ENTRY_ONLY',
@@ -456,12 +283,11 @@ export default function AdminDailyEntryPage() {
       const errorMessage = error?.response?.data?.message || error?.message || '条目详情加载失败';
       message.error(errorMessage);
       if (error?.response?.status === 404) {
-        setContractIssues(['后端尚未提供条目详情 / 行为配置 / 范围 / 聊天配置接口，前端表单结构已按版本文档拆分完成。']);
+        setContractIssues(['后端尚未提供条目详情 / 范围 / 聊天配置接口，前端表单结构已按版本文档拆分完成。']);
       }
       setEditing({ id, code: '', name: '', sortOrder: 100, status: 'INACTIVE', meta: {} });
       entryForm.setFieldsValue({ code: '', name: '', sortOrder: 100, status: 'INACTIVE', metaText: prettyJson({}) });
       setTargets([]);
-      setBehaviorConfig(createDefaultBehaviorEditor());
       setChatPolicy({
         dailyEntryId: id,
         sessionResolveStrategy: 'BY_ENTRY_ONLY',
@@ -485,7 +311,6 @@ export default function AdminDailyEntryPage() {
       metaText: prettyJson({}),
     });
     setTargets([]);
-    setBehaviorConfig(createDefaultBehaviorEditor());
     setChatPolicy({
       sessionResolveStrategy: 'BY_ENTRY_ONLY',
       providerKey: 'daily_list',
@@ -515,22 +340,13 @@ export default function AdminDailyEntryPage() {
     ]);
   };
 
-  const updateBehaviorField = (fieldIndex: number, updater: (prev: BehaviorFieldEditor) => BehaviorFieldEditor) => {
-    setBehaviorConfig((prev) => ({
-      ...prev,
-      preActionFields: prev.preActionFields.map((item, index) => (index === fieldIndex ? updater(item) : item)),
-    }));
-  };
-
   const save = async () => {
     const values = await entryForm.validateFields();
-    const behaviorPayload = buildBehaviorPayload(behaviorConfig);
-    const entryPayload: DailyEntryPayload = {
+    const entryPayload = {
       code: String(values.code || '').trim().toUpperCase(),
       name: String(values.name || '').trim(),
       sortOrder: Number(values.sortOrder || 0),
       status: values.status as DailyEntryStatus,
-      behaviorConfig: behaviorPayload,
       meta: safeJsonParse(values.metaText, '条目 Meta'),
     };
     if (!chatPolicy) {
@@ -576,7 +392,7 @@ export default function AdminDailyEntryPage() {
       const errorMessage = error?.response?.data?.message || error?.message || '保存失败';
       message.error(errorMessage);
       if (error?.response?.status === 404) {
-        setContractIssues(['后端条目管理保存接口尚未完整支持行为配置，前端页面与运行时链路已按版本文档落位。']);
+        setContractIssues(['后端条目管理保存接口尚未可用，前端页面与交互已独立完成。']);
       }
     } finally {
       setSaving(false);
@@ -661,11 +477,6 @@ export default function AdminDailyEntryPage() {
                   render: (_: unknown, row: DailyEntryRecord) => targetSummary(row.targets || [], orgMap, userMap),
                 },
                 {
-                  title: '行为配置摘要',
-                  width: 220,
-                  render: (_: unknown, row: DailyEntryRecord) => behaviorSummary(row.behaviorConfig),
-                },
-                {
                   title: '会话策略摘要',
                   width: 180,
                   render: (_: unknown, row: DailyEntryRecord) => policySummary(row.chatPolicy),
@@ -721,7 +532,7 @@ export default function AdminDailyEntryPage() {
       <Drawer
         title={editing?.id ? `编辑日常条目：${editing.name || editing.code || editing.id}` : '新建日常条目'}
         open={drawerOpen}
-        width={920}
+        width={860}
         onClose={() => setDrawerOpen(false)}
         extra={(
           <Space>
@@ -804,151 +615,6 @@ export default function AdminDailyEntryPage() {
                     </div>
                   </Card>
                 ))}
-              </Space>
-            </Card>
-
-            <Card
-              size="small"
-              title="行为配置"
-              extra={(
-                <Space>
-                  <Text type="secondary">运行时按条目行为决定是否先弹窗</Text>
-                  <Switch checked={behaviorConfig.enabled} onChange={(checked) => setBehaviorConfig((prev) => ({ ...prev, enabled: checked }))} />
-                </Space>
-              )}
-            >
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                <Text type="secondary">前置弹窗行为配置挂在日常条目上，不挂在 block 上；会议只是首个使用场景，不做名称硬编码。</Text>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-                  <div>
-                    <div style={{ marginBottom: 6 }}>动作类型</div>
-                    <Select
-                      disabled={!behaviorConfig.enabled}
-                      value={behaviorConfig.actionType}
-                      options={behaviorActionTypeOptions}
-                      onChange={(value) => setBehaviorConfig((prev) => ({ ...prev, actionType: value }))}
-                    />
-                  </div>
-                  <div>
-                    <div style={{ marginBottom: 6 }}>会话类型</div>
-                    <Input
-                      disabled={!behaviorConfig.enabled}
-                      value={behaviorConfig.sessionType}
-                      onChange={(e) => setBehaviorConfig((prev) => ({ ...prev, sessionType: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <div style={{ marginBottom: 6 }}>动作 ID</div>
-                    <Input
-                      disabled={!behaviorConfig.enabled}
-                      value={behaviorConfig.actionId}
-                      placeholder="后端若要求 actionId，可在此配置"
-                      onChange={(e) => setBehaviorConfig((prev) => ({ ...prev, actionId: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <Card type="inner" size="small" title="前置弹窗参数">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
-                    <div>
-                      <div style={{ marginBottom: 6 }}>启用前置弹窗</div>
-                      <Switch
-                        disabled={!behaviorConfig.enabled}
-                        checked={behaviorConfig.requiresPreActionForm}
-                        onChange={(checked) => setBehaviorConfig((prev) => ({ ...prev, requiresPreActionForm: checked }))}
-                      />
-                    </div>
-                    <div>
-                      <div style={{ marginBottom: 6 }}>弹窗标题</div>
-                      <Input
-                        disabled={!behaviorConfig.enabled}
-                        value={behaviorConfig.preActionFormTitle}
-                        placeholder="例如：填写群聊主题"
-                        onChange={(e) => setBehaviorConfig((prev) => ({ ...prev, preActionFormTitle: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <div style={{ marginBottom: 6 }}>确认按钮文案</div>
-                      <Input
-                        disabled={!behaviorConfig.enabled}
-                        value={behaviorConfig.preActionFormSubmitLabel}
-                        placeholder="例如：创建群聊"
-                        onChange={(e) => setBehaviorConfig((prev) => ({ ...prev, preActionFormSubmitLabel: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  {behaviorConfig.enabled && behaviorConfig.requiresPreActionForm ? (
-                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ color: '#475569' }}>首版至少支持文本字段、必填校验和确认提交，推荐会议条目配置 `session_title`。</div>
-                        <Button size="small" icon={<PlusOutlined />} onClick={() => setBehaviorConfig((prev) => ({ ...prev, preActionFields: [...prev.preActionFields, createEmptyBehaviorField(prev.preActionFields.length)] }))}>新增字段</Button>
-                      </div>
-
-                      {!behaviorConfig.preActionFields.length ? (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前未配置前置字段" />
-                      ) : behaviorConfig.preActionFields.map((field, index) => (
-                        <Card
-                          key={field.id}
-                          type="inner"
-                          size="small"
-                          title={`字段 ${index + 1}`}
-                          extra={<Button danger size="small" onClick={() => setBehaviorConfig((prev) => ({ ...prev, preActionFields: prev.preActionFields.filter((_, currentIndex) => currentIndex !== index) }))}>删除</Button>}
-                        >
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>字段 Key</div>
-                              <Input value={field.fieldKey} onChange={(e) => updateBehaviorField(index, (prev) => ({ ...prev, fieldKey: e.target.value }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>字段标签</div>
-                              <Input value={field.label} onChange={(e) => updateBehaviorField(index, (prev) => ({ ...prev, label: e.target.value }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>输入类型</div>
-                              <Select value={field.inputType} options={behaviorFieldTypeOptions} onChange={(value) => updateBehaviorField(index, (prev) => ({ ...prev, inputType: value }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>状态</div>
-                              <Select value={field.status} options={behaviorFieldStatusOptions} onChange={(value) => updateBehaviorField(index, (prev) => ({ ...prev, status: value }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>占位提示</div>
-                              <Input value={field.placeholder} onChange={(e) => updateBehaviorField(index, (prev) => ({ ...prev, placeholder: e.target.value }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>默认值</div>
-                              <Input value={field.defaultValue} onChange={(e) => updateBehaviorField(index, (prev) => ({ ...prev, defaultValue: e.target.value }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>最大长度</div>
-                              <InputNumber style={{ width: '100%' }} min={1} value={field.maxLength} onChange={(value) => updateBehaviorField(index, (prev) => ({ ...prev, maxLength: typeof value === 'number' ? value : undefined }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>排序</div>
-                              <InputNumber style={{ width: '100%' }} min={0} value={field.sortOrder} onChange={(value) => updateBehaviorField(index, (prev) => ({ ...prev, sortOrder: typeof value === 'number' ? value : 0 }))} />
-                            </div>
-                            <div>
-                              <div style={{ marginBottom: 6 }}>必填</div>
-                              <Switch checked={field.required} onChange={(checked) => updateBehaviorField(index, (prev) => ({ ...prev, required: checked }))} />
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : null}
-                </Card>
-
-                <div>
-                  <div style={{ marginBottom: 6 }}>行为 Meta(JSON)</div>
-                  <TextArea
-                    rows={4}
-                    disabled={!behaviorConfig.enabled}
-                    value={behaviorConfig.metaText}
-                    onChange={(e) => setBehaviorConfig((prev) => ({ ...prev, metaText: e.target.value }))}
-                  />
-                </div>
               </Space>
             </Card>
 

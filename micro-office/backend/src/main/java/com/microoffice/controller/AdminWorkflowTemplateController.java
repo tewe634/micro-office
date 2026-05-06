@@ -7,6 +7,7 @@ import com.microoffice.service.MenuPermissionService;
 import com.microoffice.service.WorkflowTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,11 +31,21 @@ public class AdminWorkflowTemplateController {
      * 查询模板包列表。
      */
     @GetMapping("/packages")
-    public ApiResponse<List<Map<String, Object>>> listPackages(@RequestParam(required = false) String sceneCategory,
+    public ApiResponse<List<Map<String, Object>>> listPackages(@RequestParam(required = false) String positionId,
+                                                               @RequestParam(required = false) String sceneCategory,
                                                                @RequestParam(required = false) String status,
                                                                Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listPackages(sceneCategory, status));
+        return ApiResponse.ok(workflowTemplateService.listPackages(positionId, sceneCategory, status));
+    }
+
+    /**
+     * 查询模板包关联岗位选项。
+     */
+    @GetMapping("/positions")
+    public ApiResponse<List<Map<String, Object>>> listPositions(Authentication auth) {
+        requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.listTemplatePositions());
     }
 
     /**
@@ -75,6 +86,15 @@ public class AdminWorkflowTemplateController {
                                                                 Authentication auth) {
         String userId = requireAdmin(auth);
         return ApiResponse.ok(workflowTemplateService.updatePackageStatus(id, body == null ? null : body.getStatus(), userId));
+    }
+
+    /**
+     * 删除模板包及其节点编排。
+     */
+    @DeleteMapping("/packages/{id}")
+    public ApiResponse<Map<String, Object>> deletePackage(@PathVariable String id, Authentication auth) {
+        String userId = requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.deletePackage(id, userId));
     }
 
     /**

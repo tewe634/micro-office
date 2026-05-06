@@ -39,7 +39,6 @@ public class PortalTemplateAdminController {
     private static final List<String> ACTION_TYPES = List.of("switch_subject", "open_workbench_session");
     private static final List<String> SUBJECT_TYPES = List.of("PERSON", "ORGANIZATION", "PRODUCT", "CUSTOMER_COMPANY", "SUPPLIER", "CARRIER", "BANK");
     private static final List<String> SESSION_TYPES = List.of("DAILY_ENTRY", "SUPPLIER", "CARRIER", "BANK", "PRODUCT", "CUSTOMER_COMPANY", "ORGANIZATION", "PERSON");
-    private static final List<String> INPUT_TYPES = List.of("TEXT", "TEXTAREA", "NUMBER", "SELECT");
     private static final Pattern NON_CODE_PATTERN = Pattern.compile("[^A-Z0-9_]+");
 
     private final JdbcTemplate jdbc;
@@ -798,24 +797,6 @@ public class PortalTemplateAdminController {
                 return Map.of();
             }
         }
-        boolean requiresPreActionForm = Boolean.TRUE.equals(action.get("requiresPreActionForm"));
-        Map<String, Object> preActionForm = asMap(action.get("preActionForm"));
-        String preActionFormTitle = asNullableString(firstNonBlank(
-            asNullableString(action.get("preActionFormTitle")),
-            asNullableString(preActionForm.get("title"))
-        ));
-        String preActionFormSubmitLabel = asNullableString(firstNonBlank(
-            asNullableString(action.get("preActionFormSubmitLabel")),
-            asNullableString(preActionForm.get("submitLabel"))
-        ));
-        List<Map<String, Object>> preActionFormFields = normalizeActionFormFields(asListOfMap(firstNonBlankValue(
-            action.get("preActionFields"),
-            action.get("preActionFormFields"),
-            preActionForm.get("fields")
-        )));
-        if (requiresPreActionForm && (!hasText(preActionFormTitle) || preActionFormFields.isEmpty())) {
-            return Map.of();
-        }
 
         Map<String, Object> normalized = new LinkedHashMap<>();
         normalized.put("actionType", normalizedType);
@@ -828,60 +809,9 @@ public class PortalTemplateAdminController {
         if (hasText(asNullableString(action.get("sessionType")))) {
             normalized.put("sessionType", asString(action.get("sessionType")));
         }
-        normalized.put("requiresPreActionForm", requiresPreActionForm);
-        if (hasText(preActionFormTitle)) {
-            normalized.put("preActionFormTitle", preActionFormTitle);
-        }
-        if (hasText(preActionFormSubmitLabel)) {
-            normalized.put("preActionFormSubmitLabel", preActionFormSubmitLabel);
-        }
-        if (!preActionFormFields.isEmpty()) {
-            normalized.put("preActionFields", preActionFormFields);
-            normalized.put("preActionFormFields", preActionFormFields);
-            Map<String, Object> normalizedForm = new LinkedHashMap<>();
-            normalizedForm.put("title", preActionFormTitle);
-            normalizedForm.put("submitLabel", hasText(preActionFormSubmitLabel) ? preActionFormSubmitLabel : "确定");
-            normalizedForm.put("fields", preActionFormFields);
-            normalized.put("preActionForm", normalizedForm);
-        }
         Map<String, Object> meta = asMap(action.get("meta"));
         if (!meta.isEmpty()) {
             normalized.put("meta", meta);
-        }
-        return normalized;
-    }
-
-    private List<Map<String, Object>> normalizeActionFormFields(List<Map<String, Object>> fields) {
-        List<Map<String, Object>> normalized = new ArrayList<>();
-        Set<String> fieldKeys = new LinkedHashSet<>();
-        for (Map<String, Object> field : fields) {
-            String fieldKey = asNullableString(field.get("fieldKey"));
-            String label = asNullableString(field.get("label"));
-            String inputType = asNullableString(field.get("inputType"));
-            if (!hasText(fieldKey) || !hasText(label) || !hasText(inputType)) {
-                return List.of();
-            }
-            String normalizedInputType = inputType.trim().toUpperCase(Locale.ROOT);
-            if (!INPUT_TYPES.contains(normalizedInputType) || !fieldKeys.add(fieldKey)) {
-                return List.of();
-            }
-            Integer maxLength = nullableInteger(field.get("maxLength"));
-            if (maxLength != null && maxLength <= 0) {
-                return List.of();
-            }
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", asString(field.get("id")));
-            item.put("fieldKey", fieldKey);
-            item.put("label", label);
-            item.put("inputType", normalizedInputType);
-            item.put("required", Boolean.TRUE.equals(field.get("required")));
-            item.put("placeholder", asNullableString(field.get("placeholder")));
-            item.put("defaultValue", asNullableString(field.get("defaultValue")));
-            item.put("maxLength", maxLength);
-            item.put("sortOrder", asInt(field.get("sortOrder"), normalized.size() * 10));
-            item.put("status", hasText(asNullableString(field.get("status"))) ? asNullableString(field.get("status")).trim().toUpperCase(Locale.ROOT) : "ACTIVE");
-            item.put("meta", asMap(field.get("meta")));
-            normalized.add(item);
         }
         return normalized;
     }
@@ -910,7 +840,7 @@ public class PortalTemplateAdminController {
                 "  WHERE t.template_type = 'PERSON_ROLE' AND t.position_id = p.id " +
                 "  ORDER BY t.updated_at DESC, t.created_at DESC LIMIT 1" +
                 ") tpl ON TRUE " +
-                "ORDER BY p.name, p.id"
+                "ORDER BY COALESCE(p.sort_order, 0), p.name, p.id"
         );
         Map<String, Map<String, Object>> seedByRole = loadSeedTemplateByRole();
         List<Map<String, Object>> result = new ArrayList<>();
@@ -1136,12 +1066,10 @@ public class PortalTemplateAdminController {
         Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
         for (String templateId : templateIds) {
             List<Map<String, Object>> actionRows = jdbc.queryForList(
-                "SELECT id, action_type, target_subject_type, target_id_path, session_type, " +
-                    "requires_pre_action_form, pre_action_form_title, pre_action_form_submit_label, sort_order, meta " +
+                "SELECT id, action_type, target_subject_type, target_id_path, session_type, sort_order, meta " +
                     "FROM mo_portal_block_template_actions WHERE block_template_id = ? ORDER BY sort_order, id",
                 templateId
             );
-            Map<String, List<Map<String, Object>>> formFieldsByActionId = loadActionFormFieldsByActionIds(actionRows);
             List<Map<String, Object>> actions = new ArrayList<>();
             for (Map<String, Object> row : actionRows) {
                 Map<String, Object> action = new LinkedHashMap<>();
@@ -1150,21 +1078,8 @@ public class PortalTemplateAdminController {
                 action.put("targetSubjectType", asString(row.get("target_subject_type")));
                 action.put("targetIdPath", asString(row.get("target_id_path")));
                 action.put("sessionType", asString(row.get("session_type")));
-                action.put("requiresPreActionForm", Boolean.TRUE.equals(row.get("requires_pre_action_form")));
-                action.put("preActionFormTitle", asNullableString(row.get("pre_action_form_title")));
-                action.put("preActionFormSubmitLabel", asNullableString(row.get("pre_action_form_submit_label")));
                 action.put("sortOrder", asInt(row.get("sort_order"), 0));
                 action.put("meta", toJsonMap(row.get("meta")));
-                List<Map<String, Object>> formFields = formFieldsByActionId.getOrDefault(asString(row.get("id")), List.of());
-                if (!formFields.isEmpty() || Boolean.TRUE.equals(row.get("requires_pre_action_form"))) {
-                    action.put("preActionFields", formFields);
-                    action.put("preActionFormFields", formFields);
-                    Map<String, Object> preActionForm = new LinkedHashMap<>();
-                    preActionForm.put("title", asNullableString(row.get("pre_action_form_title")));
-                    preActionForm.put("submitLabel", firstNonBlank(asNullableString(row.get("pre_action_form_submit_label")), "确定"));
-                    preActionForm.put("fields", formFields);
-                    action.put("preActionForm", preActionForm);
-                }
                 actions.add(action);
             }
             result.put(templateId, actions);
@@ -1172,40 +1087,8 @@ public class PortalTemplateAdminController {
         return result;
     }
 
-    private Map<String, List<Map<String, Object>>> loadActionFormFieldsByActionIds(List<Map<String, Object>> actionRows) {
-        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
-        for (Map<String, Object> row : actionRows) {
-            String actionId = asString(row.get("id"));
-            if (!hasText(actionId)) {
-                continue;
-            }
-            List<Map<String, Object>> fieldRows = jdbc.queryForList(
-                "SELECT id, action_id, field_key, label, input_type, required, placeholder, default_value, max_length, sort_order, status, meta " +
-                    "FROM mo_portal_block_template_action_form_fields WHERE action_id = ? AND status = 'ACTIVE' ORDER BY sort_order, id",
-                actionId
-            );
-            List<Map<String, Object>> fields = new ArrayList<>();
-            for (Map<String, Object> fieldRow : fieldRows) {
-                Map<String, Object> field = new LinkedHashMap<>();
-                field.put("id", asString(fieldRow.get("id")));
-                field.put("fieldKey", asString(fieldRow.get("field_key")));
-                field.put("label", asString(fieldRow.get("label")));
-                field.put("inputType", asString(fieldRow.get("input_type")));
-                field.put("required", Boolean.TRUE.equals(fieldRow.get("required")));
-                field.put("placeholder", asNullableString(fieldRow.get("placeholder")));
-                field.put("defaultValue", asNullableString(fieldRow.get("default_value")));
-                field.put("maxLength", nullableInteger(fieldRow.get("max_length")));
-                field.put("sortOrder", asInt(fieldRow.get("sort_order"), 0));
-                field.put("status", asString(fieldRow.get("status")));
-                field.put("meta", asMap(fieldRow.get("meta")));
-                fields.add(field);
-            }
-            result.put(actionId, fields);
-        }
-        return result;
-    }
-
     private void saveTemplateSections(String templateId, List<Map<String, Object>> sections, String currentUserId) {
+        Map<String, Object> templateContext = loadTemplateCompatibilityContext(templateId);
         jdbc.update("DELETE FROM mo_portal_template_sections WHERE template_id = ?", templateId);
         for (Map<String, Object> section : sections) {
             String sectionId = persistentId(asString(section.get("id")));
@@ -1237,6 +1120,8 @@ public class PortalTemplateAdminController {
                 if (!"ACTIVE".equals(asString(blockTemplate.get("status")))) {
                     throw new IllegalArgumentException("仅允许引用 ACTIVE 块模板");
                 }
+                boolean enabled = asBoolean(readField(blockRef, "enabled", "enabled"), true);
+                validateEnabledBlockRefCompatibility(templateContext, blockTemplate, enabled);
                 jdbc.update(
                     "INSERT INTO mo_portal_template_block_refs (id, template_id, section_id, block_template_id, sort_order, enabled, override_meta, created_by, updated_by) " +
                         "VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)",
@@ -1245,7 +1130,7 @@ public class PortalTemplateAdminController {
                     sectionId,
                     blockTemplateId,
                     asInt(readField(blockRef, "sortOrder", "sort_order"), 0),
-                    asBoolean(readField(blockRef, "enabled", "enabled"), true),
+                    enabled,
                     toJson(asMap(readField(blockRef, "overrideMeta", "override_meta"))),
                     currentUserId,
                     currentUserId
@@ -1385,7 +1270,7 @@ public class PortalTemplateAdminController {
     private Map<String, Object> requireActiveBlockTemplate(String blockTemplateId) {
         try {
             Map<String, Object> row = jdbc.queryForMap(
-                "SELECT id, status FROM mo_portal_block_templates WHERE id = ?",
+                "SELECT id, code, name, label, data_key, status FROM mo_portal_block_templates WHERE id = ?",
                 blockTemplateId
             );
             String status = asString(row.get("status"));
@@ -1405,6 +1290,54 @@ public class PortalTemplateAdminController {
             || readField(blockRef, "actions", "actions") != null) {
             throw new IllegalArgumentException("块引用不允许覆盖 displayType/dataKey/actions");
         }
+    }
+
+    private Map<String, Object> loadTemplateCompatibilityContext(String templateId) {
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                "SELECT id, code, name, meta FROM mo_portal_templates WHERE id = ?",
+                templateId
+            );
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("id", asString(row.get("id")));
+            result.put("code", asString(row.get("code")));
+            result.put("name", asString(row.get("name")));
+            result.put("meta", toJsonMap(row.get("meta")));
+            return result;
+        } catch (EmptyResultDataAccessException ex) {
+            throw new IllegalArgumentException("模板不存在");
+        }
+    }
+
+    private void validateEnabledBlockRefCompatibility(Map<String, Object> templateContext,
+                                                      Map<String, Object> blockTemplate,
+                                                      boolean enabled) {
+        if (!enabled) {
+            return;
+        }
+        String dataKey = asNullableString(blockTemplate.get("data_key"));
+        if (!hasText(dataKey)) {
+            return;
+        }
+        if (dataKey.trim().toLowerCase(Locale.ROOT).startsWith("ceo.")
+            && !isCeoTemplateDefinition(asNullableString(templateContext.get("code")), asMap(templateContext.get("meta")))) {
+            String blockName = firstNonBlank(
+                asNullableString(blockTemplate.get("label")),
+                asNullableString(blockTemplate.get("name")),
+                asNullableString(blockTemplate.get("code")),
+                dataKey
+            );
+            throw new IllegalArgumentException("块模板「" + blockName + "」(" + dataKey + ") 仅允许 CEO 模板引用");
+        }
+    }
+
+    private boolean isCeoTemplateDefinition(String templateCode, Map<String, Object> templateMeta) {
+        Map<String, Object> safeMeta = templateMeta == null ? Map.of() : templateMeta;
+        String layoutMode = asNullableString(safeMeta.get("layout_mode"));
+        String designIntent = asNullableString(safeMeta.get("designIntent"));
+        return "ceo-dashboard-v1".equalsIgnoreCase(layoutMode)
+            || "executive-decision-dashboard".equalsIgnoreCase(designIntent)
+            || Objects.toString(templateCode, "").toUpperCase(Locale.ROOT).contains("CEO");
     }
 
     private Object readField(Map<String, Object> source, String camelKey, String snakeKey) {
@@ -1571,24 +1504,6 @@ public class PortalTemplateAdminController {
         return null;
     }
 
-    private Object firstNonBlankValue(Object... values) {
-        if (values == null) {
-            return null;
-        }
-        for (Object value : values) {
-            if (value instanceof String text) {
-                if (hasText(text)) {
-                    return text;
-                }
-                continue;
-            }
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
     private boolean asBoolean(Object value, boolean defaultValue) {
         if (value == null) {
             return defaultValue;
@@ -1619,20 +1534,6 @@ public class PortalTemplateAdminController {
         } catch (NumberFormatException ex) {
             return defaultValue;
         }
-    }
-
-    private Integer nullableInteger(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        String text = asNullableString(value);
-        if (!hasText(text)) {
-            return null;
-        }
-        return Integer.parseInt(text);
     }
 
     private String persistentId(String value) {

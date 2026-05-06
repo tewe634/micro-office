@@ -3,7 +3,6 @@ package com.microoffice.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.microoffice.dto.response.ApiResponse;
 import com.microoffice.service.DailyEntryAdminService;
-import com.microoffice.service.DailyEntryBehaviorService;
 import com.microoffice.service.DailyEntryChatAdminService;
 import com.microoffice.service.MenuPermissionService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DailyEntryAdminController {
     private final DailyEntryAdminService dailyEntryAdminService;
-    private final DailyEntryBehaviorService dailyEntryBehaviorService;
     private final DailyEntryChatAdminService dailyEntryChatAdminService;
     private final MenuPermissionService menuPermissionService;
 
@@ -71,20 +69,6 @@ public class DailyEntryAdminController {
     public ApiResponse<List<Map<String, Object>>> listTargets(@PathVariable String id, Authentication auth) {
         requireAdmin(auth);
         return ApiResponse.ok(dailyEntryAdminService.listTargets(id));
-    }
-
-    @GetMapping("/{id}/behavior")
-    public ApiResponse<Map<String, Object>> behavior(@PathVariable String id, Authentication auth) {
-        requireAdmin(auth);
-        return ApiResponse.ok(dailyEntryBehaviorService.getBehavior(id));
-    }
-
-    @PutMapping("/{id}/behavior")
-    public ApiResponse<Map<String, Object>> saveBehavior(@PathVariable String id,
-                                                         @RequestBody Map<String, Object> body,
-                                                         Authentication auth) {
-        String userId = requireAdmin(auth);
-        return ApiResponse.ok(dailyEntryBehaviorService.saveBehavior(id, body, userId));
     }
 
     @PutMapping("/{id}/targets")

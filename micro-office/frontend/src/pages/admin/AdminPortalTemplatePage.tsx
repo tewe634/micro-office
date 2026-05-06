@@ -165,7 +165,7 @@ export default function AdminPortalTemplatePage() {
     setCreatePreset(null);
     createForm.resetFields();
     await loadLists();
-    message.success('对象模板已创建，已跳转到装配页');
+    message.success('客户&对象模板已创建，已跳转到装配页');
     if (resp.data?.id) {
       nav(`/admin/portal-templates/${resp.data.id}`);
     }
@@ -236,8 +236,8 @@ export default function AdminPortalTemplatePage() {
         >
           <div style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
             <Space direction="vertical" size={6}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>对象模板新建</div>
-              <div style={{ color: '#6b7280', fontSize: 12 }}>外部对象模板按定义对象类型创建，创建时先确定模板定义类型，再进入装配设计。</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>客户&对象模板新建</div>
+              <div style={{ color: '#6b7280', fontSize: 12 }}>客户&对象模板按定义对象类型创建，创建时先确定模板定义类型，再进入装配设计。</div>
             </Space>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginTop: 16 }}>
               {objectCreatePresets.map(preset => (
@@ -402,7 +402,7 @@ export default function AdminPortalTemplatePage() {
       </div>
 
       <Modal
-        title={createPreset?.title || '新建对象模板'}
+        title={createPreset?.title || '新建客户&对象模板'}
         open={createOpen}
         onCancel={() => {
           setCreateOpen(false);
