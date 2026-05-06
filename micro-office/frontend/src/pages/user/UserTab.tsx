@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag, Pagination } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { userApi, orgApi, positionApi } from '../../api';
 import { formatPaginationTotal, formatRoleLabel, paginationLocale, uiText } from '../../constants/ui';
 import { useAuthStore } from '../../store/auth';
+import { canAccessMenu } from '../../constants/routes';
 
 const roleColorMap: Record<string, string> = { ADMIN: 'red', HR: 'purple', SALES: 'cyan', PURCHASE: 'geekblue', FINANCE: 'gold', BIZ: 'orange', TECH: 'lime', WAREHOUSE: 'volcano', IT: 'magenta', PRODUCTION: 'green', STAFF: 'default' };
 
-type UserTabProps = {
-  orgId?: string;
-  onOrgIdChange?: (orgId?: string) => void;
-};
-
-export default function UserTab({ orgId, onOrgIdChange }: UserTabProps) {
+export default function UserTab() {
+  const nav = useNavigate();
   const role = useAuthStore(s => s.role);
+  const menus = useAuthStore(s => s.menus);
   const canManagePersonnel = role === 'ADMIN' || role === 'HR';
+  const canViewUserPortal = canAccessMenu('/users', menus);
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [current, setCurrent] = useState(1);
@@ -22,9 +22,7 @@ export default function UserTab({ orgId, onOrgIdChange }: UserTabProps) {
   const [orgs, setOrgs] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [internalFilterOrg, setInternalFilterOrg] = useState<string | undefined>();
-  const isOrgFilterControlled = typeof onOrgIdChange === 'function' || orgId !== undefined;
-  const filterOrg = isOrgFilterControlled ? orgId : internalFilterOrg;
+  const [filterOrg, setFilterOrg] = useState<any>();
 
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<any>(null);
@@ -95,15 +93,8 @@ export default function UserTab({ orgId, onOrgIdChange }: UserTabProps) {
             optionFilterProp="label"
             placeholder="按组织筛选"
             style={{ width: 220 }}
-            value={filterOrg}
             options={orgs.map(o => ({ value: o.id, label: o.name }))}
-            onChange={(value) => {
-              const nextValue = value as string | undefined;
-              if (!isOrgFilterControlled) {
-                setInternalFilterOrg(nextValue);
-              }
-              onOrgIdChange?.(nextValue);
-            }}
+            onChange={v => setFilterOrg(v)}
           />
           <div className="page-toolbar-right">
             {canManagePersonnel ? <Button type="primary" onClick={() => { setEdit(null); form.resetFields(); setModal(true); }}>新增</Button> : null}
@@ -145,18 +136,23 @@ export default function UserTab({ orgId, onOrgIdChange }: UserTabProps) {
                   ellipsis: true,
                   render: (ids: any[]) => ids?.length ? ids.map(id => <Tag key={id} color="orange">{posName(id)}</Tag>) : '-',
                 },
-                ...(canManagePersonnel ? [{
+                {
                   title: '操作',
-                  width: 140,
+                  width: canManagePersonnel ? 210 : 140,
                   render: (_: any, r: any) => (
                     <Space size={6} wrap>
-                      <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
-                      <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); const nextCurrent = current > 1 && users.length === 1 ? current - 1 : current; loadUsers(nextCurrent, size, filterOrg); }}>
-                        <Button size="small" danger>删除</Button>
-                      </Popconfirm>
+                      {canViewUserPortal ? <Button size="small" onClick={() => nav(`/users/${r.id}/portal`)}>门户</Button> : null}
+                      {canManagePersonnel ? (
+                        <>
+                          <Button size="small" onClick={() => openEdit(r)}>编辑</Button>
+                          <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={async () => { await userApi.delete(r.id); message.success('已删除'); const nextCurrent = current > 1 && users.length === 1 ? current - 1 : current; loadUsers(nextCurrent, size, filterOrg); }}>
+                            <Button size="small" danger>删除</Button>
+                          </Popconfirm>
+                        </>
+                      ) : null}
                     </Space>
                   ),
-                }] : []),
+                },
               ]}
             />
           </div>

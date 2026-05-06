@@ -692,7 +692,7 @@ export default function PortalPage({ entityType }: { entityType: PortalEntityTyp
   }, [productPortalHierarchy.departmentRows, productPortalHierarchy.personRows, selectedProductDepartment]);
 
   const listRoute = useMemo(() => {
-    if (entityType === 'users') return '/org?tab=users';
+    if (entityType === 'users') return '/users';
     if (entityType === 'objects') return '/objects';
     return '/products';
   }, [entityType]);

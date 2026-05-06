@@ -1,6 +1,7 @@
 import { Card, Tabs } from 'antd';
 import UserTab from './UserTab';
 import PositionTab from './PositionTab';
+import ExternalAccountBindingTab from './ExternalAccountBindingTab';
 
 export default function UserAndPositionPage() {
   return (
@@ -27,6 +28,15 @@ export default function UserAndPositionPage() {
               children: (
                 <div className="page-fill">
                   <PositionTab />
+                </div>
+              ),
+            },
+            {
+              key: 'external-account-bindings',
+              label: '外部账号绑定',
+              children: (
+                <div className="page-fill">
+                  <ExternalAccountBindingTab />
                 </div>
               ),
             },

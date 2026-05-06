@@ -10,6 +10,7 @@ import { buildAllowedMenus, canAccessMenu, resolveAdminHomePath, resolveHomePath
 const MainLayout = lazy(() => import('./layouts/MainLayout'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const OrgPage = lazy(() => import('./pages/org/OrgPage'));
+const UserAndPositionPage = lazy(() => import('./pages/user/UserAndPositionPage'));
 const ObjectPage = lazy(() => import('./pages/object/ObjectPage'));
 const ProductPage = lazy(() => import('./pages/product/ProductPage'));
 const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage'));
@@ -178,9 +179,9 @@ export default function App() {
             <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
               <Route index element={<HomeRedirect />} />
               <Route path="org" element={<MenuRouteGuard menuKey="/org"><OrgPage /></MenuRouteGuard>} />
-              <Route path="users" element={<MenuRouteGuard menuKey="/users"><Navigate to="/org?tab=users" replace /></MenuRouteGuard>} />
-              <Route path="users/:id/portal" element={<MenuRouteGuard menuKey="/users"><Navigate to="/org?tab=users" replace /></MenuRouteGuard>} />
-              <Route path="users/:id/portal/details/:detailSection" element={<MenuRouteGuard menuKey="/users"><Navigate to="/org?tab=users" replace /></MenuRouteGuard>} />
+              <Route path="users" element={<MenuRouteGuard menuKey="/users"><UserAndPositionPage /></MenuRouteGuard>} />
+              <Route path="users/:id/portal" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
+              <Route path="users/:id/portal/details/:detailSection" element={<MenuRouteGuard menuKey="/users"><PortalPage entityType="users" /></MenuRouteGuard>} />
               <Route path="objects" element={<MenuRouteGuard menuKey="/objects"><ObjectPage /></MenuRouteGuard>} />
               <Route path="objects/:id/portal" element={<MenuRouteGuard menuKey="/objects"><PortalPage entityType="objects" /></MenuRouteGuard>} />
               <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />

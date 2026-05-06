@@ -31,6 +31,7 @@ public class PortalBlockTemplateAdminController {
     private static final List<String> ACTION_TYPES = List.of("switch_subject", "open_workbench_session");
     private static final List<String> SUBJECT_TYPES = List.of("PERSON", "ORGANIZATION", "PRODUCT", "CUSTOMER_COMPANY", "SUPPLIER", "CARRIER", "BANK");
     private static final List<String> SESSION_TYPES = List.of("DAILY_ENTRY", "SUPPLIER", "CARRIER", "BANK", "PRODUCT", "CUSTOMER_COMPANY", "ORGANIZATION", "PERSON");
+    private static final List<String> INPUT_TYPES = List.of("TEXT", "TEXTAREA", "NUMBER", "SELECT");
     private static final Pattern NON_CODE_PATTERN = Pattern.compile("[^A-Z0-9_]+");
 
     private final JdbcTemplate jdbc;
@@ -325,8 +326,11 @@ public class PortalBlockTemplateAdminController {
     }
 
     private List<Map<String, Object>> loadTemplateActions(String blockTemplateId) {
+        Map<String, List<Map<String, Object>>> formFieldsByActionId = loadActionFormFieldsByActionIds(List.of(blockTemplateId), true);
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, block_template_id, action_type, target_subject_type, target_id_path, session_type, sort_order, meta, created_at, created_by, updated_at, updated_by " +
+            "SELECT id, block_template_id, action_type, target_subject_type, target_id_path, session_type, " +
+                "requires_pre_action_form, pre_action_form_title, pre_action_form_submit_label, " +
+                "sort_order, meta, created_at, created_by, updated_at, updated_by " +
                 "FROM mo_portal_block_template_actions WHERE block_template_id = ? ORDER BY sort_order, id",
             blockTemplateId
         );
@@ -339,8 +343,21 @@ public class PortalBlockTemplateAdminController {
             action.put("targetSubjectType", asString(row.get("target_subject_type")));
             action.put("targetIdPath", asString(row.get("target_id_path")));
             action.put("sessionType", asString(row.get("session_type")));
+            action.put("requiresPreActionForm", Boolean.TRUE.equals(row.get("requires_pre_action_form")));
+            action.put("preActionFormTitle", asNullableString(row.get("pre_action_form_title")));
+            action.put("preActionFormSubmitLabel", asNullableString(row.get("pre_action_form_submit_label")));
             action.put("sortOrder", asInt(row.get("sort_order"), 0));
             action.put("meta", asMap(row.get("meta")));
+            List<Map<String, Object>> formFields = formFieldsByActionId.getOrDefault(asString(row.get("id")), List.of());
+            if (!formFields.isEmpty() || Boolean.TRUE.equals(row.get("requires_pre_action_form"))) {
+                action.put("preActionFields", formFields);
+                action.put("preActionFormFields", formFields);
+                Map<String, Object> preActionForm = new LinkedHashMap<>();
+                preActionForm.put("title", asNullableString(row.get("pre_action_form_title")));
+                preActionForm.put("submitLabel", asNullableString(row.get("pre_action_form_submit_label")));
+                preActionForm.put("fields", formFields);
+                action.put("preActionForm", preActionForm);
+            }
             action.put("createdAt", row.get("created_at"));
             action.put("createdBy", asString(row.get("created_by")));
             action.put("updatedAt", row.get("updated_at"));
@@ -354,20 +371,29 @@ public class PortalBlockTemplateAdminController {
         jdbc.update("DELETE FROM mo_portal_block_template_actions WHERE block_template_id = ?", blockTemplateId);
         int defaultSort = 10;
         for (Map<String, Object> action : actions) {
+            String actionId = persistentId(asString(action.get("id")));
             jdbc.update(
-                "INSERT INTO mo_portal_block_template_actions (id, block_template_id, action_type, target_subject_type, target_id_path, session_type, sort_order, meta, created_by, updated_by) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)",
-                persistentId(asString(action.get("id"))),
+                "INSERT INTO mo_portal_block_template_actions (id, block_template_id, action_type, target_subject_type, target_id_path, session_type, " +
+                    "requires_pre_action_form, pre_action_form_title, pre_action_form_submit_label, sort_order, meta, created_by, updated_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)",
+                actionId,
                 blockTemplateId,
                 normalizeAllowed(action.get("actionType"), ACTION_TYPES, false, "动作类型不合法"),
                 asNullableString(action.get("targetSubjectType")),
                 asNullableString(action.get("targetIdPath")),
                 asNullableString(action.get("sessionType")),
+                Boolean.TRUE.equals(action.get("requiresPreActionForm")),
+                asNullableString(action.get("preActionFormTitle")),
+                asNullableString(action.get("preActionFormSubmitLabel")),
                 asInt(action.get("sortOrder"), defaultSort),
                 toJson(asMap(action.get("meta"))),
                 currentUserId,
                 currentUserId
             );
+            saveActionFormFields(actionId, asListOfMap(firstNonBlankValue(
+                action.get("preActionFields"),
+                action.get("preActionFormFields")
+            )), currentUserId);
             defaultSort += 10;
         }
     }
@@ -383,12 +409,40 @@ public class PortalBlockTemplateAdminController {
             if ("open_workbench_session".equals(actionType)) {
                 normalizeAllowed(action.get("sessionType"), SESSION_TYPES, false, "sessionType 不合法");
             }
+            boolean requiresPreActionForm = Boolean.TRUE.equals(action.get("requiresPreActionForm"));
+            Map<String, Object> preActionForm = asMap(action.get("preActionForm"));
+            String preActionFormTitle = asNullableString(firstNonBlank(
+                asNullableString(action.get("preActionFormTitle")),
+                asNullableString(preActionForm.get("title"))
+            ));
+            String preActionFormSubmitLabel = asNullableString(firstNonBlank(
+                asNullableString(action.get("preActionFormSubmitLabel")),
+                asNullableString(preActionForm.get("submitLabel"))
+            ));
+            List<Map<String, Object>> preActionFormFields = normalizeActionFormFields(asListOfMap(firstNonBlankValue(
+                action.get("preActionFields"),
+                action.get("preActionFormFields"),
+                preActionForm.get("fields")
+            )));
+            if (requiresPreActionForm) {
+                if (!hasText(preActionFormTitle)) {
+                    throw new IllegalArgumentException("启用前置弹窗时，preActionForm.title 不能为空");
+                }
+                if (preActionFormFields.isEmpty()) {
+                    throw new IllegalArgumentException("启用前置弹窗时，preActionForm.fields 至少需要一项");
+                }
+            }
             Map<String, Object> normalized = new LinkedHashMap<>();
             normalized.put("id", asString(action.get("id")));
             normalized.put("actionType", actionType);
             normalized.put("targetSubjectType", asNullableString(action.get("targetSubjectType")));
             normalized.put("targetIdPath", asNullableString(action.get("targetIdPath")));
             normalized.put("sessionType", asNullableString(action.get("sessionType")));
+            normalized.put("requiresPreActionForm", requiresPreActionForm);
+            normalized.put("preActionFormTitle", preActionFormTitle);
+            normalized.put("preActionFormSubmitLabel", hasText(preActionFormSubmitLabel) ? preActionFormSubmitLabel : "确定");
+            normalized.put("preActionFields", preActionFormFields);
+            normalized.put("preActionFormFields", preActionFormFields);
             normalized.put("sortOrder", asInt(action.get("sortOrder"), 0));
             normalized.put("meta", asMap(action.get("meta")));
             result.add(normalized);
@@ -396,6 +450,98 @@ public class PortalBlockTemplateAdminController {
         return result;
     }
 
+    private void saveActionFormFields(String actionId, List<Map<String, Object>> fields, String currentUserId) {
+        jdbc.update("DELETE FROM mo_portal_block_template_action_form_fields WHERE action_id = ?", actionId);
+        int defaultSort = 10;
+        for (Map<String, Object> field : fields) {
+            jdbc.update(
+                "INSERT INTO mo_portal_block_template_action_form_fields (id, action_id, field_key, label, input_type, required, placeholder, default_value, max_length, sort_order, status, meta, created_by, updated_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?)",
+                persistentId(asString(field.get("id"))),
+                actionId,
+                asString(field.get("fieldKey")),
+                asString(field.get("label")),
+                asString(field.get("inputType")),
+                Boolean.TRUE.equals(field.get("required")),
+                asNullableString(field.get("placeholder")),
+                asNullableString(field.get("defaultValue")),
+                nullableInteger(field.get("maxLength")),
+                asInt(field.get("sortOrder"), defaultSort),
+                asString(field.get("status")),
+                toJson(asMap(field.get("meta"))),
+                currentUserId,
+                currentUserId
+            );
+            defaultSort += 10;
+        }
+    }
+
+    private Map<String, List<Map<String, Object>>> loadActionFormFieldsByActionIds(List<String> ids, boolean loadByBlockTemplate) {
+        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
+        if (ids == null || ids.isEmpty()) {
+            return result;
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            loadByBlockTemplate
+                ? "SELECT f.id, f.action_id, f.field_key, f.label, f.input_type, f.required, f.placeholder, f.default_value, f.max_length, f.sort_order, f.status, f.meta " +
+                    "FROM mo_portal_block_template_action_form_fields f " +
+                    "JOIN mo_portal_block_template_actions a ON a.id = f.action_id " +
+                    "WHERE a.block_template_id = ? AND f.status = 'ACTIVE' ORDER BY f.action_id, f.sort_order, f.id"
+                : "SELECT id, action_id, field_key, label, input_type, required, placeholder, default_value, max_length, sort_order, status, meta " +
+                    "FROM mo_portal_block_template_action_form_fields WHERE action_id = ? AND status = 'ACTIVE' ORDER BY action_id, sort_order, id",
+            ids.get(0)
+        );
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("id", asString(row.get("id")));
+            field.put("fieldKey", asString(row.get("field_key")));
+            field.put("label", asString(row.get("label")));
+            field.put("inputType", asString(row.get("input_type")));
+            field.put("required", Boolean.TRUE.equals(row.get("required")));
+            field.put("placeholder", asNullableString(row.get("placeholder")));
+            field.put("defaultValue", asNullableString(row.get("default_value")));
+            field.put("maxLength", nullableInteger(row.get("max_length")));
+            field.put("sortOrder", asInt(row.get("sort_order"), 0));
+            field.put("status", asString(row.get("status")));
+            field.put("meta", asMap(row.get("meta")));
+            result.computeIfAbsent(asString(row.get("action_id")), key -> new ArrayList<>()).add(field);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> normalizeActionFormFields(List<Map<String, Object>> fields) {
+        List<Map<String, Object>> normalized = new ArrayList<>();
+        int dedupSort = 0;
+        List<String> fieldKeys = new ArrayList<>();
+        for (Map<String, Object> field : fields) {
+            String fieldKey = requireText(field.get("fieldKey"), "preActionForm.fields[].fieldKey 不能为空");
+            String label = requireText(field.get("label"), "preActionForm.fields[].label 不能为空");
+            String inputType = normalizeAllowed(asNullableString(field.get("inputType")), INPUT_TYPES, false, "preActionForm.fields[].inputType 不合法");
+            Integer maxLength = nullableInteger(field.get("maxLength"));
+            if (maxLength != null && maxLength <= 0) {
+                throw new IllegalArgumentException("preActionForm.fields[].maxLength 必须大于 0");
+            }
+            if (fieldKeys.contains(fieldKey)) {
+                throw new IllegalArgumentException("preActionForm.fields[].fieldKey 不允许重复: " + fieldKey);
+            }
+            fieldKeys.add(fieldKey);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", asString(field.get("id")));
+            item.put("fieldKey", fieldKey);
+            item.put("label", label);
+            item.put("inputType", inputType);
+            item.put("required", Boolean.TRUE.equals(field.get("required")));
+            item.put("placeholder", asNullableString(field.get("placeholder")));
+            item.put("defaultValue", asNullableString(field.get("defaultValue")));
+            item.put("maxLength", maxLength);
+            item.put("sortOrder", asInt(field.get("sortOrder"), dedupSort));
+            item.put("status", hasText(asNullableString(field.get("status"))) ? asNullableString(field.get("status")).trim().toUpperCase(Locale.ROOT) : "ACTIVE");
+            item.put("meta", asMap(field.get("meta")));
+            normalized.add(item);
+            dedupSort += 10;
+        }
+        return normalized;
+    }
     private void ensureCodeUnique(String code, String ignoreId) {
         Integer count;
         if (hasText(ignoreId)) {
@@ -427,6 +573,38 @@ public class PortalBlockTemplateAdminController {
         String upper = Objects.toString(value, "").toUpperCase(Locale.ROOT);
         String normalized = NON_CODE_PATTERN.matcher(upper).replaceAll("_");
         return normalized.replaceAll("_+", "_").replaceAll("^_+|_+$", "");
+    }
+
+    private Object firstNonBlankValue(Object... values) {
+        if (values == null) {
+            return null;
+        }
+        for (Object value : values) {
+            if (value instanceof String text) {
+                if (hasText(text)) {
+                    return text;
+                }
+                continue;
+            }
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Integer nullableInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        String text = asNullableString(value);
+        if (!hasText(text)) {
+            return null;
+        }
+        return Integer.parseInt(text);
     }
 
     private Object readValue(Map<String, Object> body, String camelKey, String snakeKey) {

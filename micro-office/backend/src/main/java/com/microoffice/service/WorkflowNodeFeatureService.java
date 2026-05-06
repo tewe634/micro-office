@@ -177,29 +177,6 @@ public class WorkflowNodeFeatureService {
     }
 
     @Transactional
-    public Map<String, Object> deleteFeature(String id, String userId) {
-        Map<String, Object> source = loadFeatureOrThrow(id);
-        Map<String, Object> references = getReferences(id);
-        int referenceCount = asInt(references.get("referenceCount"), 0);
-        if (referenceCount > 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "节点功能已被工作流模板节点引用，无法删除");
-        }
-
-        jdbc.update("DELETE FROM mo_module_fields WHERE module_definition_id = ?", id);
-        jdbc.update("DELETE FROM mo_workflow_module_definitions WHERE id = ?", id);
-        int deleted = jdbc.update("DELETE FROM mo_module_definitions WHERE id = ?", id);
-        if (deleted == 0) {
-            throw new ResponseStatusException(NOT_FOUND, "节点功能不存在");
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", id);
-        result.put("name", asString(source.get("name")));
-        result.put("deletedBy", userId);
-        return result;
-    }
-
-    @Transactional
     public Map<String, Object> updateFeatureStatus(String id, String status, String userId) {
         boolean active = "ACTIVE".equals(normalizeStatus(status));
         int updated = jdbc.update(

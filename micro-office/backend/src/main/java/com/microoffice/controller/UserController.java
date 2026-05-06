@@ -17,13 +17,6 @@ import java.util.*;
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
-    private static final Map<String, List<String>> SPECIAL_VISIBLE_USERS_BY_ORG_NAME = Map.of(
-        "管理体系", List.of("王舟珍"),
-        "财务部", List.of("王舟珍"),
-        "业务数字化", List.of("杨筱辉"),
-        "生产成套部", List.of("方俊锋")
-    );
-
     private final SysUserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbc;
@@ -122,19 +115,62 @@ public class UserController {
             if (!visibleOrgIds.contains(orgId)) {
                 return ApiResponse.ok(new ArrayList<>());
             }
-            List<String> scopedUserIds = resolveScopedUserIds(orgId);
-            if (scopedUserIds.isEmpty()) {
-                users = new ArrayList<>();
+            Integer isRoot = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM organization WHERE id = ? AND parent_id IS NULL", Integer.class, orgId);
+            if (isRoot != null && isRoot > 0) {
+                // 顶级组织：只查直属
+                users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().eq(SysUser::getOrgId, orgId));
             } else {
-                users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().in(SysUser::getId, scopedUserIds));
+                // 递归查本节点及所有子组织的人员
+                List<String> orgIds = jdbc.queryForList(
+                    "WITH RECURSIVE sub AS (SELECT id FROM organization WHERE id = ? " +
+                    "UNION ALL SELECT o.id FROM organization o JOIN sub s ON o.parent_id = s.id) " +
+                    "SELECT id FROM sub", String.class, orgId);
+                java.util.Set<String> userIds = new java.util.LinkedHashSet<>(
+                    jdbc.queryForList("SELECT id FROM sys_user WHERE org_id = ANY(?::varchar[])",
+                        String.class, (Object) orgIds.toArray(new String[0])));
+                // 确定附加哪些负责人（手机号）
+                java.util.List<String> extraPhones = new java.util.ArrayList<>();
+                extraPhones.add("13305713391"); // 杨筱辉（所有体系都加）
+                // 找当前节点所属顶级体系名称
+                String topName = jdbc.queryForObject(
+                    "WITH RECURSIVE path AS (" +
+                    "  SELECT id, name, parent_id FROM organization WHERE id = ?" +
+                    "  UNION ALL SELECT o.id, o.name, o.parent_id FROM organization o JOIN path p ON o.id = p.parent_id" +
+                    ") SELECT name FROM path WHERE parent_id=(SELECT id FROM organization WHERE parent_id IS NULL) LIMIT 1",
+                    String.class, orgId);
+                if ("管理体系".equals(topName)) {
+                    extraPhones.add("13958118773"); // 王舟珍
+                } else if ("销售体系".equals(topName)) {
+                    // 找当前节点所属业务部（或自身就是业务部）
+                    String bizName = null;
+                    try {
+                        bizName = jdbc.queryForObject(
+                            "WITH RECURSIVE path AS (" +
+                            "  SELECT id, name, parent_id FROM organization WHERE id = ?" +
+                            "  UNION ALL SELECT o.id, o.name, o.parent_id FROM organization o JOIN path p ON o.id = p.parent_id" +
+                            ") SELECT name FROM path WHERE parent_id=(SELECT id FROM organization WHERE name='销售体系') LIMIT 1",
+                            String.class, orgId);
+                    } catch (Exception ignored) {}
+                    if ("业务一部".equals(bizName)) extraPhones.add("13588806597");
+                    else if ("业务二部".equals(bizName)) extraPhones.add("13906507118");
+                    else if ("业务三部".equals(bizName)) extraPhones.add("13306506051");
+                    // 销售体系本身：加三个大区负责人
+                    else { extraPhones.add("13588806597"); extraPhones.add("13906507118"); extraPhones.add("13306506051"); }
+                }
+                // 附加负责人 ID
+                userIds.addAll(jdbc.queryForList(
+                    "SELECT id FROM sys_user WHERE phone = ANY(?::varchar[])",
+                    String.class, (Object) extraPhones.toArray(new String[0])));
+                users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().in(SysUser::getId, new java.util.ArrayList<>(userIds)));
             }
         } else {
             users = userMapper.selectList(new LambdaQueryWrapper<SysUser>().in(SysUser::getOrgId, visibleOrgIds));
         }
         // 按工号数字部分排序
         users.sort((a, b) -> {
-            int na = extractEmpNoSortValue(a.getEmpNo());
-            int nb = extractEmpNoSortValue(b.getEmpNo());
+            int na = a.getEmpNo() != null ? Integer.parseInt(a.getEmpNo().replaceAll("[^0-9]", "")) : 0;
+            int nb = b.getEmpNo() != null ? Integer.parseInt(b.getEmpNo().replaceAll("[^0-9]", "")) : 0;
             return Integer.compare(na, nb);
         });
         List<Map<String, Object>> result = new ArrayList<>();
@@ -223,92 +259,6 @@ public class UserController {
         jdbc.update("UPDATE external_object SET owner_id = NULL WHERE owner_id = ?", id);
         userMapper.deleteById(id);
         return ApiResponse.ok(null);
-    }
-
-    private List<String> resolveScopedUserIds(String orgId) {
-        if (isRootOrg(orgId)) {
-            return jdbc.queryForList(
-                "SELECT id FROM sys_user WHERE role = 'ADMIN' ORDER BY name, id",
-                String.class
-            );
-        }
-
-        LinkedHashSet<String> userIds = new LinkedHashSet<>(loadUserIdsByOrgIds(loadSubtreeOrgIds(orgId)));
-        userIds.addAll(loadSpecialMappedUserIds(orgId));
-        return new ArrayList<>(userIds);
-    }
-
-    private boolean isRootOrg(String orgId) {
-        Integer isRoot = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM organization WHERE id = ? AND parent_id IS NULL",
-            Integer.class,
-            orgId
-        );
-        return isRoot != null && isRoot > 0;
-    }
-
-    private List<String> loadSubtreeOrgIds(String orgId) {
-        return jdbc.queryForList(
-            "WITH RECURSIVE sub AS (" +
-                "SELECT id FROM organization WHERE id = ? " +
-                "UNION ALL " +
-                "SELECT o.id FROM organization o JOIN sub s ON o.parent_id = s.id" +
-            ") SELECT id FROM sub",
-            String.class,
-            orgId
-        );
-    }
-
-    private List<String> loadUserIdsByOrgIds(List<String> orgIds) {
-        if (orgIds.isEmpty()) {
-            return List.of();
-        }
-        return jdbc.queryForList(
-            "SELECT id FROM sys_user WHERE org_id = ANY(?::varchar[]) ORDER BY name, id",
-            String.class,
-            (Object) orgIds.toArray(new String[0])
-        );
-    }
-
-    private List<String> loadSpecialMappedUserIds(String orgId) {
-        String orgName = jdbc.queryForObject("SELECT name FROM organization WHERE id = ?", String.class, orgId);
-        List<String> specialUserNames = SPECIAL_VISIBLE_USERS_BY_ORG_NAME.get(orgName);
-        if (specialUserNames == null || specialUserNames.isEmpty()) {
-            return List.of();
-        }
-
-        LinkedHashMap<String, String> userIdByName = new LinkedHashMap<>();
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT id, name FROM sys_user WHERE name = ANY(?::varchar[]) ORDER BY name, id",
-            (Object) specialUserNames.toArray(new String[0])
-        );
-        for (Map<String, Object> row : rows) {
-            String name = row.get("name") == null ? null : String.valueOf(row.get("name"));
-            String id = row.get("id") == null ? null : String.valueOf(row.get("id"));
-            if (name != null && id != null) {
-                userIdByName.putIfAbsent(name, id);
-            }
-        }
-
-        List<String> userIds = new ArrayList<>();
-        for (String name : specialUserNames) {
-            String userId = userIdByName.get(name);
-            if (userId != null) {
-                userIds.add(userId);
-            }
-        }
-        return userIds;
-    }
-
-    private int extractEmpNoSortValue(String empNo) {
-        if (empNo == null) {
-            return 0;
-        }
-        String digits = empNo.replaceAll("[^0-9]", "");
-        if (digits.isEmpty()) {
-            return 0;
-        }
-        return Integer.parseInt(digits);
     }
 
     private void saveExtraPositions(String userId, Map<String, Object> body) {

@@ -11,7 +11,6 @@ import com.microoffice.service.MenuPermissionService;
 import com.microoffice.service.WorkflowNodeFeatureService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -74,15 +73,6 @@ public class AdminWorkflowNodeFeatureController {
                                                    Authentication auth) {
         String userId = requireAdmin(auth);
         return ApiResponse.ok(workflowNodeFeatureService.updateFeature(id, body, userId));
-    }
-
-    /**
-     * 删除节点功能。若已被模板节点引用则拒绝删除。
-     */
-    @DeleteMapping("/{id}")
-    public ApiResponse<Map<String, Object>> delete(@PathVariable String id, Authentication auth) {
-        String userId = requireAdmin(auth);
-        return ApiResponse.ok(workflowNodeFeatureService.deleteFeature(id, userId));
     }
 
     /**

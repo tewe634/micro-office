@@ -55,9 +55,7 @@ public class PositionService {
             }
             q.in(Position::getId, positionIds);
         }
-        q.orderByAsc(Position::getSortOrder);
         q.orderByAsc(Position::getCode);
-        q.orderByAsc(Position::getId);
         return q;
     }
 
@@ -69,29 +67,13 @@ public class PositionService {
     }
 
     public Position getById(String id) { return mapper.selectById(id); }
-
-    public Position create(Position p) {
-        normalizeSortOrder(p);
-        mapper.insert(p);
-        return p;
-    }
-
-    public void update(Position p) {
-        normalizeSortOrder(p);
-        mapper.updateById(p);
-    }
-
+    public Position create(Position p) { mapper.insert(p); return p; }
+    public void update(Position p) { mapper.updateById(p); }
     public void delete(String id) { mapper.deleteById(id); }
 
     private boolean canManagePersonnel(String currentUserId) {
         SysUser currentUser = userMapper.selectById(currentUserId);
         if (currentUser == null) return false;
         return "ADMIN".equals(currentUser.getRole()) || "HR".equals(currentUser.getRole());
-    }
-
-    private void normalizeSortOrder(Position position) {
-        if (position != null && position.getSortOrder() == null) {
-            position.setSortOrder(0);
-        }
     }
 }

@@ -23,7 +23,7 @@ export const objectTypeLabelMap: Record<string, string> = {
 
 export const refTypeLabelMap: Record<string, string> = {
   THREAD: '工作流',
-  OBJECT: '客户&对象',
+  OBJECT: '外部对象',
   PRODUCT: '产品',
 };
 
@@ -34,7 +34,7 @@ export const uiText = {
   noRelatedRecords: '暂无关联记录',
   noMessageRecords: '暂无消息记录',
   noNodeRecords: '暂无节点记录',
-  noExternalObjectLinks: '暂无关联客户&对象',
+  noExternalObjectLinks: '暂无关联外部对象',
   noAchievementRecords: '暂无记录，可点击右上角新增',
   deleteConfirm: '确定要删除当前记录吗？',
   removeReferenceConfirm: '确定要移除这条关联吗？',

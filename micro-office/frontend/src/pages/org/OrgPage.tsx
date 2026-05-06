@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm, Slider, Empty, Tag, Drawer, Descriptions, Tabs } from 'antd';
+import { Card, Button, Modal, Form, Input, InputNumber, Space, TreeSelect, message, Popconfirm, Slider, Empty, Tag, Drawer, Descriptions } from 'antd';
 import { MinusOutlined, PlusOutlined, ReloadOutlined, ZoomInOutlined } from '@ant-design/icons';
-import { useSearchParams } from 'react-router-dom';
 import { orgApi } from '../../api';
 import { formatRoleLabel, uiText } from '../../constants/ui';
-import { buildAllowedMenus, canAccessMenu } from '../../constants/routes';
 import { useAuthStore } from '../../store/auth';
-import PositionTab from '../user/PositionTab';
-import UserTab from '../user/UserTab';
 
 type OrgItem = {
   id: string;
@@ -22,7 +18,7 @@ type OrgUser = {
   email?: string | null;
   phone?: string | null;
   emp_no?: string | null;
-  org_id: string | null;
+  org_id: string;
   org_name?: string | null;
   role?: string | null;
   hired_at?: string | null;
@@ -31,48 +27,22 @@ type OrgUser = {
   leaderCandidate?: boolean;
 };
 
-type OrgPageTabKey = 'org' | 'users' | 'positions';
-
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
 const MAX_ZOOM = 160;
-const FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
-  总经办: ['杨筱辉'],
-  产品支持体系: ['杨筱辉'],
-  销售体系: ['杨筱辉'],
-  商务部: ['吴敏'],
-  公共组: ['程雅珺'],
-  '管理数字化（BI）': ['李孝快'],
-  商务一组: ['汪丽美', '崔彩侠'],
-  商务二组: ['费燕萍'],
-  财务部: ['王舟珍'],
-  业务一部: ['严春南'],
-  业务二部: ['张巨根'],
-  业务三部: ['吕跃水'],
-  技术支持: ['方俊锋'],
-  生产成套部: ['方俊锋'],
-};
-const SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME: Record<string, string[]> = {
-  产品支持体系: ['杨筱辉'],
-  销售体系: ['杨筱辉'],
-  管理体系: ['王舟珍'],
-  财务部: ['王舟珍'],
-  商务部: ['吴敏'],
-  公共组: ['程雅珺'],
-  '管理数字化（BI）': ['李孝快'],
-  商务一组: ['汪丽美', '崔彩侠'],
-  商务二组: ['费燕萍'],
-  业务一部: ['严春南'],
-  业务二部: ['张巨根'],
-  业务三部: ['吕跃水'],
-  业务数字化: ['杨筱辉'],
-  技术支持: ['方俊锋'],
-  生产成套部: ['方俊锋'],
-};
-const HIDE_MEMBER_SECTION_ORG_NAMES = new Set(['商务部', '业务一部', '业务二部', '业务三部']);
+const FIXED_LEADER_NAME = '杨筱辉';
+const HIDE_MEMBER_SECTION_NODE_NAMES = new Set(['产品支持体系', '管理体系', '销售体系', '销售体系业务一部', '销售体系业务二部', '销售体系业务三部', '业务一部', '业务二部', '业务三部', '商务部']);
+const FIXED_LEADER_NODE_NAMES = new Set(['产品支持体系', '销售体系']);
 
-function shouldHideMemberSection(depth: number, nodeName: string) {
-  return depth <= 2 || HIDE_MEMBER_SECTION_ORG_NAMES.has(nodeName);
+function isBusinessSpecialist(user: OrgUser) {
+  return (user.primary_position_name || '').includes('商务专员') || (user.extra_position_names || '').includes('商务专员');
+}
+
+function shouldHideMemberSection(nodeName: string, isRoot = false) {
+  return isRoot
+    || HIDE_MEMBER_SECTION_NODE_NAMES.has(nodeName)
+    || /^销售体系业务[一二三123]部$/.test(nodeName)
+    || /^业务[一二三123]部$/.test(nodeName);
 }
 
 function dedupeUsers(list: OrgUser[]) {
@@ -82,70 +52,6 @@ function dedupeUsers(list: OrgUser[]) {
     seen.add(user.id);
     return true;
   });
-}
-
-function sortUsers(list: OrgUser[]) {
-  return [...list].sort((a, b) => {
-    if (!!b.leaderCandidate !== !!a.leaderCandidate) {
-      return Number(b.leaderCandidate) - Number(a.leaderCandidate);
-    }
-    return a.name.localeCompare(b.name, 'zh-CN');
-  });
-}
-
-function collectSubtreeOrgIds(
-  orgId: string,
-  childrenMap: Map<string | null, OrgItem[]>,
-  cache: Map<string, string[]>,
-): string[] {
-  const cached = cache.get(orgId);
-  if (cached) {
-    return cached;
-  }
-
-  const ids = [orgId];
-  (childrenMap.get(orgId) || []).forEach(child => {
-    ids.push(...collectSubtreeOrgIds(child.id, childrenMap, cache));
-  });
-  cache.set(orgId, ids);
-  return ids;
-}
-
-function buildDisplayUsersByOrg(
-  orgs: OrgItem[],
-  orgUsers: OrgUser[],
-  rootId: string | undefined,
-  childrenMap: Map<string | null, OrgItem[]>,
-) {
-  const directUsersByOrg = new Map<string, OrgUser[]>();
-  const userByName = new Map<string, OrgUser>();
-  const subtreeCache = new Map<string, string[]>();
-
-  orgUsers.forEach(user => {
-    if (user.org_id) {
-      directUsersByOrg.set(user.org_id, [...(directUsersByOrg.get(user.org_id) || []), user]);
-    }
-    if (!userByName.has(user.name)) {
-      userByName.set(user.name, user);
-    }
-  });
-
-  const usersByOrg = new Map<string, OrgUser[]>();
-  const specialLeaderUserIdsByOrg = new Map<string, Set<string>>();
-
-  orgs.forEach(org => {
-    const specialUsers = (SPECIAL_DISPLAY_USER_NAMES_BY_ORG_NAME[org.name] || [])
-      .map(userName => userByName.get(userName))
-      .filter((user): user is OrgUser => !!user);
-    const specialLeaderIds = new Set(specialUsers.map(user => user.id));
-    const baseUsers = org.id === rootId
-      ? orgUsers.filter(user => user.role === 'ADMIN')
-      : collectSubtreeOrgIds(org.id, childrenMap, subtreeCache).flatMap(orgNodeId => directUsersByOrg.get(orgNodeId) || []);
-    usersByOrg.set(org.id, sortUsers(dedupeUsers([...baseUsers, ...specialUsers])));
-    specialLeaderUserIdsByOrg.set(org.id, specialLeaderIds);
-  });
-
-  return { usersByOrg, directUsersByOrg, specialLeaderUserIdsByOrg };
 }
 
 const orgChartStyles = `
@@ -465,7 +371,7 @@ function PersonCard({ user, onClick, showLeaderTag }: { user: OrgUser; onClick: 
     <button type="button" className="org-person-card" onClick={() => onClick(user)}>
       <div className="org-person-card__top">
         <span className="org-person-card__name">{user.name}</span>
-        {showLeaderTag ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
+        {showLeaderTag || user.leaderCandidate ? <Tag color="gold" style={{ marginRight: 0 }}>负责人</Tag> : null}
       </div>
       <div className="org-person-card__meta">
         <span>主岗位：{user.primary_position_name || '-'}</span>
@@ -479,55 +385,49 @@ function PersonCard({ user, onClick, showLeaderTag }: { user: OrgUser; onClick: 
 function OrgChartNode({
   node,
   rootId,
-  depth,
   childrenMap,
   usersByOrg,
-  directUsersByOrg,
-  specialLeaderUserIdsByOrg,
   expandedKeys,
   onToggle,
   canManageOrg,
   onEdit,
   onDelete,
   onSelectUser,
-  canAccessUserDirectory,
-  onOpenUsers,
+  fixedLeaderUser,
+  businessDepartmentId,
 }: {
   node: OrgItem;
   rootId?: string;
-  depth: number;
   childrenMap: Map<string | null, OrgItem[]>;
   usersByOrg: Map<string, OrgUser[]>;
-  directUsersByOrg: Map<string, OrgUser[]>;
-  specialLeaderUserIdsByOrg: Map<string, Set<string>>;
   expandedKeys: string[];
   onToggle: (id: string) => void;
   canManageOrg: boolean;
   onEdit: (org?: OrgItem) => void;
   onDelete: (id: string) => Promise<void>;
   onSelectUser: (user: OrgUser) => void;
-  canAccessUserDirectory: boolean;
-  onOpenUsers: (orgId: string) => void;
+  fixedLeaderUser?: OrgUser | null;
+  businessDepartmentId?: string | null;
 }) {
   const children = childrenMap.get(node.id) || [];
-  const users = usersByOrg.get(node.id) || [];
-  const directUsers = directUsersByOrg.get(node.id) || [];
-  const specialLeaderUserIds = specialLeaderUserIdsByOrg.get(node.id) || new Set<string>();
-  const expanded = expandedKeys.includes(node.id);
-  const isRoot = node.id === rootId;
-  const showMemberSection = !shouldHideMemberSection(depth, node.name);
-  const fixedLeaderNames = FIXED_DISPLAY_LEADER_NAMES_BY_ORG_NAME[node.name] || [];
-  const leaderSourceUsers = fixedLeaderNames.length > 0
-    ? users.filter(user => fixedLeaderNames.includes(user.name))
-    : showMemberSection
-      ? users
-      : sortUsers(dedupeUsers([
-          ...directUsers,
-          ...users.filter(user => specialLeaderUserIds.has(user.id)),
-        ]));
-  const leaderUsers = dedupeUsers(leaderSourceUsers.filter(user => user.leaderCandidate || specialLeaderUserIds.has(user.id)));
+  const users = [...(usersByOrg.get(node.id) || [])].sort((a, b) => {
+    if (!!b.leaderCandidate !== !!a.leaderCandidate) return Number(b.leaderCandidate) - Number(a.leaderCandidate);
+    return a.name.localeCompare(b.name, 'zh-CN');
+  });
+  const defaultLeaderUsers = users.filter(user => user.leaderCandidate);
+  const businessGroupLeaders = node.parentId === businessDepartmentId
+    ? dedupeUsers(users.filter(isBusinessSpecialist))
+    : [];
+  const leaderUsers = FIXED_LEADER_NODE_NAMES.has(node.name) && fixedLeaderUser
+    ? [fixedLeaderUser]
+    : businessGroupLeaders.length > 0
+      ? dedupeUsers([...defaultLeaderUsers, ...businessGroupLeaders])
+      : defaultLeaderUsers;
   const leaderUserIds = new Set(leaderUsers.map(user => user.id));
   const memberUsers = leaderUsers.length > 0 ? users.filter(user => !leaderUserIds.has(user.id)) : users;
+  const expanded = expandedKeys.includes(node.id);
+  const isRoot = node.id === rootId;
+  const showMemberSection = !shouldHideMemberSection(node.name, isRoot);
 
   return (
     <div className="org-node-wrap">
@@ -576,20 +476,13 @@ function OrgChartNode({
           </div>
         ) : null}
 
-        {canManageOrg || canAccessUserDirectory ? (
+        {canManageOrg ? (
           <div className="org-node-card__actions">
             <Space size={4} wrap>
-              {canAccessUserDirectory ? (
-                <Button size="small" type={isRoot ? 'default' : 'link'} onClick={() => onOpenUsers(node.id)}>查看人员</Button>
-              ) : null}
-              {canManageOrg ? (
-                <Button size="small" type={isRoot ? 'default' : 'link'} onClick={() => onEdit(node)}>编辑</Button>
-              ) : null}
-              {canManageOrg ? (
-                <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => onDelete(node.id)}>
-                  <Button size="small" type={isRoot ? 'default' : 'link'} danger>删除</Button>
-                </Popconfirm>
-              ) : null}
+              <Button size="small" type={isRoot ? 'default' : 'link'} onClick={() => onEdit(node)}>编辑</Button>
+              <Popconfirm okText="确定" cancelText="取消" title={uiText.deleteConfirm} onConfirm={() => onDelete(node.id)}>
+                <Button size="small" type={isRoot ? 'default' : 'link'} danger>删除</Button>
+              </Popconfirm>
             </Space>
           </div>
         ) : null}
@@ -602,19 +495,16 @@ function OrgChartNode({
               <OrgChartNode
                 node={child}
                 rootId={rootId}
-                depth={depth + 1}
                 childrenMap={childrenMap}
                 usersByOrg={usersByOrg}
-                directUsersByOrg={directUsersByOrg}
-                specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
                 expandedKeys={expandedKeys}
                 onToggle={onToggle}
                 canManageOrg={canManageOrg}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onSelectUser={onSelectUser}
-                canAccessUserDirectory={canAccessUserDirectory}
-                onOpenUsers={onOpenUsers}
+                fixedLeaderUser={fixedLeaderUser}
+                businessDepartmentId={businessDepartmentId}
               />
             </li>
           ))}
@@ -626,11 +516,7 @@ function OrgChartNode({
 
 export default function OrgPage() {
   const role = useAuthStore(s => s.role);
-  const menus = useAuthStore(s => s.menus);
   const canManageOrg = role === 'ADMIN' || role === 'HR';
-  const allowedMenus = useMemo(() => buildAllowedMenus(menus), [menus]);
-  const canAccessUserDirectory = canAccessMenu('/users', allowedMenus);
-  const [searchParams, setSearchParams] = useSearchParams();
   const [orgs, setOrgs] = useState<OrgItem[]>([]);
   const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -659,25 +545,26 @@ export default function OrgPage() {
     return map;
   }, [orgs]);
 
+  const usersByOrg = useMemo(() => {
+    const map = new Map<string, OrgUser[]>();
+    orgUsers.forEach(user => {
+      const key = String(user.org_id);
+      map.set(key, [...(map.get(key) || []), user]);
+    });
+    return map;
+  }, [orgUsers]);
+
   const rootOrg = useMemo(() => {
     return orgs.find(item => !item.parentId) || null;
   }, [orgs]);
 
-  const { usersByOrg, directUsersByOrg, specialLeaderUserIdsByOrg } = useMemo(() => {
-    return buildDisplayUsersByOrg(orgs, orgUsers, rootOrg?.id, childrenMap);
-  }, [childrenMap, orgUsers, orgs, rootOrg?.id]);
+  const businessDepartmentId = useMemo(() => {
+    return orgs.find(item => item.name === '商务部')?.id || null;
+  }, [orgs]);
 
-  const rawTab = searchParams.get('tab');
-  const activeTab: OrgPageTabKey = useMemo(() => {
-    if (!canAccessUserDirectory) {
-      return 'org';
-    }
-    if (rawTab === 'users' || rawTab === 'positions') {
-      return rawTab;
-    }
-    return 'org';
-  }, [canAccessUserDirectory, rawTab]);
-  const selectedOrgId = searchParams.get('orgId') || undefined;
+  const fixedLeaderUser = useMemo(() => {
+    return orgUsers.find(user => user.name === FIXED_LEADER_NAME) || null;
+  }, [orgUsers]);
 
   const loadChart = async () => {
     const r: any = await orgApi.chart();
@@ -688,18 +575,6 @@ export default function OrgPage() {
   useEffect(() => {
     loadChart();
   }, []);
-
-  useEffect(() => {
-    if (!canAccessUserDirectory) {
-      const requestedTab = searchParams.get('tab');
-      if (requestedTab === 'users' || requestedTab === 'positions') {
-        const next = new URLSearchParams(searchParams);
-        next.delete('tab');
-        next.delete('orgId');
-        setSearchParams(next, { replace: true });
-      }
-    }
-  }, [canAccessUserDirectory, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!rootOrg) return;
@@ -780,45 +655,6 @@ export default function OrgPage() {
     setExpandedKeys(prev => prev.includes(id) ? prev.filter(key => key !== id) : [...prev, id]);
   };
 
-  const updateOrgPageSearch = (updates: { tab?: OrgPageTabKey | null; orgId?: string | null }) => {
-    const next = new URLSearchParams(searchParams);
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'tab')) {
-      if (updates.tab && updates.tab !== 'org') {
-        next.set('tab', updates.tab);
-      } else {
-        next.delete('tab');
-      }
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updates, 'orgId')) {
-      if (updates.orgId) {
-        next.set('orgId', updates.orgId);
-      } else {
-        next.delete('orgId');
-      }
-    }
-
-    setSearchParams(next, { replace: true });
-  };
-
-  const handleTabChange = (nextTab: string) => {
-    updateOrgPageSearch({ tab: nextTab as OrgPageTabKey });
-    if (nextTab !== 'org') {
-      setSelectedUser(null);
-    }
-  };
-
-  const handleOpenUsers = (orgId: string) => {
-    if (!canAccessUserDirectory) return;
-    updateOrgPageSearch({ tab: 'users', orgId });
-    setSelectedUser(null);
-  };
-
-  const handleUserOrgChange = (orgId?: string) => {
-    updateOrgPageSearch({ orgId: orgId || null });
-  };
-
   return (
     <div className="page-fill">
       <style>{orgChartStyles}</style>
@@ -826,117 +662,79 @@ export default function OrgPage() {
         className="page-card page-fill"
         styles={{ body: { padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
       >
-        <div className="page-card-body">
-          <Tabs
-            activeKey={activeTab}
-            className="page-tabs"
-            onChange={handleTabChange}
-            items={[
-              {
-                key: 'org',
-                label: '组织',
-                children: (
-                  <div className="page-fill">
-                    <div className="page-toolbar" style={{ padding: '0 20px' }}>
-                      <div />
-                      <div className="page-toolbar-right">
-                        {canManageOrg ? <Button type="primary" onClick={() => openOrgModal()}>新增组织</Button> : null}
-                      </div>
+        <div className="page-card-body page-card-body--flush">
+          <div className="page-toolbar" style={{ padding: '16px 20px 0' }}>
+            <div />
+            <div className="page-toolbar-right">
+              {canManageOrg ? <Button type="primary" onClick={() => openOrgModal()}>新增组织</Button> : null}
+            </div>
+          </div>
+          <div className="org-canvas-page">
+            <div
+              className={`org-canvas-viewport${isDragging ? ' org-canvas-viewport--dragging' : ''}`}
+              ref={viewportRef}
+              onMouseDown={handleViewportMouseDown}
+            >
+              <div className="org-canvas-stage">
+                <div
+                  className="org-canvas-content"
+                  style={{
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom / 100})`,
+                    transition: isDragging ? 'none' : 'transform 0.12s ease-out',
+                  }}
+                >
+                  {rootOrg ? (
+                    <div className="org-root-wrap">
+                      <OrgChartNode
+                        node={rootOrg}
+                        rootId={rootOrg.id}
+                        childrenMap={childrenMap}
+                        usersByOrg={usersByOrg}
+                        expandedKeys={expandedKeys}
+                        onToggle={toggleExpanded}
+                        canManageOrg={canManageOrg}
+                        onEdit={openOrgModal}
+                        onDelete={deleteOrg}
+                        onSelectUser={setSelectedUser}
+                        fixedLeaderUser={fixedLeaderUser}
+                        businessDepartmentId={businessDepartmentId}
+                      />
                     </div>
-                    <div className="org-canvas-page">
-                      <div
-                        className={`org-canvas-viewport${isDragging ? ' org-canvas-viewport--dragging' : ''}`}
-                        ref={viewportRef}
-                        onMouseDown={handleViewportMouseDown}
-                      >
-                        <div className="org-canvas-stage">
-                          <div
-                            className="org-canvas-content"
-                            style={{
-                              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom / 100})`,
-                              transition: isDragging ? 'none' : 'transform 0.12s ease-out',
-                            }}
-                          >
-                            {rootOrg ? (
-                              <div className="org-root-wrap">
-                                <OrgChartNode
-                                  node={rootOrg}
-                                  rootId={rootOrg.id}
-                                  depth={1}
-                                  childrenMap={childrenMap}
-                                  usersByOrg={usersByOrg}
-                                  directUsersByOrg={directUsersByOrg}
-                                  specialLeaderUserIdsByOrg={specialLeaderUserIdsByOrg}
-                                  expandedKeys={expandedKeys}
-                                  onToggle={toggleExpanded}
-                                  canManageOrg={canManageOrg}
-                                  onEdit={openOrgModal}
-                                  onDelete={deleteOrg}
-                                  onSelectUser={setSelectedUser}
-                                  canAccessUserDirectory={canAccessUserDirectory}
-                                  onOpenUsers={handleOpenUsers}
-                                />
-                              </div>
-                            ) : (
-                              <div className="org-canvas-empty">
-                                <Empty description="暂无组织架构数据" />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                  ) : (
+                    <div className="org-canvas-empty">
+                      <Empty description="暂无组织架构数据" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                      <div className="org-canvas-toolbar">
-                        <div className="org-canvas-toolbar__top">
-                          <Space size={6}>
-                            <ZoomInOutlined />
-                            <span>缩放比例</span>
-                          </Space>
-                          <span>{zoom}%</span>
-                        </div>
-                        <Space.Compact block>
-                          <Button icon={<MinusOutlined />} onClick={() => setZoom(value => Math.max(MIN_ZOOM, value - 10))} />
-                          <Slider
-                            min={MIN_ZOOM}
-                            max={MAX_ZOOM}
-                            step={10}
-                            value={zoom}
-                            onChange={(value) => setZoom(Array.isArray(value) ? value[0] : value)}
-                            style={{ flex: 1, marginInline: 12 }}
-                          />
-                          <Button icon={<PlusOutlined />} onClick={() => setZoom(value => Math.min(MAX_ZOOM, value + 10))} />
-                        </Space.Compact>
-                        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-                          <Button size="small" icon={<ReloadOutlined />} onClick={() => { setZoom(DEFAULT_ZOOM); setPan({ x: 0, y: 0 }); }}>恢复 100%</Button>
-                          <Button size="small" onClick={() => { if (rootOrg) setExpandedKeys([rootOrg.id]); setPan({ x: 0, y: 0 }); }}>回到默认展开</Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ),
-              },
-              ...(canAccessUserDirectory ? [
-                {
-                  key: 'users',
-                  label: '人员',
-                  children: (
-                    <div className="page-fill">
-                      <UserTab orgId={selectedOrgId} onOrgIdChange={handleUserOrgChange} />
-                    </div>
-                  ),
-                },
-                {
-                  key: 'positions',
-                  label: '岗位',
-                  children: (
-                    <div className="page-fill">
-                      <PositionTab />
-                    </div>
-                  ),
-                },
-              ] : []),
-            ]}
-          />
+            <div className="org-canvas-toolbar">
+              <div className="org-canvas-toolbar__top">
+                <Space size={6}>
+                  <ZoomInOutlined />
+                  <span>缩放比例</span>
+                </Space>
+                <span>{zoom}%</span>
+              </div>
+              <Space.Compact block>
+                <Button icon={<MinusOutlined />} onClick={() => setZoom(value => Math.max(MIN_ZOOM, value - 10))} />
+                <Slider
+                  min={MIN_ZOOM}
+                  max={MAX_ZOOM}
+                  step={10}
+                  value={zoom}
+                  onChange={(value) => setZoom(Array.isArray(value) ? value[0] : value)}
+                  style={{ flex: 1, marginInline: 12 }}
+                />
+                <Button icon={<PlusOutlined />} onClick={() => setZoom(value => Math.min(MAX_ZOOM, value + 10))} />
+              </Space.Compact>
+              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+                <Button size="small" icon={<ReloadOutlined />} onClick={() => { setZoom(DEFAULT_ZOOM); setPan({ x: 0, y: 0 }); }}>恢复 100%</Button>
+                <Button size="small" onClick={() => { if (rootOrg) setExpandedKeys([rootOrg.id]); setPan({ x: 0, y: 0 }); }}>回到默认展开</Button>
+              </div>
+            </div>
+          </div>
         </div>
       </Card>
 

@@ -2,6 +2,7 @@ const baseMenus = ['/org'];
 
 const routePriority = [
   '/org',
+  '/users',
   '/objects',
   '/products',
   '/admin/permissions',

@@ -534,7 +534,7 @@ export default function ObjectPage() {
   if (visibleTypes.length === 0) {
     return (
       <Card className="page-card page-fill" styles={{ body: { minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
-        <p style={{ color: '#888' }}>您当前岗位没有可查看的客户&对象类型，请联系管理员配置。</p>
+        <p style={{ color: '#888' }}>您当前岗位没有可查看的外部对象类型，请联系管理员配置。</p>
       </Card>
     );
   }

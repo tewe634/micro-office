@@ -43,9 +43,9 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((request, response, ex) ->
-                    writeJson(response, HttpStatus.UNAUTHORIZED, ApiResponse.error(401, "未登录或登录已失效", "UNAUTHORIZED")))
+                    writeJson(response, HttpStatus.UNAUTHORIZED, ApiResponse.error(401, "未登录或登录已失效")))
                 .accessDeniedHandler((request, response, ex) ->
-                    writeJson(response, HttpStatus.FORBIDDEN, ApiResponse.error(403, "无权限访问", "FORBIDDEN")))
+                    writeJson(response, HttpStatus.FORBIDDEN, ApiResponse.error(403, "无权限访问")))
             )
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
@@ -63,7 +63,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/positions/**").hasAnyRole("HR", "ADMIN")
                 // 系统管理: 仅 ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // 客户&对象: 登录即可访问（具体范围在业务侧控制）
+                // 外部对象: 登录即可访问（具体范围在业务侧控制）
                 .requestMatchers("/api/objects/**").authenticated()
                 .anyRequest().authenticated()
             )

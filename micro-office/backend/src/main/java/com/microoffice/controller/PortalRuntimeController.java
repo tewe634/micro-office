@@ -945,10 +945,12 @@ public class PortalRuntimeController {
         Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
         for (String templateId : templateIds) {
             List<Map<String, Object>> actionRows = jdbc.queryForList(
-                "SELECT id, action_type, target_subject_type, target_id_path, session_type, sort_order, meta " +
+                "SELECT id, action_type, target_subject_type, target_id_path, session_type, " +
+                    "requires_pre_action_form, pre_action_form_title, pre_action_form_submit_label, sort_order, meta " +
                     "FROM mo_portal_block_template_actions WHERE block_template_id = ? ORDER BY sort_order, id",
                 templateId
             );
+            Map<String, List<Map<String, Object>>> formFieldsByActionId = loadActionFormFieldsByActionId(actionRows);
             List<Map<String, Object>> actions = new ArrayList<>();
             for (Map<String, Object> row : actionRows) {
                 Map<String, Object> action = new LinkedHashMap<>();
@@ -957,11 +959,57 @@ public class PortalRuntimeController {
                 action.put("targetSubjectType", asString(row.get("target_subject_type")));
                 action.put("targetIdPath", asString(row.get("target_id_path")));
                 action.put("sessionType", asString(row.get("session_type")));
+                action.put("requiresPreActionForm", Boolean.TRUE.equals(row.get("requires_pre_action_form")));
+                action.put("preActionFormTitle", asNullableString(row.get("pre_action_form_title")));
+                action.put("preActionFormSubmitLabel", asNullableString(row.get("pre_action_form_submit_label")));
                 action.put("sortOrder", asInt(row.get("sort_order"), 0));
                 action.put("meta", asMap(row.get("meta")));
+                List<Map<String, Object>> formFields = formFieldsByActionId.getOrDefault(asString(row.get("id")), List.of());
+                if (!formFields.isEmpty() || Boolean.TRUE.equals(row.get("requires_pre_action_form"))) {
+                    action.put("preActionFields", formFields);
+                    action.put("preActionFormFields", formFields);
+                    Map<String, Object> preActionForm = new LinkedHashMap<>();
+                    preActionForm.put("title", asNullableString(row.get("pre_action_form_title")));
+                    preActionForm.put("submitLabel", firstNonBlank(asNullableString(row.get("pre_action_form_submit_label")), "确定"));
+                    preActionForm.put("fields", formFields);
+                    action.put("preActionForm", preActionForm);
+                }
                 actions.add(action);
             }
             result.put(templateId, actions);
+        }
+        return result;
+    }
+
+    private Map<String, List<Map<String, Object>>> loadActionFormFieldsByActionId(List<Map<String, Object>> actionRows) {
+        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : actionRows) {
+            String actionId = asString(row.get("id"));
+            if (!hasText(actionId)) {
+                continue;
+            }
+            List<Map<String, Object>> fieldRows = jdbc.queryForList(
+                "SELECT id, action_id, field_key, label, input_type, required, placeholder, default_value, max_length, sort_order, status, meta " +
+                    "FROM mo_portal_block_template_action_form_fields WHERE action_id = ? AND status = 'ACTIVE' ORDER BY sort_order, id",
+                actionId
+            );
+            List<Map<String, Object>> fields = new ArrayList<>();
+            for (Map<String, Object> fieldRow : fieldRows) {
+                Map<String, Object> field = new LinkedHashMap<>();
+                field.put("id", asString(fieldRow.get("id")));
+                field.put("fieldKey", asString(fieldRow.get("field_key")));
+                field.put("label", asString(fieldRow.get("label")));
+                field.put("inputType", asString(fieldRow.get("input_type")));
+                field.put("required", Boolean.TRUE.equals(fieldRow.get("required")));
+                field.put("placeholder", asNullableString(fieldRow.get("placeholder")));
+                field.put("defaultValue", asNullableString(fieldRow.get("default_value")));
+                field.put("maxLength", fieldRow.get("max_length"));
+                field.put("sortOrder", asInt(fieldRow.get("sort_order"), 0));
+                field.put("status", asString(fieldRow.get("status")));
+                field.put("meta", asMap(fieldRow.get("meta")));
+                fields.add(field);
+            }
+            result.put(actionId, fields);
         }
         return result;
     }

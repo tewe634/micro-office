@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Input, Modal, Space, Tag, message } from 'antd';
-import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { WorkflowRelationType, WorkflowTemplatePackageNodePayload, WorkflowTemplatePackageSummary, WorkflowTemplateStatus } from '../../api';
+import type { WorkflowRelationType, WorkflowTemplatePackageNodePayload, WorkflowTemplateStatus } from '../../api';
 import { workflowNodeFeatureApi, workflowTemplateApi } from '../../api';
 
 type NodeItem = {
@@ -133,7 +133,7 @@ export default function AdminWorkflowTemplateEditorPage() {
   const packageId = String(id || '');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [packageDetail, setPackageDetail] = useState<WorkflowTemplatePackageSummary | null>(null);
+  const [packageDetail, setPackageDetail] = useState<any>(null);
   const [nodes, setNodes] = useState<NodeItem[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [moduleKeyword, setModuleKeyword] = useState('');
@@ -209,8 +209,9 @@ export default function AdminWorkflowTemplateEditorPage() {
 
   const loadPackageDetail = async () => {
     if (!packageId) return;
-    const response: any = await workflowTemplateApi.getPackage(packageId);
-    const detail = response.data;
+    const response: any = await workflowTemplateApi.listPackages();
+    const records = response.data || [];
+    const detail = records.find((item: any) => String(item.id) === packageId);
     if (!detail) {
       throw new Error('模板包不存在');
     }
@@ -268,7 +269,7 @@ export default function AdminWorkflowTemplateEditorPage() {
     }
     const moduleDef = moduleDefinitionMap.get(selectedNode.module_definition_id);
     const response: any = await workflowTemplateApi.listRecommendations({
-      sceneCategory: packageDetail.sceneCategory || undefined,
+      sceneCategory: packageDetail.scene_category,
       currentModuleDefinitionId: selectedNode.module_definition_id || undefined,
       currentNodeType: moduleDef?.node_type || selectedNode.node_type || undefined,
     });
@@ -305,7 +306,7 @@ export default function AdminWorkflowTemplateEditorPage() {
   useEffect(() => {
     void loadModuleFields(selectedNode?.module_definition_id);
     void loadRecommendations();
-  }, [selectedNode?.id, selectedNode?.module_definition_id, packageDetail?.sceneCategory, moduleDefinitionMap]);
+  }, [selectedNode?.id, selectedNode?.module_definition_id, packageDetail?.scene_category, moduleDefinitionMap]);
 
   useEffect(() => {
     const run = async () => {
@@ -404,59 +405,8 @@ export default function AdminWorkflowTemplateEditorPage() {
     closeAddNodeModal();
   };
 
-  const collectNodeAndDescendantIds = (nodeId: string, sourceNodes: NodeItem[] = nodes) => {
-    const childMap = new Map<string, string[]>();
-    sourceNodes.forEach((node) => {
-      const parentId = node.parent_package_node_id;
-      if (!parentId) return;
-      const children = childMap.get(parentId) || [];
-      children.push(node.id);
-      childMap.set(parentId, children);
-    });
-
-    const ids = new Set<string>();
-    const walk = (idValue: string) => {
-      if (ids.has(idValue)) return;
-      ids.add(idValue);
-      (childMap.get(idValue) || []).forEach(walk);
-    };
-    walk(nodeId);
-    return ids;
-  };
-
-  const deleteNodeFromCanvas = (nodeId: string) => {
-    const deletingIds = collectNodeAndDescendantIds(nodeId);
-    const nextNodes = nodes.filter((node) => !deletingIds.has(node.id));
-    setNodes(nextNodes);
-    setSelectedNodeId((current) => {
-      if (current && !deletingIds.has(current)) return current;
-      return nextNodes[0]?.id || null;
-    });
-    setValidationErrors([]);
-    message.success('节点已从画布移除，点击“保存整包节点”后生效');
-  };
-
-  const confirmDeleteNode = (node: NodeItem) => {
-    const deletingIds = collectNodeAndDescendantIds(node.id);
-    const childCount = Math.max(deletingIds.size - 1, 0);
-    Modal.confirm({
-      title: '删除节点',
-      content: childCount
-        ? `确定删除“${node.display_name || '未命名节点'}”吗？其下 ${childCount} 个子节点也会一起删除。`
-        : `确定删除“${node.display_name || '未命名节点'}”吗？`,
-      okText: '删除',
-      cancelText: '取消',
-      okButtonProps: { danger: true },
-      onOk: () => deleteNodeFromCanvas(node.id),
-    });
-  };
-
   const validateNodes = (items: NodeItem[]) => {
     const errors: string[] = [];
-    if (!items.length) {
-      errors.push('节点列表不能为空，请至少保留一个根节点');
-      return errors;
-    }
     const idSet = new Set<string>();
     const nodeMap = new Map<string, NodeItem>();
     items.forEach((node) => {
@@ -821,22 +771,9 @@ export default function AdminWorkflowTemplateEditorPage() {
                                     background: active ? 'linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)' : '#fff',
                                     boxShadow: active ? '0 12px 28px rgba(37, 99, 235, 0.12)' : '0 8px 16px rgba(15, 23, 42, 0.05)',
                                     cursor: 'pointer',
-                                    position: 'relative',
                                   }}
                                 >
-                                  <Button
-                                    type="text"
-                                    danger
-                                    size="small"
-                                    icon={<DeleteOutlined />}
-                                    aria-label="删除节点"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      confirmDeleteNode(node);
-                                    }}
-                                    style={{ position: 'absolute', top: 10, right: 10 }}
-                                  />
-                                  <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 700, whiteSpace: 'pre-line', paddingRight: 32 }}>
+                                  <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 700, whiteSpace: 'pre-line' }}>
                                     {node.display_name || '未命名节点'}
                                   </div>
                                   <div style={{ marginTop: 10, color: '#64748b', fontSize: 13 }}>

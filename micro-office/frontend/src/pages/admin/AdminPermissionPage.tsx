@@ -24,9 +24,9 @@ const roleColorMap: Record<string, string> = {
 };
 
 const menus = [
-  { key: '/users', label: '人员/岗位' },
-  { key: '/objects', label: '客户&对象' },
-  { key: '/products', label: '产品&服务' },
+  { key: '/users', label: '人员管理' },
+  { key: '/objects', label: '外部对象' },
+  { key: '/products', label: '产品服务' },
   { key: '/admin', label: '系统管理' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
@@ -84,7 +84,7 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
 
   return (
     <div className="page-fill" style={{ gap: 16 }}>
-      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织标签固定为全员可见；人员/岗位标签仍走权限配置，与组织架构查看权限相互独立。</p>
+      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织架构模块固定为全员可见；人员管理仍走权限配置，与组织架构查看权限相互独立。</p>
       <div className="page-card-scroll">
         <Table
           dataSource={menus}
@@ -278,7 +278,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
               <Divider />
 
               <div style={{ marginBottom: 8 }}>
-                <b>客户&对象类型</b> {hasCustomObjTypes ? <Tag color="orange">个人定制</Tag> : <Tag>岗位默认</Tag>}
+                <b>外部对象类型</b> {hasCustomObjTypes ? <Tag color="orange">个人定制</Tag> : <Tag>岗位默认</Tag>}
               </div>
               <Table
                 dataSource={objectTypes}
@@ -349,7 +349,7 @@ function ObjectTypePermTab() {
 
   return (
     <div className="page-fill" style={{ gap: 16 }}>
-      <p style={{ color: '#888', margin: 0 }}>配置每个岗位默认可见的客户&对象类型。用户如果没有个人对象类型配置，则根据岗位汇总。</p>
+      <p style={{ color: '#888', margin: 0 }}>配置每个岗位默认可见的外部对象类型。用户如果没有个人对象类型配置，则根据岗位汇总。</p>
       <div className="page-card-scroll">
         <Table
           dataSource={positions}
