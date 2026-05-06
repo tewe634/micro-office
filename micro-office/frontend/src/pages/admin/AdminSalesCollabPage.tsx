@@ -71,7 +71,6 @@ type TemplateSummary = {
   id: string;
   name: string;
   enabled: boolean;
-  remark?: string;
   ruleCount?: number;
   bindingCount?: number;
 };
@@ -80,7 +79,6 @@ type TemplateDetail = {
   id: string;
   name: string;
   enabled: boolean;
-  remark?: string;
   groups: GroupMeta[];
 };
 
@@ -115,7 +113,6 @@ type OrgBinding = {
   templateId?: string | null;
   templateName?: string | null;
   enabled: boolean;
-  remark?: string | null;
   updatedAt?: string | null;
 };
 
@@ -172,7 +169,6 @@ function buildRuleSignature(rule: RuleItem) {
     rule.resolveScopeType || '',
     rule.resolveScopeRefId || '',
     String(rule.enabled ?? true),
-    rule.remark || '',
   ].join('|');
 }
 
@@ -467,7 +463,7 @@ export default function AdminSalesCollabPage() {
   const [templateModalMode, setTemplateModalMode] = useState<TemplateModalMode>('create');
   const [templateModalTargetId, setTemplateModalTargetId] = useState<string>();
   const [templateDuplicating, setTemplateDuplicating] = useState(false);
-  const [templateForm] = Form.useForm<{ name: string; enabled: boolean; remark?: string }>();
+  const [templateForm] = Form.useForm<{ name: string; enabled: boolean }>();
   const [bindingForm] = Form.useForm<{ templateId?: string; enabled: boolean }>();
 
   const orgNameMap = useMemo(() => Object.fromEntries(orgs.map(org => [org.id, org.name])), [orgs]);
@@ -545,10 +541,7 @@ export default function AdminSalesCollabPage() {
     const keyword = templateKeyword.trim().toLowerCase();
     return templates.filter(template => {
       if (!keyword) return true;
-      return [template.name, template.remark || '']
-        .join(' ')
-        .toLowerCase()
-        .includes(keyword);
+      return template.name.toLowerCase().includes(keyword);
     });
   }, [templateKeyword, templates]);
 
@@ -589,7 +582,7 @@ export default function AdminSalesCollabPage() {
   const openCreateTemplate = () => {
     setTemplateModalTargetId(undefined);
     setTemplateModalMode('create');
-    templateForm.setFieldsValue({ name: '', enabled: true, remark: '' });
+    templateForm.setFieldsValue({ name: '', enabled: true });
     setTemplateModalOpen(true);
   };
 
@@ -600,7 +593,6 @@ export default function AdminSalesCollabPage() {
     templateForm.setFieldsValue({
       name: template.name,
       enabled: template.enabled,
-      remark: template.remark,
     });
     setTemplateModalOpen(true);
   };
@@ -610,7 +602,7 @@ export default function AdminSalesCollabPage() {
     setTemplateConfigOpen(true);
   };
 
-  const submitTemplateModal = async (values: { name: string; enabled: boolean; remark?: string }) => {
+  const submitTemplateModal = async (values: { name: string; enabled: boolean }) => {
     if (templateModalMode === 'create') {
       const response: any = await salesCollabApi.createTemplate(values);
       message.success('模板已创建');
@@ -703,7 +695,6 @@ export default function AdminSalesCollabPage() {
         orgId: bindingModalOrgId,
         templateId: values.templateId ? String(values.templateId) : null,
         enabled: values.enabled ?? true,
-        remark: null,
       });
       message.success(values.templateId ? '部门模板绑定已保存' : '部门模板绑定已清除');
       setBindingModalOpen(false);
@@ -722,7 +713,6 @@ export default function AdminSalesCollabPage() {
         orgId: row.orgId,
         templateId: null,
         enabled: true,
-        remark: null,
       });
       message.success('部门模板绑定已清除');
       await refreshOrgBindings();
@@ -789,13 +779,6 @@ export default function AdminSalesCollabPage() {
                           key: 'bindingCount',
                           width: 120,
                           render: (value: number | undefined) => value ?? 0,
-                        },
-                        {
-                          title: '备注',
-                          dataIndex: 'remark',
-                          key: 'remark',
-                          ellipsis: true,
-                          render: (value: string | undefined) => value || '-',
                         },
                         {
                           title: '操作',
@@ -948,9 +931,6 @@ export default function AdminSalesCollabPage() {
           <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入模板名称' }]}>
             <Input placeholder="例如：销售协同标准模板" />
           </Form.Item>
-          <Form.Item name="remark" label="备注">
-            <Input.TextArea rows={3} />
-          </Form.Item>
           <Form.Item name="enabled" label="启用" valuePropName="checked">
             <Switch />
           </Form.Item>
@@ -974,7 +954,6 @@ export default function AdminSalesCollabPage() {
             <Card>
               <Space size={[8, 8]} wrap>
                 {templateDetail.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>}
-                {templateDetail.remark ? <Tag>{templateDetail.remark}</Tag> : null}
               </Space>
             </Card>
             {templateDetail.groups.map(group => (

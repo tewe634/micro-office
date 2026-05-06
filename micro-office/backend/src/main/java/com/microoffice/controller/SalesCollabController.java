@@ -85,7 +85,6 @@ public class SalesCollabController {
             item.put("name", asString(row.get("name")));
             item.put("applicableScope", asString(row.get("applicable_scope")));
             item.put("enabled", asBoolean(row.get("enabled"), true));
-            item.put("remark", asString(row.get("remark")));
             item.put("createdAt", row.get("created_at"));
             item.put("updatedAt", row.get("updated_at"));
             item.put("ruleCount", asInt(row.get("rule_count"), 0));
@@ -106,14 +105,12 @@ public class SalesCollabController {
         requireAdmin(auth);
         String name = requireText(body.get("name"), "模板名称不能为空");
         boolean enabled = asBoolean(body.get("enabled"), true);
-        String remark = asNullableString(body.get("remark"));
         String id = UUID.randomUUID().toString();
         jdbc.update(
-            "INSERT INTO sales_collab_template (id, name, applicable_scope, enabled, remark) VALUES (?, ?, 'SALES_DEPARTMENT', ?, ?)",
+            "INSERT INTO sales_collab_template (id, name, applicable_scope, enabled, remark) VALUES (?, ?, 'SALES_DEPARTMENT', ?, NULL)",
             id,
             name,
-            enabled,
-            remark
+            enabled
         );
         insertDefaultManagementSyncRules(id);
         return ApiResponse.ok(loadTemplateDetail(id));
@@ -131,11 +128,10 @@ public class SalesCollabController {
             targetName = asString(source.get("name")) + "（复制）";
         }
         jdbc.update(
-            "INSERT INTO sales_collab_template (id, name, applicable_scope, enabled, remark) VALUES (?, ?, 'SALES_DEPARTMENT', ?, ?)",
+            "INSERT INTO sales_collab_template (id, name, applicable_scope, enabled, remark) VALUES (?, ?, 'SALES_DEPARTMENT', ?, NULL)",
             copiedId,
             targetName,
-            asBoolean(source.get("enabled"), true),
-            asNullableString(source.get("remark"))
+            asBoolean(source.get("enabled"), true)
         );
         List<Map<String, Object>> groups = asListOfMap(source.get("groups"));
         for (Map<String, Object> group : groups) {
@@ -154,12 +150,10 @@ public class SalesCollabController {
         requireAdmin(auth);
         String name = requireText(body.get("name"), "模板名称不能为空");
         boolean enabled = asBoolean(body.get("enabled"), true);
-        String remark = asNullableString(body.get("remark"));
         jdbc.update(
-            "UPDATE sales_collab_template SET name = ?, enabled = ?, remark = ?, updated_at = NOW() WHERE id = ?",
+            "UPDATE sales_collab_template SET name = ?, enabled = ?, remark = NULL, updated_at = NOW() WHERE id = ?",
             name,
             enabled,
-            remark,
             id
         );
         return ApiResponse.ok(loadTemplateDetail(id));
@@ -219,7 +213,6 @@ public class SalesCollabController {
                                                            Authentication auth) {
         requireAdmin(auth);
         String templateId = asNullableString(body.get("templateId"));
-        String remark = asNullableString(body.get("remark"));
         boolean enabled = asBoolean(body.get("enabled"), true);
 
         if (templateId == null || templateId.isBlank()) {
@@ -235,20 +228,18 @@ public class SalesCollabController {
         );
         if (exists != null && exists > 0) {
             jdbc.update(
-                "UPDATE sales_collab_org_binding SET template_id = ?, enabled = ?, remark = ?, updated_at = NOW() WHERE org_id = ?",
+                "UPDATE sales_collab_org_binding SET template_id = ?, enabled = ?, remark = NULL, updated_at = NOW() WHERE org_id = ?",
                 templateId,
                 enabled,
-                remark,
                 orgId
             );
         } else {
             jdbc.update(
-                "INSERT INTO sales_collab_org_binding (id, org_id, template_id, enabled, remark) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO sales_collab_org_binding (id, org_id, template_id, enabled, remark) VALUES (?, ?, ?, ?, NULL)",
                 UUID.randomUUID().toString(),
                 orgId,
                 templateId,
-                enabled,
-                remark
+                enabled
             );
         }
         return ApiResponse.ok(loadOrgBinding(orgId));
@@ -355,7 +346,6 @@ public class SalesCollabController {
         result.put("name", asString(template.get("name")));
         result.put("applicableScope", asString(template.get("applicable_scope")));
         result.put("enabled", asBoolean(template.get("enabled"), true));
-        result.put("remark", asString(template.get("remark")));
         result.put("createdAt", template.get("created_at"));
         result.put("updatedAt", template.get("updated_at"));
         result.put("groups", groups);
@@ -549,7 +539,6 @@ public class SalesCollabController {
             item.put("templateId", asString(row.get("template_id")));
             item.put("templateName", asString(row.get("template_name")));
             item.put("enabled", asBoolean(row.get("enabled"), true));
-            item.put("remark", asString(row.get("remark")));
             item.put("updatedAt", row.get("updated_at") == null ? null : String.valueOf(row.get("updated_at")));
             result.add(item);
         }
@@ -567,7 +556,6 @@ public class SalesCollabController {
         result.put("templateId", binding == null ? null : asString(binding.get("template_id")));
         result.put("templateName", binding == null ? null : asString(binding.get("template_name")));
         result.put("enabled", binding == null ? true : asBoolean(binding.get("enabled"), true));
-        result.put("remark", binding == null ? null : asString(binding.get("remark")));
         result.put("updatedAt", binding == null || binding.get("updated_at") == null ? null : String.valueOf(binding.get("updated_at")));
         return result;
     }
