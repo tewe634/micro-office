@@ -8,7 +8,7 @@ RUN mkdir -p /root/.m2 && echo '<settings><mirrors><mirror><id>aliyun</id><mirro
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
 COPY src ./src
-RUN mvn package -DskipTests -B
+RUN mvn package -Dmaven.test.skip=true -B
 
 # ---- Run Stage ----
 FROM eclipse-temurin:17-jre
