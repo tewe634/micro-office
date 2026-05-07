@@ -156,7 +156,7 @@ export default function AdminWorkflowTemplatePage() {
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
       <Card
-        title="工作流模板管理"
+        title="流程管理"
         extra={
           <Space>
             <Button icon={<ReloadOutlined />} onClick={() => void loadPage()}>

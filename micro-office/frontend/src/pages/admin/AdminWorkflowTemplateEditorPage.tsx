@@ -615,7 +615,7 @@ export default function AdminWorkflowTemplateEditorPage() {
                   alignItems: 'center',
                 }}
               >
-                {packageDetail ? `工作流模板编排：${packageDetail.name}` : '工作流模板编排'}
+                {packageDetail ? `流程管理：${packageDetail.name}` : '流程管理'}
               </div>
               <div
                 style={{
