@@ -30,6 +30,7 @@ const pageTitles: Record<string, string> = {
   '/users': '人员&组织',
   '/objects': '客户&对象管理',
   '/products': '产品&服务',
+  '/admin/external-accounts': '账号绑定',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
   '/admin/workflow-node-features': '工作节点模版管理',
@@ -42,6 +43,7 @@ const pageTitles: Record<string, string> = {
 const menuOrder = ['/org', '/objects', '/products'];
 
 const adminChildren = [
+  { key: '/admin/external-accounts', label: '账号绑定' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
   { key: '/admin/workflow-node-features', label: '工作节点模版管理' },
@@ -52,6 +54,7 @@ const adminChildren = [
 ];
 
 function resolveSelectedKey(pathname: string) {
+  if (pathname.startsWith('/admin/external-accounts')) return '/admin/external-accounts';
   if (pathname.startsWith('/admin/daily-entries')) return '/admin/daily-entries';
   if (pathname.startsWith('/admin/portal-block-templates')) return '/admin/portal-block-templates';
   if (pathname.startsWith('/admin/portal-templates')) return '/admin/portal-templates';

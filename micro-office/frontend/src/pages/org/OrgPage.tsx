@@ -672,7 +672,7 @@ export default function OrgPage() {
     if (!canAccessUserDirectory) {
       return 'org';
     }
-    if (rawTab === 'users' || rawTab === 'positions' || rawTab === 'external-accounts') {
+    if (rawTab === 'users' || rawTab === 'positions') {
       return rawTab;
     }
     return 'org';
@@ -690,14 +690,13 @@ export default function OrgPage() {
   }, []);
 
   useEffect(() => {
-    if (!canAccessUserDirectory) {
-      const requestedTab = searchParams.get('tab');
-      if (requestedTab === 'users' || requestedTab === 'positions' || requestedTab === 'external-accounts') {
-        const next = new URLSearchParams(searchParams);
-        next.delete('tab');
-        next.delete('orgId');
-        setSearchParams(next, { replace: true });
-      }
+    const requestedTab = searchParams.get('tab');
+    const isValidUserTab = canAccessUserDirectory && (requestedTab === 'users' || requestedTab === 'positions');
+    if (requestedTab && !isValidUserTab) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      next.delete('orgId');
+      setSearchParams(next, { replace: true });
     }
   }, [canAccessUserDirectory, searchParams, setSearchParams]);
 
@@ -932,14 +931,6 @@ export default function OrgPage() {
                     <div className="page-fill">
                       <PositionTab />
                     </div>
-                  ),
-                },
-                {
-                  key: 'external-accounts',
-                  label: '外部账号绑定',
-                  children: (
-                    <div className="page-fill">
-                                </div>
                   ),
                 },
               ] : []),

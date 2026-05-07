@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Form, Input, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import {
-  orgApi,
-  positionApi,
   userApi,
   userExternalAccountAdminApi,
   type UserExternalAccountBindingPayload,
@@ -18,8 +16,6 @@ type UserOption = {
   id: string;
   name: string;
   orgId?: string | number | null;
-  primaryPositionId?: string | number | null;
-  extraPositionIds?: Array<string | number>;
 };
 
 type BindingRecord = {
@@ -97,7 +93,6 @@ export default function ExternalAccountBindingTab() {
   const [records, setRecords] = useState<BindingRecord[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [orgMap, setOrgMap] = useState<Map<string, string>>(new Map());
-  const [positionMap, setPositionMap] = useState<Map<string, string>>(new Map());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<BindingRecord | null>(null);
@@ -113,21 +108,21 @@ export default function ExternalAccountBindingTab() {
   const pagedRecords = records.slice((page - 1) * pageSize, page * pageSize);
 
   const loadLookups = async () => {
-    const [userResp, orgResp, positionResp] = await Promise.all([
-      userApi.list().catch(() => ({ data: [] })),
-      orgApi.list().catch(() => ({ data: [] })),
-      positionApi.list().catch(() => ({ data: [] })),
-    ]);
-    const nextUsers = (userResp.data || []).map((item: any) => ({
-      id: asText(item.id),
-      name: asText(item.name),
-      orgId: item.orgId ?? item.org_id ?? null,
-      primaryPositionId: item.primaryPositionId ?? item.primary_position_id ?? null,
-      extraPositionIds: Array.isArray(item.extraPositionIds) ? item.extraPositionIds : [],
-    }));
-    setUsers(nextUsers);
-    setOrgMap(new Map((orgResp.data || []).map((item: any) => [asText(item.id), asText(item.name)])));
-    setPositionMap(new Map((positionResp.data || []).map((item: any) => [asText(item.id), asText(item.name)])));
+    try {
+      const lookupResp: any = await userApi.lookups();
+      const nextUsers = (lookupResp.data?.users || []).map((item: any) => ({
+        id: asText(item.id),
+        name: asText(item.name),
+        orgId: item.orgId ?? item.org_id ?? null,
+      }));
+      setUsers(nextUsers);
+      setOrgMap(new Map((lookupResp.data?.orgs || []).map((item: any) => [asText(item.id), asText(item.name)])));
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || '人员基础数据加载失败';
+      message.error(errorMessage);
+      setUsers([]);
+      setOrgMap(new Map());
+    }
   };
 
   const loadRecords = async () => {
@@ -194,6 +189,7 @@ export default function ExternalAccountBindingTab() {
         return itemId ? itemId === record.id : item?.provider === record.provider && item?.corpId === record.corpId;
       });
       const detail = normalizeBindingRecord(matched ? { ...matched, user: resp.data?.user } : record);
+      setEditing(detail);
       form.setFieldsValue({
         userId: detail.userId,
         id: detail.id,
@@ -268,17 +264,18 @@ export default function ExternalAccountBindingTab() {
 
   const resolveUserContext = (userId: string) => {
     const user = users.find((item) => item.id === userId);
+    const currentRecord = editing?.userId === userId ? editing : records.find((item) => item.userId === userId) || null;
     if (!user) {
       return {
-        orgName: '-',
-        primaryPositionName: '-',
-        extraPositionNames: [] as string[],
+        orgName: currentRecord?.orgName || '-',
+        primaryPositionName: currentRecord?.primaryPositionName || '-',
+        extraPositionNames: currentRecord?.extraPositionNames || [] as string[],
       };
     }
     return {
       orgName: user.orgId ? orgMap.get(asText(user.orgId)) || asText(user.orgId) : '-',
-      primaryPositionName: user.primaryPositionId ? positionMap.get(asText(user.primaryPositionId)) || asText(user.primaryPositionId) : '-',
-      extraPositionNames: (user.extraPositionIds || []).map((id) => positionMap.get(asText(id)) || asText(id)).filter(Boolean),
+      primaryPositionName: currentRecord?.primaryPositionName || '-',
+      extraPositionNames: currentRecord?.extraPositionNames || [],
     };
   };
 

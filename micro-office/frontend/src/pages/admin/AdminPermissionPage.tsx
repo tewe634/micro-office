@@ -28,6 +28,7 @@ const menus = [
   { key: '/objects', label: '客户&对象' },
   { key: '/products', label: '产品&服务' },
   { key: '/admin', label: '系统管理' },
+  { key: '/admin/external-accounts', label: '账号绑定' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
   { key: '/admin/workflow-node-features', label: '工作节点模版管理' },
@@ -64,8 +65,8 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
       const list = [...(prev[role] || [])];
       if (checked && !list.includes(menuKey)) list.push(menuKey);
       if (!checked) {
-        const i = list.indexOf(menuKey);
-        if (i >= 0) list.splice(i, 1);
+        const index = list.indexOf(menuKey);
+        if (index >= 0) list.splice(index, 1);
       }
       return { ...prev, [role]: list };
     });
@@ -84,7 +85,9 @@ function RolePermTab({ roles }: { roles: RoleItem[] }) {
 
   return (
     <div className="page-fill" style={{ gap: 16 }}>
-      <p style={{ color: '#888', margin: 0 }}>角色模块权限已同步系统角色表。组织标签固定为全员可见；人员/岗位标签仍走权限配置，与组织架构查看权限相互独立。</p>
+      <p style={{ color: '#888', margin: 0 }}>
+        角色模块权限已同步系统角色表。组织标签固定为全员可见；人员/岗位标签仍走权限配置，与组织架构查看权限相互独立。账号绑定已迁到系统管理菜单，历史上仅配置 `/users` 的角色仍兼容可见，后续建议改为单独勾选“账号绑定”。
+      </p>
       <div className="page-card-scroll">
         <Table
           dataSource={menus}
@@ -163,7 +166,7 @@ function UserPermTab({ roles }: { roles: RoleItem[] }) {
 
   const toggleMenu = (key: string, checked: boolean) => {
     setHasCustomMenus(true);
-    setUserMenus(prev => checked ? [...prev, key] : prev.filter(k => k !== key));
+    setUserMenus(prev => checked ? [...prev, key] : prev.filter(menuKey => menuKey !== key));
   };
 
   const toggleObjType = (type: string, checked: boolean) => {

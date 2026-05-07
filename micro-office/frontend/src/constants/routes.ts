@@ -2,6 +2,7 @@ const baseMenus = ['/org'];
 
 const routePriority = [
   '/org',
+  '/admin/external-accounts',
   '/objects',
   '/products',
   '/admin/permissions',
@@ -14,6 +15,7 @@ const routePriority = [
 ];
 
 const adminRoutePriority = [
+  '/admin/external-accounts',
   '/admin/permissions',
   '/admin/sales-collab',
   '/admin/workflow-node-features',
@@ -22,6 +24,10 @@ const adminRoutePriority = [
   '/admin/portal-block-templates',
   '/admin/portal-templates',
 ];
+
+const menuAccessAliases: Record<string, string[]> = {
+  '/admin/external-accounts': ['/users'],
+};
 
 export function buildAllowedMenus(menus: string[]) {
   return Array.from(new Set([...baseMenus, ...menus]));
@@ -34,7 +40,8 @@ export function canAccessMenu(menuKey: string, menus: string[]) {
   if (menus.includes('/admin') && menuKey.startsWith('/admin')) {
     return true;
   }
-  return menus.includes(menuKey);
+  const candidates = [menuKey, ...(menuAccessAliases[menuKey] || [])];
+  return candidates.some(candidate => menus.includes(candidate));
 }
 
 export function resolveHomePath(menus: string[]) {

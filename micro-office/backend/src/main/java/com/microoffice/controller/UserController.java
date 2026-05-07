@@ -338,6 +338,7 @@ public class UserController {
         List<String> order = List.of(
             "/org",
             "/users",
+            "/admin/external-accounts",
             "/objects",
             "/products",
             "/admin/portal-templates",

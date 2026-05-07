@@ -4,6 +4,7 @@ import com.microoffice.dto.response.ApiResponse;
 import com.microoffice.service.MenuPermissionService;
 import com.microoffice.service.UserExternalAccountAdminService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,13 +30,13 @@ public class UserExternalAccountAdminController {
                                                        @RequestParam(required = false) String status,
                                                        @RequestParam(required = false) String keyword,
                                                        Authentication auth) {
-        requireUsersMenu(auth);
+        requireExternalAccountsMenu(auth);
         return ApiResponse.ok(userExternalAccountAdminService.listAccounts(provider, status, keyword));
     }
 
     @GetMapping("/users/{userId}/external-accounts")
     public ApiResponse<Map<String, Object>> detail(@PathVariable String userId, Authentication auth) {
-        requireUsersMenu(auth);
+        requireExternalAccountsMenu(auth);
         return ApiResponse.ok(userExternalAccountAdminService.getUserAccounts(userId));
     }
 
@@ -43,7 +44,7 @@ public class UserExternalAccountAdminController {
     public ApiResponse<Map<String, Object>> save(@PathVariable String userId,
                                                  @RequestBody Map<String, Object> body,
                                                  Authentication auth) {
-        String operatorId = requireUsersMenu(auth);
+        String operatorId = requireExternalAccountsMenu(auth);
         return ApiResponse.ok(userExternalAccountAdminService.saveAccount(userId, body, operatorId));
     }
 
@@ -51,7 +52,7 @@ public class UserExternalAccountAdminController {
     public ApiResponse<Map<String, Object>> unbind(@PathVariable String userId,
                                                    @RequestBody(required = false) Map<String, Object> body,
                                                    Authentication auth) {
-        String operatorId = requireUsersMenu(auth);
+        String operatorId = requireExternalAccountsMenu(auth);
         return ApiResponse.ok(userExternalAccountAdminService.unbindAccount(userId, body, operatorId));
     }
 
@@ -60,13 +61,17 @@ public class UserExternalAccountAdminController {
                                                    @RequestParam(required = false) String corpId,
                                                    @RequestParam(required = false) String provider,
                                                    Authentication auth) {
-        String operatorId = requireUsersMenu(auth);
+        String operatorId = requireExternalAccountsMenu(auth);
         return ApiResponse.ok(userExternalAccountAdminService.removeAccount(userId, corpId, provider, operatorId));
     }
 
-    private String requireUsersMenu(Authentication auth) {
+    private String requireExternalAccountsMenu(Authentication auth) {
         String currentUserId = (String) auth.getPrincipal();
-        menuPermissionService.requireMenu(currentUserId, "/users");
+        if (!menuPermissionService.hasMenu(currentUserId, "/admin")
+            && !menuPermissionService.hasMenu(currentUserId, "/admin/external-accounts")
+            && !menuPermissionService.hasMenu(currentUserId, "/users")) {
+            throw new AccessDeniedException("无权限访问");
+        }
         return currentUserId;
     }
 }

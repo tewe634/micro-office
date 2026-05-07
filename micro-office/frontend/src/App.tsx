@@ -13,6 +13,7 @@ const OrgPage = lazy(() => import('./pages/org/OrgPage'));
 const ObjectPage = lazy(() => import('./pages/object/ObjectPage'));
 const ProductPage = lazy(() => import('./pages/product/ProductPage'));
 const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage'));
+const AdminExternalAccountPage = lazy(() => import('./pages/admin/AdminExternalAccountPage'));
 const AdminSalesCollabPage = lazy(() => import('./pages/admin/AdminSalesCollabPage'));
 const AdminWorkflowNodeFeaturePage = lazy(() => import('./pages/admin/AdminWorkflowNodeFeaturePage'));
 const AdminWorkflowNodeFeatureEditorPage = lazy(() => import('./pages/admin/AdminWorkflowNodeFeatureEditorPage'));
@@ -186,6 +187,7 @@ export default function App() {
               <Route path="products" element={<MenuRouteGuard menuKey="/products"><ProductPage /></MenuRouteGuard>} />
               <Route path="products/:id/portal" element={<MenuRouteGuard menuKey="/products"><PortalPage entityType="products" /></MenuRouteGuard>} />
               <Route path="admin" element={<MenuRouteGuard menuKey="/admin"><AdminRouteRedirect /></MenuRouteGuard>} />
+              <Route path="admin/external-accounts" element={<MenuRouteGuard menuKey="/admin/external-accounts"><AdminExternalAccountPage /></MenuRouteGuard>} />
               <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
               <Route path="admin/sales-collab" element={<MenuRouteGuard menuKey="/admin/sales-collab"><AdminSalesCollabPage /></MenuRouteGuard>} />
               <Route path="admin/workflow-node-features" element={<MenuRouteGuard menuKey="/admin/workflow-node-features"><AdminWorkflowNodeFeaturePage /></MenuRouteGuard>} />
