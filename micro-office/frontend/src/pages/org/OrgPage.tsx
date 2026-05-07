@@ -939,8 +939,7 @@ export default function OrgPage() {
                   label: '外部账号绑定',
                   children: (
                     <div className="page-fill">
-                      <ExternalAccountBindingTab />
-                    </div>
+                                </div>
                   ),
                 },
               ] : []),
