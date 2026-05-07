@@ -6,6 +6,7 @@ import { orgApi } from '../../api';
 import { formatRoleLabel, uiText } from '../../constants/ui';
 import { buildAllowedMenus, canAccessMenu } from '../../constants/routes';
 import { useAuthStore } from '../../store/auth';
+import ExternalAccountBindingTab from '../user/ExternalAccountBindingTab';
 import PositionTab from '../user/PositionTab';
 import UserTab from '../user/UserTab';
 
@@ -31,7 +32,7 @@ type OrgUser = {
   leaderCandidate?: boolean;
 };
 
-type OrgPageTabKey = 'org' | 'users' | 'positions';
+type OrgPageTabKey = 'org' | 'users' | 'positions' | 'external-accounts';
 
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
@@ -672,7 +673,7 @@ export default function OrgPage() {
     if (!canAccessUserDirectory) {
       return 'org';
     }
-    if (rawTab === 'users' || rawTab === 'positions') {
+    if (rawTab === 'users' || rawTab === 'positions' || rawTab === 'external-accounts') {
       return rawTab;
     }
     return 'org';
@@ -692,7 +693,7 @@ export default function OrgPage() {
   useEffect(() => {
     if (!canAccessUserDirectory) {
       const requestedTab = searchParams.get('tab');
-      if (requestedTab === 'users' || requestedTab === 'positions') {
+      if (requestedTab === 'users' || requestedTab === 'positions' || requestedTab === 'external-accounts') {
         const next = new URLSearchParams(searchParams);
         next.delete('tab');
         next.delete('orgId');
@@ -931,6 +932,15 @@ export default function OrgPage() {
                   children: (
                     <div className="page-fill">
                       <PositionTab />
+                    </div>
+                  ),
+                },
+                {
+                  key: 'external-accounts',
+                  label: '外部账号绑定',
+                  children: (
+                    <div className="page-fill">
+                      <ExternalAccountBindingTab />
                     </div>
                   ),
                 },

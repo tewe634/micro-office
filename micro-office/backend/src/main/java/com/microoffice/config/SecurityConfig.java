@@ -61,6 +61,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/positions/**").authenticated()
                 .requestMatchers("/api/users/**").hasAnyRole("HR", "ADMIN")
                 .requestMatchers("/api/positions/**").hasAnyRole("HR", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/user-external-accounts").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/admin/users/*/external-accounts").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/admin/users/*/external-accounts").hasAnyRole("HR", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/admin/users/*/external-accounts/unbind").hasAnyRole("HR", "ADMIN")
                 // 系统管理: 仅 ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // 客户&对象: 登录即可访问（具体范围在业务侧控制）

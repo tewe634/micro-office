@@ -92,6 +92,8 @@ export type DailyEntryStatus = 'ACTIVE' | 'INACTIVE';
 export type DailyEntryTargetType = 'ORG' | 'USER';
 export type DailyEntrySessionResolveStrategy = 'BY_ENTRY_ONLY' | 'BY_ENTRY_AND_USER';
 export type DailyEntryBindingScope = 'SHARED' | 'PERSONAL';
+export type UserExternalAccountProvider = 'DINGTALK';
+export type UserExternalAccountStatus = 'ACTIVE' | 'UNBOUND';
 
 export interface DailyEntryPayload {
   code: string;
@@ -127,6 +129,18 @@ export interface DailyEntrySessionBindingPayload {
   bindingScope: DailyEntryBindingScope;
   status: DailyEntryStatus;
   meta?: Record<string, any>;
+}
+
+export interface UserExternalAccountBindingPayload {
+  id?: string;
+  userId: string;
+  provider: UserExternalAccountProvider;
+  corpId: string;
+  externalUserId: string;
+  status: UserExternalAccountStatus;
+  boundAt?: string | null;
+  meta?: Record<string, any>;
+  version?: number;
 }
 
 export type WorkflowTemplateStatus = 'ACTIVE' | 'DISABLED';
@@ -298,6 +312,13 @@ export const dailyEntryAdminApi = {
   saveChatPolicy: (id: string | number, data: DailyEntryChatPolicyPayload) => api.put(`/admin/daily-entry-chat-policies/${id}`, data),
   listSessionBindings: (id: string | number) => api.get(`/admin/daily-entry-chat-policies/${id}/session-bindings`),
   saveSessionBindings: (id: string | number, bindings: DailyEntrySessionBindingPayload[]) => api.put(`/admin/daily-entry-chat-policies/${id}/session-bindings`, bindings),
+};
+
+export const userExternalAccountAdminApi = {
+  list: (params?: { keyword?: string; status?: UserExternalAccountStatus; provider?: UserExternalAccountProvider }) => api.get('/admin/user-external-accounts', { params }),
+  get: (userId: string | number) => api.get(`/admin/users/${userId}/external-accounts`),
+  save: (userId: string | number, data: UserExternalAccountBindingPayload) => api.put(`/admin/users/${userId}/external-accounts`, data),
+  unbind: (userId: string | number, data?: { id?: string; corpId?: string; provider?: UserExternalAccountProvider; reason?: string }) => api.put(`/admin/users/${userId}/external-accounts/unbind`, data || {}),
 };
 
 export const portalApi = {
