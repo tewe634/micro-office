@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Form, Input, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
@@ -103,13 +103,14 @@ export default function ExternalAccountBindingTab() {
   const [editing, setEditing] = useState<BindingRecord | null>(null);
   const [keyword, setKeyword] = useState<string>('');
   const [status, setStatus] = useState<UserExternalAccountStatus | undefined>();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm<UserExternalAccountBindingPayload>();
   const selectedBindingUserId = Form.useWatch('userId', form);
 
-  const userOptions = useMemo(
-    () => users.map((item) => ({ value: item.id, label: item.name })),
-    [users],
-  );
+  const userOptions = users.map((item) => ({ value: item.id, label: item.name }));
+
+  const pagedRecords = records.slice((page - 1) * pageSize, page * pageSize);
 
   const loadLookups = async () => {
     const [userResp, orgResp, positionResp] = await Promise.all([
@@ -141,7 +142,9 @@ export default function ExternalAccountBindingTab() {
         : Array.isArray(resp.data)
           ? resp.data
           : [];
-      setRecords(list.map(normalizeBindingRecord));
+      const nextRecords = list.map(normalizeBindingRecord);
+      setRecords(nextRecords);
+      setPage(1);
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || '外部账号绑定列表加载失败';
       message.error(errorMessage);
@@ -311,10 +314,25 @@ export default function ExternalAccountBindingTab() {
             <Table
               loading={loading}
               rowKey={(record) => `${record.userId}-${record.provider}-${record.corpId}`}
-              dataSource={records}
-              pagination={false}
+              dataSource={pagedRecords}
+              pagination={{
+                current: page,
+                pageSize,
+                total: records.length,
+                showSizeChanger: true,
+                showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条 / 共 ${total} 条`,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                onChange: (nextPage, nextPageSize) => {
+                  setPage(nextPage);
+                  setPageSize(nextPageSize);
+                },
+                onShowSizeChange: (nextPage, nextPageSize) => {
+                  setPage(nextPage);
+                  setPageSize(nextPageSize);
+                },
+              }}
               tableLayout="fixed"
-              scroll={{ y: 'calc(100dvh - 455px)', x: 1380 }}
+              scroll={{ y: 'calc(100dvh - 455px)', x: 1120 }}
               locale={{ emptyText: <Empty description="暂无外部账号绑定" /> }}
               columns={[
                 {
@@ -323,20 +341,10 @@ export default function ExternalAccountBindingTab() {
                   render: (_: unknown, record: BindingRecord) => (
                     <div>
                       <div style={{ fontWeight: 600 }}>{record.userName || '-'}</div>
-                      <div style={{ color: '#6b7280', fontSize: 12 }}>userId: {record.userId || '-'}</div>
                     </div>
                   ),
                 },
-                { title: '所属组织', dataIndex: 'orgName', width: 180, render: (value: string) => value || '-' },
-                { title: '主岗位', dataIndex: 'primaryPositionName', width: 160, render: (value: string) => value || '-' },
-                {
-                  title: '辅助岗位',
-                  dataIndex: 'extraPositionNames',
-                  width: 220,
-                  render: (value: string[]) => value?.length ? value.map((item) => <Tag key={item}>{item}</Tag>) : '-',
-                },
-                { title: 'Provider', dataIndex: 'provider', width: 120 },
-                { title: 'Corp ID', dataIndex: 'corpId', width: 220, ellipsis: true },
+                { title: '所属组织', dataIndex: 'orgName', width: 220, render: (value: string) => value || '-' },
                 {
                   title: '外部账号',
                   dataIndex: 'externalUserId',
@@ -352,12 +360,6 @@ export default function ExternalAccountBindingTab() {
                       {value === 'ACTIVE' ? '已绑定' : value === 'UNBOUND' ? '已解绑' : value}
                     </Tag>
                   ),
-                },
-                {
-                  title: '绑定时间',
-                  dataIndex: 'boundAt',
-                  width: 180,
-                  render: (value: string) => value || '-',
                 },
                 {
                   title: '操作',
