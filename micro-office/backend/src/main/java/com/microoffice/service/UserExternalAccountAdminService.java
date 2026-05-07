@@ -137,6 +137,47 @@ public class UserExternalAccountAdminService {
         return getUserAccounts(userId);
     }
 
+    @Transactional
+    public Map<String, Object> removeAccount(String userId, String corpId, String provider, String operatorId) {
+        ensureSchemaReady();
+        loadUser(userId);
+
+        String normalizedProvider = normalizeAllowed(asNullableString(provider), PROVIDER_OPTIONS, true, "provider 不合法，仅支持 DINGTALK");
+        String normalizedCorpId = blankToNull(corpId);
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT id, corp_id, provider FROM mo_user_external_accounts WHERE user_id = ? ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC",
+            userId
+        );
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到外部账号绑定记录");
+        }
+
+        Map<String, Object> target = null;
+        for (Map<String, Object> row : rows) {
+            String rowProvider = asString(row.get("provider"));
+            String rowCorpId = asString(row.get("corp_id"));
+            if (hasText(normalizedProvider) && !Objects.equals(normalizedProvider, rowProvider)) {
+                continue;
+            }
+            if (hasText(normalizedCorpId) && !Objects.equals(normalizedCorpId, rowCorpId)) {
+                continue;
+            }
+            target = row;
+            break;
+        }
+
+        if (target == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到匹配的外部账号绑定记录");
+        }
+
+        jdbc.update(
+            "DELETE FROM mo_user_external_accounts WHERE id = ?",
+            asString(target.get("id"))
+        );
+        return getUserAccounts(userId);
+    }
+
     private Map<String, Object> normalizeBody(String userId, Map<String, Object> body) {
         Map<String, Object> safeBody = body == null ? Map.of() : body;
         if (safeBody.containsKey("positionId") || safeBody.containsKey("position_id")) {

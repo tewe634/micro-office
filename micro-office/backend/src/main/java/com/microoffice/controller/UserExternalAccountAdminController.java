@@ -5,6 +5,7 @@ import com.microoffice.service.MenuPermissionService;
 import com.microoffice.service.UserExternalAccountAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -52,6 +53,15 @@ public class UserExternalAccountAdminController {
                                                    Authentication auth) {
         String operatorId = requireUsersMenu(auth);
         return ApiResponse.ok(userExternalAccountAdminService.unbindAccount(userId, body, operatorId));
+    }
+
+    @DeleteMapping("/users/{userId}/external-accounts")
+    public ApiResponse<Map<String, Object>> remove(@PathVariable String userId,
+                                                   @RequestParam(required = false) String corpId,
+                                                   @RequestParam(required = false) String provider,
+                                                   Authentication auth) {
+        String operatorId = requireUsersMenu(auth);
+        return ApiResponse.ok(userExternalAccountAdminService.removeAccount(userId, corpId, provider, operatorId));
     }
 
     private String requireUsersMenu(Authentication auth) {

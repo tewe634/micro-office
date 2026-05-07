@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Form, Input, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import {
   orgApi,
   positionApi,
@@ -252,6 +252,20 @@ export default function ExternalAccountBindingTab() {
     }
   };
 
+  const handleDelete = async (record: BindingRecord) => {
+    try {
+      await userExternalAccountAdminApi.remove(record.userId, {
+        provider: record.provider,
+        corpId: record.corpId,
+      });
+      message.success('已删除');
+      await loadRecords();
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || '删除失败';
+      message.error(errorMessage);
+    }
+  };
+
   const resolveUserContext = (userId: string) => {
     const user = users.find((item) => item.id === userId);
     if (!user) {
@@ -292,7 +306,6 @@ export default function ExternalAccountBindingTab() {
           </Space>
           <div className="page-toolbar-right">
             <Space>
-              <Button icon={<ReloadOutlined />} onClick={() => void loadRecords()}>刷新</Button>
               {canManagePersonnel ? <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增绑定</Button> : null}
             </Space>
           </div>
@@ -344,7 +357,6 @@ export default function ExternalAccountBindingTab() {
                     </div>
                   ),
                 },
-                { title: '所属组织', dataIndex: 'orgName', width: 220, render: (value: string) => value || '-' },
                 {
                   title: '外部账号',
                   dataIndex: 'externalUserId',
@@ -363,7 +375,7 @@ export default function ExternalAccountBindingTab() {
                 },
                 {
                   title: '操作',
-                  width: canManagePersonnel ? 220 : 100,
+                  width: canManagePersonnel ? 280 : 100,
                   fixed: 'right',
                   render: (_: unknown, record: BindingRecord) => (
                     <Space wrap>
@@ -381,6 +393,15 @@ export default function ExternalAccountBindingTab() {
                               <Button size="small" danger>解绑</Button>
                             </Popconfirm>
                           ) : null}
+                          <Popconfirm
+                            title="确认删除该外部账号绑定？"
+                            description="删除后将无法恢复，需要重新绑定。"
+                            okText="删除"
+                            cancelText="取消"
+                            onConfirm={() => void handleDelete(record)}
+                          >
+                            <Button size="small" danger type="primary">删除</Button>
+                          </Popconfirm>
                         </>
                       ) : null}
                     </Space>

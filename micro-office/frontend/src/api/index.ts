@@ -319,6 +319,7 @@ export const userExternalAccountAdminApi = {
   get: (userId: string | number) => api.get(`/admin/users/${userId}/external-accounts`),
   save: (userId: string | number, data: UserExternalAccountBindingPayload) => api.put(`/admin/users/${userId}/external-accounts`, data),
   unbind: (userId: string | number, data?: { id?: string; corpId?: string; provider?: UserExternalAccountProvider; reason?: string }) => api.put(`/admin/users/${userId}/external-accounts/unbind`, data || {}),
+  remove: (userId: string | number, params?: { corpId?: string; provider?: UserExternalAccountProvider }) => api.delete(`/admin/users/${userId}/external-accounts`, { params }),
 };
 
 export const portalApi = {
