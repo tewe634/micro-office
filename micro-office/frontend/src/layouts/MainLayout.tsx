@@ -33,7 +33,7 @@ const pageTitles: Record<string, string> = {
   '/admin/external-accounts': '账号绑定',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
-  '/admin/workflow-node-features': '工作节点模版管理',
+  '/admin/workflow-node-features': '节点管理',
   '/admin/workflow-templates': '工作流模版管理',
   '/admin/daily-entries': '日常条目管理',
   '/admin/portal-block-templates': '门户卡片管理',
@@ -46,7 +46,7 @@ const adminChildren = [
   { key: '/admin/external-accounts', label: '账号绑定' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
-  { key: '/admin/workflow-node-features', label: '工作节点模版管理' },
+  { key: '/admin/workflow-node-features', label: '节点管理' },
   { key: '/admin/workflow-templates', label: '工作流模版管理' },
   { key: '/admin/daily-entries', label: '日常条目管理' },
   { key: '/admin/portal-block-templates', label: '门户卡片管理' },
@@ -78,7 +78,7 @@ function resolvePageTitle(pathname: string) {
   if (/^\/admin\/portal-block-templates\/[^/]+$/.test(pathname)) return '门户卡片管理';
   if (/^\/admin\/daily-entries\/[^/]+$/.test(pathname)) return '日常条目管理';
   if (/^\/admin\/workflow-templates\/[^/]+$/.test(pathname)) return '工作流模版管理';
-  if (/^\/admin\/workflow-node-features\/[^/]+$/.test(pathname)) return '工作节点模版管理';
+  if (/^\/admin\/workflow-node-features\/[^/]+$/.test(pathname)) return '节点管理';
   return pageTitles[pathname] || '东华微办公';
 }
 

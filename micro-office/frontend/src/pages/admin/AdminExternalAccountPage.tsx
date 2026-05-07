@@ -1,5 +1,5 @@
 import { Card } from 'antd';
-import ExternalAccountBindingTab from '../user/ExternalAccountBindingTab';
+import ExternalAccountBindingTab from './ExternalAccountBindingTab';
 
 export default function AdminExternalAccountPage() {
   return (

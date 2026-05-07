@@ -153,7 +153,7 @@ export default function AdminWorkflowNodeFeaturePage() {
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
         className="page-card"
-        title="工作节点模版管理"
+        title="节点管理"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/admin/workflow-node-features/new')}>
             新建工作节点模版

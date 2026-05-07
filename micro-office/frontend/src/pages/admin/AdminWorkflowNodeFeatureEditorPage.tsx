@@ -312,7 +312,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
     <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
         className="page-card"
-        title={isCreate ? '新建节点功能' : `编辑节点功能：${detail.name || detail.code || id}`}
+        title={isCreate ? '节点管理：新建' : `节点管理：编辑 ${detail.name || detail.code || id}`}
         extra={
           <Space>
             <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/admin/workflow-node-features')}>
