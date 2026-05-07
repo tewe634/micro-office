@@ -6,7 +6,6 @@ import { orgApi } from '../../api';
 import { formatRoleLabel, uiText } from '../../constants/ui';
 import { buildAllowedMenus, canAccessMenu } from '../../constants/routes';
 import { useAuthStore } from '../../store/auth';
-import ExternalAccountBindingTab from '../user/ExternalAccountBindingTab';
 import PositionTab from '../user/PositionTab';
 import UserTab from '../user/UserTab';
 
@@ -32,7 +31,7 @@ type OrgUser = {
   leaderCandidate?: boolean;
 };
 
-type OrgPageTabKey = 'org' | 'users' | 'positions' | 'external-accounts';
+type OrgPageTabKey = 'org' | 'users' | 'positions';
 
 const DEFAULT_ZOOM = 100;
 const MIN_ZOOM = 60;
