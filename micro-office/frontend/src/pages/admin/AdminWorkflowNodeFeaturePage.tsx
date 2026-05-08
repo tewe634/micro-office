@@ -3,35 +3,12 @@ import { Button, Card, Input, Pagination, Popconfirm, Select, Space, Table, Tag,
 import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workflowNodeFeatureApi, type WorkflowNodeFeatureStatus } from '../../api';
-import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
+import { formatPaginationTotal, formatWorkflowNodeTypeLabel, paginationLocale, workflowNodeTypeOptions } from '../../constants/ui';
 
 const statusOptions: Array<{ value: WorkflowNodeFeatureStatus; label: string }> = [
   { value: 'ACTIVE', label: '启用' },
   { value: 'DISABLED', label: '停用' },
 ];
-
-const nodeTypeLabelMap: Record<string, string> = {
-  TASK: '任务',
-  APPROVAL: '审批',
-  REVIEW: '审核',
-  CC: '抄送',
-  COPY: '抄送',
-  NOTIFY: '通知',
-  NOTICE: '通知',
-  HANDLE: '办理',
-  PROCESS: '处理',
-  START: '开始',
-  END: '结束',
-  CONDITION: '条件',
-  BRANCH: '分支',
-  MERGE: '汇聚',
-  AUTO: '自动',
-};
-
-function formatNodeTypeLabel(nodeType?: string) {
-  const key = String(nodeType || '').trim().toUpperCase();
-  return key ? nodeTypeLabelMap[key] || key : '-';
-}
 
 function statusColor(status?: string) {
   return status === 'ACTIVE' ? 'green' : 'default';
@@ -48,20 +25,19 @@ export default function AdminWorkflowNodeFeaturePage() {
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState<WorkflowNodeFeatureStatus | undefined>();
   const [nodeType, setNodeType] = useState<string | undefined>();
-  const [positionKey, setPositionKey] = useState<string | undefined>();
-  const [roleKey, setRoleKey] = useState<string | undefined>();
   const [current, setCurrent] = useState(1);
   const [size, setSize] = useState(20);
   const [total, setTotal] = useState(0);
 
   const nodeTypeOptions = useMemo(() => {
-    const values = new Set(records.map((item) => String(item.nodeType || '')).filter(Boolean));
+    const values = new Set(records.map((item) => String(item.nodeType || '').trim().toUpperCase()).filter(Boolean));
+    workflowNodeTypeOptions.forEach((item) => values.add(item.value));
     if (nodeType) {
-      values.add(String(nodeType));
+      values.add(String(nodeType).trim().toUpperCase());
     }
     return Array.from(values)
       .sort()
-      .map((item) => ({ value: item, label: formatNodeTypeLabel(item) }));
+      .map((item) => ({ value: item, label: formatWorkflowNodeTypeLabel(item) }));
   }, [records, nodeType]);
 
   const load = async (params?: {
@@ -70,16 +46,12 @@ export default function AdminWorkflowNodeFeaturePage() {
     status?: WorkflowNodeFeatureStatus;
     nodeType?: string;
     keyword?: string;
-    positionKey?: string;
-    roleKey?: string;
   }) => {
     const nextCurrent = params?.current ?? current;
     const nextSize = params?.size ?? size;
     const nextStatus = params?.status ?? status;
     const nextNodeType = params?.nodeType ?? nodeType;
     const nextKeyword = params?.keyword ?? (keyword || undefined);
-    const nextPositionKey = params?.positionKey ?? positionKey;
-    const nextRoleKey = params?.roleKey ?? roleKey;
 
     setLoading(true);
     try {
@@ -89,8 +61,6 @@ export default function AdminWorkflowNodeFeaturePage() {
         status: nextStatus,
         nodeType: nextNodeType,
         keyword: nextKeyword,
-        positionKey: nextPositionKey,
-        roleKey: nextRoleKey,
       });
       const payload = response.data;
       const nextRecords = Array.isArray(payload) ? payload : payload?.records || [];
@@ -120,7 +90,7 @@ export default function AdminWorkflowNodeFeaturePage() {
     try {
       await workflowNodeFeatureApi.updateStatus(record.id, nextStatus);
       message.success(nextStatus === 'ACTIVE' ? '节点功能已启用（ACTIVE）' : '节点功能已停用（DISABLED）');
-      await load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+      await load({ current, size, status, nodeType, keyword: keyword || undefined });
     } catch (error: any) {
       message.error(error?.response?.data?.message || '状态切换失败');
     }
@@ -130,7 +100,7 @@ export default function AdminWorkflowNodeFeaturePage() {
     try {
       const response: any = await workflowNodeFeatureApi.copy(record.id);
       message.success('节点功能已复制');
-      await load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+      await load({ current, size, status, nodeType, keyword: keyword || undefined });
       if (response.data?.id) {
         nav(`/admin/workflow-node-features/${response.data.id}`);
       }
@@ -143,7 +113,7 @@ export default function AdminWorkflowNodeFeaturePage() {
     try {
       await workflowNodeFeatureApi.delete(record.id);
       message.success(`节点功能“${record.name}”已删除`);
-      await load({ current, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+      await load({ current, size, status, nodeType, keyword: keyword || undefined });
     } catch (error: any) {
       message.error(error?.response?.data?.message || '节点功能删除失败');
     }
@@ -169,7 +139,7 @@ export default function AdminWorkflowNodeFeaturePage() {
               value={keyword}
               style={{ width: 260 }}
               onChange={(e) => setKeyword(e.target.value)}
-              onPressEnter={() => void load({ current: 1, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey })}
+              onPressEnter={() => void load({ current: 1, size, status, nodeType, keyword: keyword || undefined })}
             />
             <Select
               allowClear
@@ -187,9 +157,7 @@ export default function AdminWorkflowNodeFeaturePage() {
               options={statusOptions}
               onChange={(value) => setStatus(value)}
             />
-            <Input allowClear placeholder="岗位标识" value={positionKey} style={{ width: 180 }} onChange={(e) => setPositionKey(e.target.value || undefined)} />
-            <Input allowClear placeholder="角色标识" value={roleKey} style={{ width: 160 }} onChange={(e) => setRoleKey(e.target.value || undefined)} />
-            <Button type="primary" onClick={() => void load({ current: 1, size, status, nodeType, keyword: keyword || undefined, positionKey, roleKey })}>
+            <Button type="primary" onClick={() => void load({ current: 1, size, status, nodeType, keyword: keyword || undefined })}>
               查询
             </Button>
           </Space>
@@ -236,17 +204,14 @@ export default function AdminWorkflowNodeFeaturePage() {
                   title: '节点类型',
                   dataIndex: 'nodeType',
                   width: 100,
-                  render: (value: string) => formatNodeTypeLabel(value),
+                  render: (value: string) => formatWorkflowNodeTypeLabel(value),
                 },
-                { title: '岗位标识', dataIndex: 'positionKey', width: 140, ellipsis: true },
-                { title: '角色标识', dataIndex: 'roleKey', width: 120, ellipsis: true },
                 {
                   title: '状态',
                   dataIndex: 'status',
                   width: 100,
                   render: (value: WorkflowNodeFeatureStatus) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
                 },
-                { title: '版本', dataIndex: 'version', width: 80 },
                 {
                   title: '操作',
                   width: 290,
@@ -306,7 +271,7 @@ export default function AdminWorkflowNodeFeaturePage() {
               showSizeChanger
               showTotal={(count) => formatPaginationTotal(count)}
               onChange={(page, pageSize) => {
-                void load({ current: page, size: pageSize, status, nodeType, keyword: keyword || undefined, positionKey, roleKey });
+                void load({ current: page, size: pageSize, status, nodeType, keyword: keyword || undefined });
               }}
             />
           </div>

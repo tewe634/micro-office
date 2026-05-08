@@ -16,6 +16,7 @@ import {
 import { ArrowLeftOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { workflowNodeFeatureApi, type WorkflowNodeFeatureStatus } from '../../api';
+import { workflowNodeTypeOptions } from '../../constants/ui';
 
 const { Text } = Typography;
 
@@ -42,12 +43,8 @@ type FeatureDetail = {
   code: string;
   name: string;
   sourceModuleId?: string;
-  sourceSystem: string;
   nodeType: string;
-  version: number;
   sortOrder: number;
-  positionKey?: string;
-  roleKey?: string;
   status: WorkflowNodeFeatureStatus;
 };
 
@@ -80,12 +77,8 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
   const [detail, setDetail] = useState<FeatureDetail>({
     code: '',
     name: '',
-    sourceSystem: 'MICRO_OFFICE',
     nodeType: '',
-    version: 1,
     sortOrder: 100,
-    positionKey: '',
-    roleKey: '',
     status: 'DISABLED',
   });
   const [fields, setFields] = useState<FieldItem[]>([]);
@@ -118,12 +111,8 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
         code: feature.code || '',
         name: feature.name || '',
         sourceModuleId: feature.sourceModuleId || '',
-        sourceSystem: feature.sourceSystem || 'MICRO_OFFICE',
         nodeType: feature.nodeType || '',
-        version: Number(feature.version || 1),
         sortOrder: Number(feature.sortOrder || 100),
-        positionKey: feature.positionKey || '',
-        roleKey: feature.roleKey || '',
         status: (feature.status || 'DISABLED') as WorkflowNodeFeatureStatus,
       });
 
@@ -177,12 +166,10 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
       code: detail.code.trim(),
       name: detail.name.trim(),
       sourceModuleId: detail.sourceModuleId?.trim() || undefined,
-      sourceSystem: detail.sourceSystem.trim() || 'MICRO_OFFICE',
+      sourceSystem: 'MICRO_OFFICE',
       nodeType: detail.nodeType.trim(),
-      version: Number(detail.version || 1),
+      version: 1,
       sortOrder: Number(detail.sortOrder || 100),
-      positionKey: detail.positionKey?.trim() || undefined,
-      roleKey: detail.roleKey?.trim() || undefined,
     };
     if (!payload.code || !payload.name || !payload.nodeType) {
       throw new Error('节点编码 / 节点名称 / 节点类型 不能为空');
@@ -341,12 +328,14 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
                 <Input value={detail.code} placeholder="节点编码" onChange={(e) => setDetail((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))} />
                 <Input value={detail.name} placeholder="节点名称" onChange={(e) => setDetail((prev) => ({ ...prev, name: e.target.value }))} />
-                <Input value={detail.nodeType} placeholder="节点类型" onChange={(e) => setDetail((prev) => ({ ...prev, nodeType: e.target.value.toUpperCase() }))} />
-                <Input value={detail.sourceSystem} placeholder="来源系统" onChange={(e) => setDetail((prev) => ({ ...prev, sourceSystem: e.target.value.toUpperCase() }))} />
-                <InputNumber min={1} style={{ width: '100%' }} value={detail.version} placeholder="版本" onChange={(value) => setDetail((prev) => ({ ...prev, version: Number(value || 1) }))} />
+                <Select
+                  value={detail.nodeType || undefined}
+                  placeholder="节点类型"
+                  style={{ width: '100%' }}
+                  options={workflowNodeTypeOptions}
+                  onChange={(value) => setDetail((prev) => ({ ...prev, nodeType: value }))}
+                />
                 <InputNumber min={0} style={{ width: '100%' }} value={detail.sortOrder} placeholder="排序值" onChange={(value) => setDetail((prev) => ({ ...prev, sortOrder: Number(value || 0) }))} />
-                <Input value={detail.positionKey} placeholder="岗位标识" onChange={(e) => setDetail((prev) => ({ ...prev, positionKey: e.target.value }))} />
-                <Input value={detail.roleKey} placeholder="角色标识" onChange={(e) => setDetail((prev) => ({ ...prev, roleKey: e.target.value }))} />
               </div>
               <div style={{ marginTop: 10 }}>
                 <Tag color={detail.status === 'ACTIVE' ? 'green' : 'default'}>{detail.status}</Tag>

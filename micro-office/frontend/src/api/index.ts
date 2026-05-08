@@ -368,8 +368,6 @@ export const workflowNodeFeatureApi = {
     status?: WorkflowNodeFeatureStatus;
     nodeType?: string;
     keyword?: string;
-    positionKey?: string;
-    roleKey?: string;
   }) => api.get('/admin/workflow-node-features', { params }),
   detail: (id: string | number) => api.get(`/admin/workflow-node-features/${id}`),
   create: (data: {
@@ -380,8 +378,6 @@ export const workflowNodeFeatureApi = {
     nodeType: string;
     version?: number;
     sortOrder?: number;
-    positionKey?: string;
-    roleKey?: string;
   }) => api.post('/admin/workflow-node-features', data),
   update: (id: string | number, data: {
     code: string;
@@ -391,8 +387,6 @@ export const workflowNodeFeatureApi = {
     nodeType: string;
     version?: number;
     sortOrder?: number;
-    positionKey?: string;
-    roleKey?: string;
   }) => api.put(`/admin/workflow-node-features/${id}`, data),
   updateStatus: (id: string | number, status: WorkflowNodeFeatureStatus) => api.put(`/admin/workflow-node-features/${id}/status`, { status }),
   delete: (id: string | number) => api.delete(`/admin/workflow-node-features/${id}`),

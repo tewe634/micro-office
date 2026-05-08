@@ -12,6 +12,33 @@ export const roleLabelMap: Record<string, string> = {
   STAFF: '普通员工',
 };
 
+export const workflowNodeTypeLabelMap: Record<string, string> = {
+  TASK: '任务',
+  APPROVAL: '审批',
+  REVIEW: '审核',
+  CC: '抄送',
+  COPY: '抄送',
+  NOTIFY: '通知',
+  NOTICE: '通知',
+  HANDLE: '办理',
+  PROCESS: '处理',
+  START: '开始',
+  END: '结束',
+  CONDITION: '条件',
+  BRANCH: '分支',
+  MERGE: '汇聚',
+  AUTO: '自动',
+  MODULE: '模块',
+  CUSTOM: '自定义',
+};
+
+export const workflowNodeTypeOptions = [
+  { value: 'TASK', label: workflowNodeTypeLabelMap.TASK },
+  { value: 'APPROVAL', label: workflowNodeTypeLabelMap.APPROVAL },
+  { value: 'MODULE', label: workflowNodeTypeLabelMap.MODULE },
+  { value: 'CUSTOM', label: workflowNodeTypeLabelMap.CUSTOM },
+];
+
 export const objectTypeLabelMap: Record<string, string> = {
   CUSTOMER: '客户',
   SUPPLIER: '供应商',
@@ -70,6 +97,11 @@ export function formatRoleLabel(code?: string, name?: string) {
     return name;
   }
   return code || '-';
+}
+
+export function formatWorkflowNodeTypeLabel(nodeType?: string) {
+  const key = String(nodeType || '').trim().toUpperCase();
+  return key ? workflowNodeTypeLabelMap[key] || key : '-';
 }
 
 export function formatObjectType(type?: string) {
