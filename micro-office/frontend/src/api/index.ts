@@ -159,13 +159,11 @@ export interface WorkflowTemplatePackageSummary {
   positionIds?: string[];
   positionName?: string | null;
   positionNames?: string[];
-  applicableSubjectType?: string | null;
   description?: string | null;
   status: WorkflowTemplateStatus;
   sortOrder?: number;
   allowCreateAsNormal?: boolean;
   allowCreateAsSubflow?: boolean;
-  version?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -185,7 +183,6 @@ export interface WorkflowTemplatePackageNodePayload {
   inputFields: WorkflowTemplateNodeFieldConfigPayload[];
   outputFields: WorkflowTemplateNodeFieldConfigPayload[];
   recommendedTemplates: WorkflowTemplateNodeRecommendationPayload[];
-  version?: number;
 }
 
 export interface WorkflowTemplateNodeFieldConfigPayload {
@@ -359,15 +356,12 @@ export const portalApi = {
 };
 
 export const workflowTemplateApi = {
-  listPackages: (params?: { positionId?: string; applicableSubjectType?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  listPackages: (params?: { positionId?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
   listPositions: () => api.get('/admin/workflow-templates/positions'),
   getPackage: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}`),
   createPackage: (data: {
     name: string;
-    code: string;
-    version?: number;
     positionIds?: string[];
-    applicableSubjectType?: string;
     description?: string;
     sortOrder?: number;
     allowCreateAsNormal?: boolean;
@@ -375,10 +369,7 @@ export const workflowTemplateApi = {
   }) => api.post('/admin/workflow-templates/packages', data),
   updatePackage: (id: string | number, data: {
     name: string;
-    code: string;
-    version?: number;
     positionIds?: string[];
-    applicableSubjectType?: string | null;
     description?: string;
     sortOrder?: number;
     allowCreateAsNormal?: boolean;

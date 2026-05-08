@@ -34,11 +34,10 @@ public class AdminWorkflowTemplateController {
      */
     @GetMapping("/packages")
     public ApiResponse<List<Map<String, Object>>> listPackages(@RequestParam(required = false) String positionId,
-                                                               @RequestParam(required = false) String applicableSubjectType,
                                                                @RequestParam(required = false) String status,
                                                                Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listPackages(positionId, applicableSubjectType, status));
+        return ApiResponse.ok(workflowTemplateService.listPackages(positionId, status));
     }
 
     /**

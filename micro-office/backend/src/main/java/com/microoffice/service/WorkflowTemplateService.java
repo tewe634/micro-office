@@ -43,10 +43,10 @@ public class WorkflowTemplateService {
 
     private final JdbcTemplate jdbc;
 
-    public List<Map<String, Object>> listPackages(String positionId, String applicableSubjectType, String status) {
+    public List<Map<String, Object>> listPackages(String positionId, String status) {
         List<Object> args = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-            "SELECT p.id, p.name, p.code, p.position_id, p.applicable_subject_type, p.description, p.status, p.sort_order, " +
+            "SELECT p.id, p.name, p.code, p.position_id, p.description, p.status, p.sort_order, " +
                 "p.allow_create_as_normal, p.allow_create_as_subflow, p.created_at, p.created_by, p.updated_at, p.updated_by, p.version " +
                 "FROM mo_workflow_recommendation_packages p WHERE 1=1"
         );
@@ -54,10 +54,6 @@ public class WorkflowTemplateService {
             String normalizedPositionId = normalizePositionId(positionId);
             sql.append(" AND EXISTS (SELECT 1 FROM mo_workflow_recommendation_package_positions pp WHERE pp.package_id = p.id AND pp.position_id = ?)");
             args.add(normalizedPositionId);
-        }
-        if (hasText(applicableSubjectType)) {
-            sql.append(" AND p.applicable_subject_type = ?");
-            args.add(applicableSubjectType.trim().toUpperCase(Locale.ROOT));
         }
         if (hasText(status)) {
             sql.append(" AND p.status = ?");
@@ -90,8 +86,8 @@ public class WorkflowTemplateService {
     public Map<String, Object> createPackage(WorkflowTemplatePackageSaveRequest request, String userId) {
         requireRequest(request);
         String id = UUID.randomUUID().toString();
-        int version = normalizeVersion(request.getVersion());
-        String code = normalizeTemplateCode(request.getCode());
+        int version = 1;
+        String code = generateTemplateCode();
         ensureTemplateCodeVersionUnique(code, version, null);
         List<String> positionIds = normalizePositionIds(request);
         String primaryPositionId = positionIds.isEmpty() ? null : positionIds.get(0);
@@ -104,7 +100,7 @@ public class WorkflowTemplateService {
             requireText(request.getName(), "模板名称不能为空"),
             code,
             primaryPositionId,
-            normalizeApplicableSubjectType(request.getApplicableSubjectType()),
+            null,
             blankToNull(request.getDescription()),
             normalizeSortOrder(request.getSortOrder()),
             defaultTrue(request.getAllowCreateAsNormal()),
@@ -120,9 +116,9 @@ public class WorkflowTemplateService {
     @Transactional
     public Map<String, Object> updatePackageInfo(String id, WorkflowTemplatePackageSaveRequest request, String userId) {
         requireRequest(request);
-        loadPackageOrThrow(id);
-        int version = normalizeVersion(request.getVersion());
-        String code = normalizeTemplateCode(request.getCode());
+        Map<String, Object> current = loadPackageOrThrow(id);
+        int version = 1;
+        String code = asString(current.get("code"));
         ensureTemplateCodeVersionUnique(code, version, id);
         List<String> positionIds = normalizePositionIds(request);
         String primaryPositionId = positionIds.isEmpty() ? null : positionIds.get(0);
@@ -135,7 +131,7 @@ public class WorkflowTemplateService {
             requireText(request.getName(), "模板名称不能为空"),
             code,
             primaryPositionId,
-            normalizeApplicableSubjectType(request.getApplicableSubjectType()),
+            null,
             blankToNull(request.getDescription()),
             normalizeSortOrder(request.getSortOrder()),
             defaultTrue(request.getAllowCreateAsNormal()),
@@ -191,7 +187,7 @@ public class WorkflowTemplateService {
             asString(source.get("name")) + "（复制）",
             copiedCode,
             sourcePositionIds.isEmpty() ? null : sourcePositionIds.get(0),
-            asString(source.get("applicableSubjectType")),
+            null,
             asString(source.get("description")),
             asInt(source.get("sortOrder"), 100),
             asBoolean(source.get("allowCreateAsNormal"), true),
@@ -778,7 +774,6 @@ public class WorkflowTemplateService {
         item.put("positionName", null);
         item.put("positionIds", List.of());
         item.put("positionNames", List.of());
-        item.put("applicableSubjectType", asString(row.get("applicable_subject_type")));
         item.put("description", asString(row.get("description")));
         item.put("status", asString(row.get("status")));
         item.put("sortOrder", asInt(row.get("sort_order"), 100));
@@ -1035,9 +1030,20 @@ public class WorkflowTemplateService {
         throw new ResponseStatusException(BAD_REQUEST, "无法为复制模板生成唯一编码");
     }
 
-    private String normalizeApplicableSubjectType(String value) {
-        String normalized = blankToNull(value);
-        return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
+    private String generateTemplateCode() {
+        String prefix = "WF_" + java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        for (int index = 0; index < 1000; index += 1) {
+            String candidate = index == 0 ? prefix : prefix + "_" + String.format("%03d", index);
+            Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM mo_workflow_recommendation_packages WHERE code = ? AND version = 1",
+                Integer.class,
+                candidate
+            );
+            if (count == null || count == 0) {
+                return candidate;
+            }
+        }
+        throw new ResponseStatusException(BAD_REQUEST, "无法自动生成唯一模板编码");
     }
 
     private String normalizeNodeId(String value) {

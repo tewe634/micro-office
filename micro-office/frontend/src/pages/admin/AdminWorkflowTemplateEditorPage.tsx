@@ -75,7 +75,6 @@ function normalizeNode(item: any): NodeEditorItem {
     inputFields: Array.isArray(item.inputFields) ? item.inputFields : [],
     outputFields: Array.isArray(item.outputFields) ? item.outputFields : [],
     recommendedTemplates: Array.isArray(item.recommendedTemplates) ? item.recommendedTemplates : [],
-    version: item.version === undefined || item.version === null ? undefined : Number(item.version),
   };
 }
 
@@ -250,7 +249,6 @@ export default function AdminWorkflowTemplateEditorPage() {
       inputFields: [],
       outputFields: [],
       recommendedTemplates: [],
-      version: 1,
     };
     setNodes((prev) => sortNodes([...prev, node]));
     setSelectedNodeId(node.id);
@@ -317,7 +315,6 @@ export default function AdminWorkflowTemplateEditorPage() {
                 </Typography.Title>
                 <Space size={8} wrap style={{ marginTop: 8 }}>
                   <Tag>{packageDetail.code}</Tag>
-                  <Tag>版本 {packageDetail.version || 1}</Tag>
                   <Tag color={packageDetail.status === 'ACTIVE' ? 'green' : 'default'}>
                     {packageDetail.status === 'ACTIVE' ? '启用' : '停用'}
                   </Tag>
@@ -518,16 +515,6 @@ export default function AdminWorkflowTemplateEditorPage() {
                         style={{ width: '100%' }}
                         value={selectedNode.sequence}
                         onChange={(value) => updateNode(selectedNode.id, (node) => ({ ...node, sequence: Number(value || 1) }))}
-                      />
-                    </Col>
-                    <Col xs={24} md={8}>
-                      <div style={{ marginBottom: 6 }}>版本</div>
-                      <InputNumber
-                        min={1}
-                        precision={0}
-                        style={{ width: '100%' }}
-                        value={selectedNode.version || 1}
-                        onChange={(value) => updateNode(selectedNode.id, (node) => ({ ...node, version: Number(value || 1) }))}
                       />
                     </Col>
                     <Col xs={24} md={8}>

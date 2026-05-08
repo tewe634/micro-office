@@ -5,12 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import type { WorkflowTemplatePackageSummary, WorkflowTemplatePositionOption, WorkflowTemplateStatus } from '../../api';
 import { workflowTemplateApi } from '../../api';
 
-const subjectTypeOptions = [
-  { label: '不限', value: '' },
-  { label: '客户公司', value: 'CUSTOMER_COMPANY' },
-  { label: '日报分类', value: 'DAILY_CATEGORY' },
-];
-
 const positionLabel = (record: WorkflowTemplatePackageSummary) => {
   const names = record.positionNames?.filter(Boolean) || [];
   if (names.length > 0) return names.join('、');
@@ -25,7 +19,6 @@ export default function AdminWorkflowTemplatePage() {
   const [positionOptions, setPositionOptions] = useState<WorkflowTemplatePositionOption[]>([]);
   const [status, setStatus] = useState<WorkflowTemplateStatus | undefined>(undefined);
   const [positionId, setPositionId] = useState<string | undefined>(undefined);
-  const [subjectType, setSubjectType] = useState<string | undefined>(undefined);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<WorkflowTemplatePackageSummary | null>(null);
   const [saving, setSaving] = useState(false);
@@ -56,7 +49,6 @@ export default function AdminWorkflowTemplatePage() {
       .filter((item) => {
         if (status && item.status !== status) return false;
         if (positionId && !(item.positionIds || []).includes(positionId)) return false;
-        if (subjectType && item.applicableSubjectType !== subjectType) return false;
         return true;
       })
       .sort((a, b) => {
@@ -64,7 +56,7 @@ export default function AdminWorkflowTemplatePage() {
         if (sortDiff !== 0) return sortDiff;
         return (a.name || '').localeCompare(b.name || '', 'zh-CN');
       });
-  }, [packages, positionId, status, subjectType]);
+  }, [packages, positionId, status]);
 
   const closeModal = () => {
     setModalOpen(false);
@@ -76,7 +68,6 @@ export default function AdminWorkflowTemplatePage() {
     setEditingRecord(null);
     form.resetFields();
     form.setFieldsValue({
-      version: 1,
       sortOrder: 100,
       positionIds: [],
       allowCreateAsNormal: true,
@@ -89,10 +80,7 @@ export default function AdminWorkflowTemplatePage() {
     setEditingRecord(record);
     form.setFieldsValue({
       name: record.name,
-      code: record.code,
-      version: record.version ?? 1,
       positionIds: record.positionIds || [],
-      applicableSubjectType: record.applicableSubjectType || undefined,
       description: record.description,
       sortOrder: record.sortOrder ?? 100,
       allowCreateAsNormal: record.allowCreateAsNormal ?? true,
@@ -107,10 +95,7 @@ export default function AdminWorkflowTemplatePage() {
       setSaving(true);
       const payload = {
         name: values.name,
-        code: values.code,
-        version: values.version ?? 1,
         positionIds: values.positionIds || [],
-        applicableSubjectType: values.applicableSubjectType || undefined,
         description: values.description,
         sortOrder: values.sortOrder ?? 100,
         allowCreateAsNormal: values.allowCreateAsNormal ?? true,
@@ -195,14 +180,6 @@ export default function AdminWorkflowTemplatePage() {
           />
           <Select
             allowClear
-            placeholder="按适用主体筛选"
-            style={{ width: 220 }}
-            value={subjectType}
-            onChange={(value) => setSubjectType(value)}
-            options={subjectTypeOptions.filter((item) => item.value).map((item) => ({ value: item.value, label: item.label }))}
-          />
-          <Select
-            allowClear
             placeholder="按状态筛选"
             style={{ width: 180 }}
             value={status}
@@ -223,13 +200,6 @@ export default function AdminWorkflowTemplatePage() {
           columns={[
             { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true },
             { title: '模板编码', dataIndex: 'code', width: 180 },
-            { title: '版本', dataIndex: 'version', width: 90 },
-            {
-              title: '适用主体',
-              dataIndex: 'applicableSubjectType',
-              width: 140,
-              render: (value?: string | null) => value || <span style={{ color: '#999' }}>不限</span>,
-            },
             {
               title: '关联岗位',
               dataIndex: 'positionNames',
@@ -310,19 +280,11 @@ export default function AdminWorkflowTemplatePage() {
           <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入模板名称' }]}>
             <Input maxLength={64} placeholder="例如：销售经理跟单流" />
           </Form.Item>
-          <Form.Item
-            name="code"
-            label="模板编码"
-            rules={[
-              { required: true, message: '请输入模板编码' },
-              { pattern: /^[A-Z0-9_]+$/, message: '模板编码仅支持大写字母、数字和下划线' },
-            ]}
-          >
-            <Input maxLength={64} placeholder="例如：SALES_FOLLOWUP" />
-          </Form.Item>
-          <Form.Item name="version" label="模板版本" rules={[{ required: true, message: '请输入版本号' }]}>
-            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
+          {!editingRecord ? (
+            <Form.Item label="模板编码">
+              <Input value="系统自动生成" disabled />
+            </Form.Item>
+          ) : null}
           <Form.Item name="positionIds" label="关联岗位">
             <Select
               mode="multiple"
@@ -330,13 +292,6 @@ export default function AdminWorkflowTemplatePage() {
               placeholder="可选，留空表示全局模板"
               optionFilterProp="label"
               options={positionOptions.map((item) => ({ value: item.id, label: item.name }))}
-            />
-          </Form.Item>
-          <Form.Item name="applicableSubjectType" label="适用主体类型">
-            <Select
-              allowClear
-              placeholder="可选"
-              options={subjectTypeOptions.filter((item) => item.value).map((item) => ({ value: item.value, label: item.label }))}
             />
           </Form.Item>
           <Form.Item name="description" label="模板说明">
