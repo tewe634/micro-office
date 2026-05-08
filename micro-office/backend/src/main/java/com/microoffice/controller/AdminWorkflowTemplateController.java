@@ -1,5 +1,7 @@
 package com.microoffice.controller;
 
+import com.microoffice.dto.request.WorkflowTemplateFieldDefinitionSaveRequest;
+import com.microoffice.dto.request.WorkflowTemplateNodesSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplatePackageSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateStatusUpdateRequest;
 import com.microoffice.dto.response.ApiResponse;
@@ -28,19 +30,19 @@ public class AdminWorkflowTemplateController {
     private final MenuPermissionService menuPermissionService;
 
     /**
-     * 查询模板包列表。
+     * 查询工作流模板列表。
      */
     @GetMapping("/packages")
     public ApiResponse<List<Map<String, Object>>> listPackages(@RequestParam(required = false) String positionId,
-                                                               @RequestParam(required = false) String sceneCategory,
+                                                               @RequestParam(required = false) String applicableSubjectType,
                                                                @RequestParam(required = false) String status,
                                                                Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listPackages(positionId, sceneCategory, status));
+        return ApiResponse.ok(workflowTemplateService.listPackages(positionId, applicableSubjectType, status));
     }
 
     /**
-     * 查询模板包关联岗位选项。
+     * 查询模板适用岗位选项。
      */
     @GetMapping("/positions")
     public ApiResponse<List<Map<String, Object>>> listPositions(Authentication auth) {
@@ -49,7 +51,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 查询单个模板包详情。
+     * 查询单个工作流模板详情。
      */
     @GetMapping("/packages/{id}")
     public ApiResponse<Map<String, Object>> getPackage(@PathVariable String id, Authentication auth) {
@@ -58,7 +60,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 创建模板包，默认状态 DISABLED。
+     * 创建工作流模板，默认状态 DISABLED。
      */
     @PostMapping("/packages")
     public ApiResponse<Map<String, Object>> createPackage(@RequestBody WorkflowTemplatePackageSaveRequest body, Authentication auth) {
@@ -67,7 +69,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 更新模板包基础信息。
+     * 更新工作流模板基础信息。
      */
     @PutMapping("/packages/{id}")
     public ApiResponse<Map<String, Object>> updatePackage(@PathVariable String id,
@@ -78,7 +80,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 更新模板包状态，仅支持 ACTIVE / DISABLED。
+     * 更新工作流模板状态，仅支持 ACTIVE / DISABLED。
      */
     @PutMapping("/packages/{id}/status")
     public ApiResponse<Map<String, Object>> updatePackageStatus(@PathVariable String id,
@@ -89,7 +91,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 删除模板包及其节点编排。
+     * 删除工作流模板及其节点配置。
      */
     @DeleteMapping("/packages/{id}")
     public ApiResponse<Map<String, Object>> deletePackage(@PathVariable String id, Authentication auth) {
@@ -98,7 +100,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 复制模板包与节点。
+     * 复制工作流模板与节点配置。
      */
     @PostMapping("/packages/{id}/copy")
     public ApiResponse<Map<String, Object>> copyPackage(@PathVariable String id, Authentication auth) {
@@ -107,7 +109,7 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 查询模板包节点编排。
+     * 查询模板节点配置。
      */
     @GetMapping("/packages/{id}/nodes")
     public ApiResponse<List<Map<String, Object>>> listPackageNodes(@PathVariable String id, Authentication auth) {
@@ -116,47 +118,56 @@ public class AdminWorkflowTemplateController {
     }
 
     /**
-     * 整包覆盖保存节点拓扑，含结构校验。请求体仅允许 { nodes: [...] }。
+     * 整包覆盖保存模板节点配置。
      */
     @PutMapping("/packages/{id}/nodes")
     public ApiResponse<List<Map<String, Object>>> savePackageNodes(@PathVariable String id,
-                                                                   @RequestBody Map<String, Object> body,
+                                                                   @RequestBody WorkflowTemplateNodesSaveRequest body,
                                                                    Authentication auth) {
         String userId = requireAdmin(auth);
         return ApiResponse.ok(workflowTemplateService.saveNodes(id, body, userId));
     }
 
     /**
-     * 查询可用模块定义。
+     * 查询全局字段定义。
      */
-    @GetMapping("/module-definitions")
-    public ApiResponse<List<Map<String, Object>>> listModuleDefinitions(@RequestParam(required = false) String nodeType,
-                                                                        @RequestParam(required = false) String roleKey,
-                                                                        @RequestParam(required = false) String positionKey,
-                                                                        Authentication auth) {
+    @GetMapping("/field-definitions")
+    public ApiResponse<List<Map<String, Object>>> listFieldDefinitions(@RequestParam(required = false) Boolean enabled,
+                                                                       @RequestParam(required = false) String keyword,
+                                                                       Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listModuleDefinitions(nodeType, roleKey, positionKey));
+        return ApiResponse.ok(workflowTemplateService.listFieldDefinitions(enabled, keyword));
     }
 
     /**
-     * 查询模块字段定义（INPUT / OUTPUT）。
+     * 新建全局字段定义。
      */
-    @GetMapping("/module-definitions/{id}/fields")
-    public ApiResponse<List<Map<String, Object>>> listModuleFields(@PathVariable String id, Authentication auth) {
-        requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listModuleFields(id));
-    }
-
-    /**
-     * 查询节点推荐规则（仅 is_active=true）。
-     */
-    @GetMapping("/recommendations")
-    public ApiResponse<List<Map<String, Object>>> recommendations(@RequestParam(required = false) String sceneCategory,
-                                                                  @RequestParam(required = false) String currentModuleDefinitionId,
-                                                                  @RequestParam(required = false) String currentNodeType,
+    @PostMapping("/field-definitions")
+    public ApiResponse<Map<String, Object>> createFieldDefinition(@RequestBody WorkflowTemplateFieldDefinitionSaveRequest body,
                                                                   Authentication auth) {
-        requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listRecommendations(sceneCategory, currentModuleDefinitionId, currentNodeType));
+        String userId = requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.createFieldDefinition(body, userId));
+    }
+
+    /**
+     * 更新全局字段定义。
+     */
+    @PutMapping("/field-definitions/{fieldKey}")
+    public ApiResponse<Map<String, Object>> updateFieldDefinition(@PathVariable String fieldKey,
+                                                                  @RequestBody WorkflowTemplateFieldDefinitionSaveRequest body,
+                                                                  Authentication auth) {
+        String userId = requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.updateFieldDefinition(fieldKey, body, userId));
+    }
+
+    /**
+     * 删除全局字段定义。
+     */
+    @DeleteMapping("/field-definitions/{fieldKey}")
+    public ApiResponse<Map<String, Object>> deleteFieldDefinition(@PathVariable String fieldKey,
+                                                                  Authentication auth) {
+        String userId = requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.deleteFieldDefinition(fieldKey, userId));
     }
 
     private String requireAdmin(Authentication auth) {

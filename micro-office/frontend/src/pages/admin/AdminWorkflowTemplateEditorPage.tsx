@@ -1,130 +1,113 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Empty, Input, Modal, Space, Tag, message } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Col,
+  Divider,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from 'antd';
 import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { WorkflowRelationType, WorkflowTemplatePackageNodePayload, WorkflowTemplatePackageSummary, WorkflowTemplateStatus } from '../../api';
-import { workflowNodeFeatureApi, workflowTemplateApi } from '../../api';
+import type {
+  WorkflowTemplateFieldDefinition,
+  WorkflowTemplateNodeFieldConfigPayload,
+  WorkflowTemplateNodeRecommendationPayload,
+  WorkflowTemplatePackageNodePayload,
+  WorkflowTemplatePackageSummary,
+  WorkflowTemplateStatus,
+} from '../../api';
+import { workflowTemplateApi } from '../../api';
 
-type NodeItem = {
-  id: string;
-  package_id?: string;
-  module_definition_id: string;
-  parent_package_node_id: string | null;
-  sort_order: number;
-  display_name: string;
-  hierarchy_level: number;
-  relation_type: WorkflowRelationType;
-  branch_group_key: string | null;
-  branch_order: number | null;
-  metaText: string;
-  version?: number;
-  node_type?: string | null;
+type NodeEditorItem = WorkflowTemplatePackageNodePayload;
+
+type FieldDefinitionFormValues = {
+  fieldKey: string;
+  name: string;
+  fieldType: string;
+  description?: string;
+  enabled?: boolean;
+  sensitive?: boolean;
+  groupKey?: string;
+  displayOrder?: number;
 };
 
-type TreeNodeItem = NodeItem & { level: number };
-type AddNodeMode = 'ROOT' | 'CHILD' | 'SIBLING' | 'PARALLEL';
-type FeatureBindingInvalidItem = {
-  moduleDefinitionId: string;
-  code?: string;
-  name?: string;
-  status?: string;
-  message?: string;
-  references?: Array<Record<string, any>>;
-};
+const fieldTypeOptions = [
+  { label: '字符串', value: 'string' },
+  { label: '长文本', value: 'text' },
+  { label: '数字', value: 'number' },
+  { label: '布尔值', value: 'boolean' },
+  { label: '日期', value: 'date' },
+  { label: '日期时间', value: 'datetime' },
+  { label: '列表', value: 'list' },
+  { label: 'JSON', value: 'json' },
+];
 
 function localId() {
   return `tmp-node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function prettyJson(value: any) {
-  return JSON.stringify(value || {}, null, 2);
-}
-
-function parseJson(text: string, label: string) {
-  const raw = String(text || '').trim();
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(`${label} 不是合法 JSON`);
-  }
-}
-
-function normalizeNode(item: any): NodeItem {
+function normalizeNode(item: any): NodeEditorItem {
   return {
     id: String(item.id || localId()),
-    package_id: item.package_id || item.packageId || undefined,
-    module_definition_id: String(item.module_definition_id || item.moduleDefinitionId || ''),
-    parent_package_node_id: item.parent_package_node_id || item.parentPackageNodeId || null,
-    sort_order: Number(item.sort_order ?? item.sortOrder ?? 0),
-    display_name: String(item.display_name || item.displayName || ''),
-    hierarchy_level: Number(item.hierarchy_level ?? item.hierarchyLevel ?? 0),
-    relation_type: (item.relation_type || item.relationType || 'SEQUENCE') as WorkflowRelationType,
-    branch_group_key: item.branch_group_key || item.branchGroupKey || null,
-    branch_order: item.branch_order ?? item.branchOrder ?? null,
-    metaText: prettyJson(item.meta),
+    templateId: item.templateId || item.template_id || undefined,
+    name: String(item.name || ''),
+    code: String(item.code || ''),
+    nodeType: String(item.nodeType || item.node_type || 'TASK'),
+    sequence: Number(item.sequence ?? 1),
+    isMainPath: item.isMainPath !== false,
+    allowAppendNextNode: Boolean(item.allowAppendNextNode),
+    allowDeriveSubflow: Boolean(item.allowDeriveSubflow),
+    inputFields: Array.isArray(item.inputFields) ? item.inputFields : [],
+    outputFields: Array.isArray(item.outputFields) ? item.outputFields : [],
+    recommendedTemplates: Array.isArray(item.recommendedTemplates) ? item.recommendedTemplates : [],
     version: item.version === undefined || item.version === null ? undefined : Number(item.version),
-    node_type: item.node_type || item.nodeType || null,
   };
 }
 
-function buildNodeTree(nodes: NodeItem[]) {
-  const childMap = new Map<string | null, NodeItem[]>();
-  nodes.forEach((node) => {
-    const parentId = node.parent_package_node_id || null;
-    const list = childMap.get(parentId) || [];
-    list.push(node);
-    childMap.set(parentId, list);
+function sortNodes(nodes: NodeEditorItem[]) {
+  return [...nodes].sort((a, b) => {
+    const diff = (a.sequence || 0) - (b.sequence || 0);
+    if (diff !== 0) return diff;
+    return a.id.localeCompare(b.id);
   });
+}
 
-  const sortNodes = (list: NodeItem[]) =>
-    [...list].sort((a, b) => {
-      const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
-      if (sortDiff !== 0) return sortDiff;
-      const branchDiff = Number(a.branch_order ?? 0) - Number(b.branch_order ?? 0);
-      if (branchDiff !== 0) return branchDiff;
-      return a.id.localeCompare(b.id);
-    });
-
-  const ordered: TreeNodeItem[] = [];
-
-  const walk = (parentId: string | null, level: number) => {
-    const children = sortNodes(childMap.get(parentId) || []);
-    children.forEach((node) => {
-      ordered.push({ ...node, level });
-      walk(node.id, level + 1);
-    });
+function normalizeFieldConfig(
+  item: Partial<WorkflowTemplateNodeFieldConfigPayload>,
+  allowWriteBackParent: boolean,
+): WorkflowTemplateNodeFieldConfigPayload {
+  return {
+    fieldKey: String(item.fieldKey || ''),
+    displayName: item.displayName || undefined,
+    displayOrder: Number(item.displayOrder ?? 100),
+    required: Boolean(item.required),
+    readOnly: allowWriteBackParent ? undefined : Boolean(item.readOnly),
+    allowWriteBackParent: allowWriteBackParent ? Boolean(item.allowWriteBackParent) : undefined,
   };
-
-  walk(null, 0);
-  return ordered;
 }
 
-function groupTreeNodesByLevel(nodes: TreeNodeItem[]) {
-  const layers = new Map<number, TreeNodeItem[]>();
-  nodes.forEach((node) => {
-    const list = layers.get(node.level) || [];
-    list.push(node);
-    layers.set(node.level, list);
-  });
-  return Array.from(layers.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([level, items]) => ({ level, items }));
-}
-
-function modeLabel(mode: AddNodeMode | null) {
-  switch (mode) {
-    case 'ROOT':
-      return '添加第一层节点';
-    case 'CHILD':
-      return '添加子节点';
-    case 'SIBLING':
-      return '添加同层节点';
-    case 'PARALLEL':
-      return '添加并行节点';
-    default:
-      return '添加节点';
-  }
+function normalizeRecommendation(item: Partial<WorkflowTemplateNodeRecommendationPayload>): WorkflowTemplateNodeRecommendationPayload {
+  return {
+    recommendedWorkflowTemplateId: String(item.recommendedWorkflowTemplateId || ''),
+    reason: item.reason || undefined,
+    displayOrder: Number(item.displayOrder ?? 100),
+    enabled: item.enabled !== false,
+  };
 }
 
 export default function AdminWorkflowTemplateEditorPage() {
@@ -134,162 +117,49 @@ export default function AdminWorkflowTemplateEditorPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [packageDetail, setPackageDetail] = useState<WorkflowTemplatePackageSummary | null>(null);
-  const [nodes, setNodes] = useState<NodeItem[]>([]);
+  const [nodes, setNodes] = useState<NodeEditorItem[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [moduleKeyword, setModuleKeyword] = useState('');
-  const [allModuleDefinitions, setAllModuleDefinitions] = useState<any[]>([]);
-  const [moduleDefinitions, setModuleDefinitions] = useState<any[]>([]);
-  const [nodeFeatureMap, setNodeFeatureMap] = useState<Map<string, any>>(new Map());
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [bindingInvalidItems, setBindingInvalidItems] = useState<FeatureBindingInvalidItem[]>([]);
-  const [addNodeModalOpen, setAddNodeModalOpen] = useState(false);
-  const [pendingAddMode, setPendingAddMode] = useState<AddNodeMode | null>(null);
-  const [pendingAddTargetLevel, setPendingAddTargetLevel] = useState<number | null>(null);
-  const [pendingModuleDefinitionId, setPendingModuleDefinitionId] = useState<string | undefined>();
+  const [fieldDefinitions, setFieldDefinitions] = useState<WorkflowTemplateFieldDefinition[]>([]);
+  const [fieldModalOpen, setFieldModalOpen] = useState(false);
+  const [fieldSaving, setFieldSaving] = useState(false);
+  const [editingField, setEditingField] = useState<WorkflowTemplateFieldDefinition | null>(null);
+  const [fieldForm] = Form.useForm<FieldDefinitionFormValues>();
 
-  const selectedNode = useMemo(() => nodes.find((item) => item.id === selectedNodeId) || null, [nodes, selectedNodeId]);
-  const moduleDefinitionMap = useMemo(
-    () => new Map(allModuleDefinitions.map((item) => [String(item.id), item])),
-    [allModuleDefinitions],
-  );
-  const treeNodes = useMemo(() => buildNodeTree(nodes), [nodes]);
-
-  const visibleLayeredNodes = useMemo(() => groupTreeNodesByLevel(treeNodes), [treeNodes]);
-  const bindingInvalidMap = useMemo(
-    () => new Map(bindingInvalidItems.map((item) => [String(item.moduleDefinitionId), item])),
-    [bindingInvalidItems],
-  );
-  const moduleDefinitionIdsInNodes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          nodes
-            .map((item) => String(item.module_definition_id || '').trim())
-            .filter(Boolean),
-        ),
-      ),
-    [nodes],
+  const selectedNode = useMemo(
+    () => sortNodes(nodes).find((item) => item.id === selectedNodeId) || null,
+    [nodes, selectedNodeId],
   );
 
-  const filteredModuleDefinitions = useMemo(() => {
-    const keyword = moduleKeyword.trim().toLowerCase();
-    if (!keyword) return moduleDefinitions;
-    return moduleDefinitions.filter((item) => {
-      const text = `${item.name || ''} ${item.code || ''} ${item.node_type || ''}`.toLowerCase();
-      return text.includes(keyword);
-    });
-  }, [moduleDefinitions, moduleKeyword]);
-
-  const addableModuleDefinitions = useMemo(() => {
-    const seen = new Set<string>();
-    const recommendationFirst: any[] = [];
-    recommendations.forEach((item) => {
-      const moduleId = String(
-        item.recommended_module_definition_id || item.recommendedModuleDefinitionId || item.module_definition_id || '',
-      );
-      if (!moduleId || seen.has(moduleId)) return;
-      const module = moduleDefinitionMap.get(moduleId);
-      if (module) {
-        seen.add(moduleId);
-        recommendationFirst.push(module);
-      }
-    });
-
-    filteredModuleDefinitions.forEach((item) => {
-      const idValue = String(item.id);
-      if (!seen.has(idValue)) {
-        seen.add(idValue);
-        recommendationFirst.push(item);
-      }
-    });
-
-    return recommendationFirst;
-  }, [filteredModuleDefinitions, moduleDefinitionMap, recommendations]);
-
-  const loadPackageDetail = async () => {
-    if (!packageId) return;
-    const response: any = await workflowTemplateApi.getPackage(packageId);
-    const detail = response.data;
-    if (!detail) {
-      throw new Error('模板包不存在');
-    }
-    setPackageDetail(detail);
-  };
-
-  const loadNodes = async () => {
-    if (!packageId) return;
-    const response: any = await workflowTemplateApi.listNodes(packageId);
-    const records = response.data || [];
-    const normalized = records.map(normalizeNode);
-    setNodes(normalized);
-    setSelectedNodeId(normalized[0]?.id || null);
-  };
-
-  const loadModuleDefinitions = async (params?: { nodeType?: string; roleKey?: string; positionKey?: string }) => {
-    const response: any = await workflowTemplateApi.listModuleDefinitions(params);
-    setModuleDefinitions(response.data || []);
-  };
-
-  const loadAllModuleDefinitions = async () => {
-    const response: any = await workflowTemplateApi.listModuleDefinitions();
-    setAllModuleDefinitions(response.data || []);
-  };
-
-  const loadNodeFeatures = async () => {
-    const allRecords: any[] = [];
-    let current = 1;
-    const size = 200;
-
-    while (true) {
-      const response: any = await workflowNodeFeatureApi.list({ current, size });
-      const payload = response.data;
-      const records = Array.isArray(payload) ? payload : payload?.records || [];
-      allRecords.push(...records);
-
-      if (Array.isArray(payload)) {
-        break;
-      }
-
-      const total = Number(payload?.total || 0);
-      if (!records.length || allRecords.length >= total) {
-        break;
-      }
-      current += 1;
-    }
-
-    setNodeFeatureMap(new Map(allRecords.map((item: any) => [String(item.id), item])));
-  };
-
-  const loadRecommendations = async () => {
-    if (!selectedNode || !packageDetail) {
-      setRecommendations([]);
-      return;
-    }
-    const moduleDef = moduleDefinitionMap.get(selectedNode.module_definition_id);
-    const response: any = await workflowTemplateApi.listRecommendations({
-      sceneCategory: packageDetail.sceneCategory || undefined,
-      currentModuleDefinitionId: selectedNode.module_definition_id || undefined,
-      currentNodeType: moduleDef?.node_type || selectedNode.node_type || undefined,
-    });
-    setRecommendations(response.data || []);
-  };
-
-  const loadModuleFields = async (moduleDefinitionId?: string) => {
-    if (!moduleDefinitionId) return;
-    try {
-      await workflowTemplateApi.listModuleFields(moduleDefinitionId);
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || '字段契约加载失败');
-    }
-  };
+  const fieldOptions = useMemo(() => {
+    return fieldDefinitions
+      .filter((item) => item.enabled)
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.fieldKey.localeCompare(b.fieldKey))
+      .map((item) => ({
+        value: item.fieldKey,
+        label: `${item.fieldKey} · ${item.name}`,
+      }));
+  }, [fieldDefinitions]);
 
   const loadPage = async () => {
+    if (!packageId) return;
     setLoading(true);
     try {
-      await Promise.all([loadPackageDetail(), loadNodes(), loadAllModuleDefinitions(), loadModuleDefinitions(), loadNodeFeatures()]);
+      const [detailResponse, nodesResponse, fieldDefinitionsResponse]: any = await Promise.all([
+        workflowTemplateApi.getPackage(packageId),
+        workflowTemplateApi.listNodes(packageId),
+        workflowTemplateApi.listFieldDefinitions(),
+      ]);
+      const detail = detailResponse.data;
+      if (!detail) {
+        throw new Error('工作流模板不存在');
+      }
+      const normalizedNodes = sortNodes((nodesResponse.data || []).map(normalizeNode));
+      setPackageDetail(detail);
+      setNodes(normalizedNodes);
+      setSelectedNodeId((current) => normalizedNodes.find((item) => item.id === current)?.id || normalizedNodes[0]?.id || null);
+      setFieldDefinitions(fieldDefinitionsResponse.data || []);
     } catch (error: any) {
-      message.error(error?.message || error?.response?.data?.message || '模板包加载失败');
+      message.error(error?.message || error?.response?.data?.message || '工作流模板详情加载失败');
       nav('/admin/workflow-templates');
     } finally {
       setLoading(false);
@@ -297,272 +167,128 @@ export default function AdminWorkflowTemplateEditorPage() {
   };
 
   useEffect(() => {
-    if (packageId) {
-      void loadPage();
-    }
+    void loadPage();
   }, [packageId]);
 
-  useEffect(() => {
-    void loadModuleFields(selectedNode?.module_definition_id);
-    void loadRecommendations();
-  }, [selectedNode?.id, selectedNode?.module_definition_id, packageDetail?.sceneCategory, moduleDefinitionMap]);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!moduleDefinitionIdsInNodes.length) {
-        setBindingInvalidItems([]);
-        return;
-      }
-      try {
-        const response: any = await workflowNodeFeatureApi.validateBindings(moduleDefinitionIdsInNodes);
-        setBindingInvalidItems(response.data?.invalidItems || []);
-      } catch (error: any) {
-        message.error(error?.response?.data?.message || '节点功能绑定校验失败');
-      }
-    };
-
-    void run();
-  }, [moduleDefinitionIdsInNodes]);
-
-  const openAddNodeModal = (mode: AddNodeMode, targetLevel: number) => {
-    setPendingAddMode(mode);
-    setPendingAddTargetLevel(targetLevel);
-    setPendingModuleDefinitionId(undefined);
-    setAddNodeModalOpen(true);
+  const openCreateFieldModal = () => {
+    setEditingField(null);
+    fieldForm.resetFields();
+    fieldForm.setFieldsValue({ enabled: true, sensitive: false, displayOrder: 100, fieldType: 'string' });
+    setFieldModalOpen(true);
   };
 
-  const closeAddNodeModal = () => {
-    setAddNodeModalOpen(false);
-    setPendingAddMode(null);
-    setPendingAddTargetLevel(null);
-    setPendingModuleDefinitionId(undefined);
+  const openEditFieldModal = (record: WorkflowTemplateFieldDefinition) => {
+    setEditingField(record);
+    fieldForm.setFieldsValue({
+      fieldKey: record.fieldKey,
+      name: record.name,
+      fieldType: record.fieldType,
+      description: record.description || undefined,
+      enabled: record.enabled,
+      sensitive: record.sensitive,
+      groupKey: record.groupKey || undefined,
+      displayOrder: record.displayOrder,
+    });
+    setFieldModalOpen(true);
   };
 
-  const insertNodeAtLevel = (targetLevel: number, moduleDefinitionId?: string) => {
-    const targetLayerItems = visibleLayeredNodes.find((layer) => layer.level === targetLevel)?.items || [];
-    const previousLayerItems = visibleLayeredNodes.find((layer) => layer.level === targetLevel - 1)?.items || [];
-    const lastTargetNode = targetLayerItems[targetLayerItems.length - 1];
-    const lastPreviousNode = previousLayerItems[previousLayerItems.length - 1];
+  const closeFieldModal = () => {
+    setFieldModalOpen(false);
+    setEditingField(null);
+    fieldForm.resetFields();
+  };
 
-    let relationType: WorkflowRelationType = 'SEQUENCE';
-    let baseParentId: string | null = null;
-    let branchGroupKey: string | null = null;
-    let branchOrder: number | null = null;
-
-    if (targetLevel === 0) {
-      baseParentId = null;
-      if (targetLayerItems.length > 0) {
-        relationType = 'PARALLEL';
-        branchGroupKey = lastTargetNode?.branch_group_key || 'root-parallel';
-        branchOrder = targetLayerItems.length;
+  const saveFieldDefinition = async () => {
+    try {
+      const values = await fieldForm.validateFields();
+      setFieldSaving(true);
+      if (editingField) {
+        await workflowTemplateApi.updateFieldDefinition(editingField.fieldKey, values);
+        message.success('全局字段定义已更新');
+      } else {
+        await workflowTemplateApi.createFieldDefinition(values);
+        message.success('全局字段定义已创建');
       }
-    } else if (targetLayerItems.length > 0 && lastTargetNode) {
-      baseParentId = lastTargetNode.parent_package_node_id;
-      relationType = 'PARALLEL';
-      branchGroupKey = lastTargetNode.branch_group_key || `branch-${baseParentId || 'root'}`;
-      branchOrder = targetLayerItems.length;
-    } else if (lastPreviousNode) {
-      baseParentId = lastPreviousNode.id;
-      relationType = 'SEQUENCE';
-    } else {
-      message.warning('请先在前一层添加节点');
-      return;
+      closeFieldModal();
+      const response: any = await workflowTemplateApi.listFieldDefinitions();
+      setFieldDefinitions(response.data || []);
+    } catch (error: any) {
+      if (error?.errorFields) return;
+      message.error(error?.response?.data?.message || '全局字段定义保存失败');
+    } finally {
+      setFieldSaving(false);
     }
+  };
 
-    const moduleDefinition = moduleDefinitionId ? moduleDefinitionMap.get(moduleDefinitionId) : null;
-    const newNode: NodeItem = {
+  const deleteFieldDefinition = async (fieldKey: string) => {
+    try {
+      await workflowTemplateApi.deleteFieldDefinition(fieldKey);
+      message.success(`字段 ${fieldKey} 已删除`);
+      const response: any = await workflowTemplateApi.listFieldDefinitions();
+      setFieldDefinitions(response.data || []);
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '字段删除失败');
+    }
+  };
+
+  const updateNode = (nodeId: string, updater: (node: NodeEditorItem) => NodeEditorItem) => {
+    setNodes((prev) => sortNodes(prev.map((node) => (node.id === nodeId ? updater(node) : node))));
+  };
+
+  const addNode = () => {
+    const nextSequence = Math.max(0, ...nodes.map((item) => item.sequence || 0)) + 1;
+    const node: NodeEditorItem = {
       id: localId(),
-      package_id: packageId || undefined,
-      module_definition_id: moduleDefinitionId || '',
-      parent_package_node_id: baseParentId,
-      sort_order: nodes.length + 1,
-      display_name: moduleDefinition?.name || '新节点',
-      hierarchy_level: targetLevel,
-      relation_type: relationType,
-      branch_group_key: relationType === 'PARALLEL' ? branchGroupKey : null,
-      branch_order: relationType === 'PARALLEL' ? branchOrder : null,
-      metaText: prettyJson({}),
-      version: moduleDefinition?.version === undefined ? undefined : Number(moduleDefinition.version),
-      node_type: moduleDefinition?.node_type || null,
+      templateId: packageId || undefined,
+      name: `节点 ${nextSequence}`,
+      code: `NODE_${nextSequence}`,
+      nodeType: 'TASK',
+      sequence: nextSequence,
+      isMainPath: true,
+      allowAppendNextNode: false,
+      allowDeriveSubflow: false,
+      inputFields: [],
+      outputFields: [],
+      recommendedTemplates: [],
+      version: 1,
     };
-    setNodes((prev) => [...prev, newNode]);
-    setSelectedNodeId(newNode.id);
+    setNodes((prev) => sortNodes([...prev, node]));
+    setSelectedNodeId(node.id);
   };
 
-  const confirmAddNode = () => {
-    if (pendingAddTargetLevel === null) return;
-    if (!pendingModuleDefinitionId) {
-      message.warning('请先选择要加入的节点模块');
-      return;
-    }
-    const nodeFeature = nodeFeatureMap.get(String(pendingModuleDefinitionId));
-    if (nodeFeature?.status === 'DISABLED') {
-      message.warning(`节点功能已停用，不能加入模板：${nodeFeature.name || pendingModuleDefinitionId}`);
-      return;
-    }
-    insertNodeAtLevel(pendingAddTargetLevel, pendingModuleDefinitionId);
-    closeAddNodeModal();
-  };
-
-  const collectNodeAndDescendantIds = (nodeId: string, sourceNodes: NodeItem[] = nodes) => {
-    const childMap = new Map<string, string[]>();
-    sourceNodes.forEach((node) => {
-      const parentId = node.parent_package_node_id;
-      if (!parentId) return;
-      const children = childMap.get(parentId) || [];
-      children.push(node.id);
-      childMap.set(parentId, children);
-    });
-
-    const ids = new Set<string>();
-    const walk = (idValue: string) => {
-      if (ids.has(idValue)) return;
-      ids.add(idValue);
-      (childMap.get(idValue) || []).forEach(walk);
-    };
-    walk(nodeId);
-    return ids;
-  };
-
-  const deleteNodeFromCanvas = (nodeId: string) => {
-    const deletingIds = collectNodeAndDescendantIds(nodeId);
-    const nextNodes = nodes.filter((node) => !deletingIds.has(node.id));
-    setNodes(nextNodes);
-    setSelectedNodeId((current) => {
-      if (current && !deletingIds.has(current)) return current;
-      return nextNodes[0]?.id || null;
-    });
-    setValidationErrors([]);
-    message.success('节点已从画布移除，点击“保存整包节点”后生效');
-  };
-
-  const confirmDeleteNode = (node: NodeItem) => {
-    const deletingIds = collectNodeAndDescendantIds(node.id);
-    const childCount = Math.max(deletingIds.size - 1, 0);
-    Modal.confirm({
-      title: '删除节点',
-      content: childCount
-        ? `确定删除“${node.display_name || '未命名节点'}”吗？其下 ${childCount} 个子节点也会一起删除。`
-        : `确定删除“${node.display_name || '未命名节点'}”吗？`,
-      okText: '删除',
-      cancelText: '取消',
-      okButtonProps: { danger: true },
-      onOk: () => deleteNodeFromCanvas(node.id),
+  const deleteNode = (nodeId: string) => {
+    setNodes((prev) => {
+      const next = prev.filter((item) => item.id !== nodeId).map((item, index) => ({ ...item, sequence: index + 1 }));
+      setSelectedNodeId((current) => (current === nodeId ? next[0]?.id || null : current));
+      return next;
     });
   };
 
-  const validateNodes = (items: NodeItem[]) => {
-    const errors: string[] = [];
-    if (!items.length) {
-      errors.push('节点列表不能为空，请至少保留一个根节点');
-      return errors;
-    }
-    const idSet = new Set<string>();
-    const nodeMap = new Map<string, NodeItem>();
-    items.forEach((node) => {
-      if (idSet.has(node.id)) errors.push(`节点 ID 重复：${node.id}`);
-      idSet.add(node.id);
-      nodeMap.set(node.id, node);
-      if (!node.display_name.trim()) errors.push(`节点 ${node.id} display_name 不能为空`);
-      if (!node.module_definition_id) errors.push(`节点 ${node.id} 缺少 module_definition_id`);
-      if (!['SEQUENCE', 'PARALLEL'].includes(node.relation_type)) {
-        errors.push(`节点 ${node.id} relation_type 非法`);
-      }
-      if (node.relation_type === 'PARALLEL') {
-        if (!node.branch_group_key || node.branch_order === null || node.branch_order === undefined) {
-          errors.push(`节点 ${node.id} 为并行节点时必须配置 branch_group_key 和 branch_order`);
-        }
-      }
-      if (node.relation_type === 'SEQUENCE' && (node.branch_group_key || node.branch_order !== null)) {
-        errors.push(`节点 ${node.id} 为顺序节点时不能配置并行分支字段`);
-      }
-    });
-
-    items.forEach((node) => {
-      if (node.parent_package_node_id && !nodeMap.has(node.parent_package_node_id)) {
-        errors.push(`节点 ${node.id} 的 parent_package_node_id 不存在`);
-      }
-      let currentParent = node.parent_package_node_id;
-      const path = new Set<string>([node.id]);
-      while (currentParent) {
-        if (path.has(currentParent)) {
-          errors.push(`节点 ${node.id} 存在父子循环依赖`);
-          break;
-        }
-        path.add(currentParent);
-        currentParent = nodeMap.get(currentParent)?.parent_package_node_id || null;
-      }
-    });
-    return errors;
-  };
-
-  const buildSaveNodesPayload = (): WorkflowTemplatePackageNodePayload[] => {
-    const ordered = buildNodeTree(nodes);
-    return ordered.map((node, index) => ({
-      id: node.id,
-      package_id: node.package_id || packageId || undefined,
-      module_definition_id: node.module_definition_id,
-      parent_package_node_id: node.parent_package_node_id || null,
-      sort_order: index + 1,
-      display_name: node.display_name.trim(),
-      hierarchy_level: node.level,
-      relation_type: node.relation_type,
-      branch_group_key: node.relation_type === 'PARALLEL' ? node.branch_group_key || null : null,
-      branch_order: node.relation_type === 'PARALLEL' ? Number(node.branch_order ?? 0) : null,
-      meta: parseJson(node.metaText, `节点 ${node.display_name || node.id} meta`),
-      version: node.version,
-    }));
-  };
-
-  const sanitizeNodePayload = (items: WorkflowTemplatePackageNodePayload[]): WorkflowTemplatePackageNodePayload[] => {
-    return items.map((node) => {
-      const sanitized: WorkflowTemplatePackageNodePayload = {
-        id: node.id,
-        package_id: node.package_id,
-        module_definition_id: String(node.module_definition_id || ''),
-        parent_package_node_id: node.parent_package_node_id ?? null,
-        sort_order: Number(node.sort_order || 0),
-        display_name: String(node.display_name || ''),
-        hierarchy_level: Number(node.hierarchy_level || 0),
-        relation_type: node.relation_type,
-        branch_group_key: node.branch_group_key ?? null,
-        branch_order: node.branch_order ?? null,
-        meta: node.meta ?? {},
-        version: node.version,
-      };
-      return sanitized;
-    });
-  };
-
-  const saveNodesOnly = async () => {
+  const saveNodes = async () => {
     if (!packageDetail) return;
     try {
       setSaving(true);
-      const payload = buildSaveNodesPayload();
-      const errors = validateNodes(payload.map(normalizeNode));
-      setValidationErrors(errors);
-      if (errors.length) {
-        message.error('节点结构校验未通过，请先修复');
-        return;
-      }
-      const bindingResponse: any = await workflowNodeFeatureApi.validateBindings(
-        Array.from(new Set(payload.map((item) => String(item.module_definition_id || '').trim()).filter(Boolean))),
-      );
-      const invalidItems = bindingResponse.data?.invalidItems || [];
-      setBindingInvalidItems(invalidItems);
-      if (invalidItems.length) {
-        message.error('存在 DISABLED 或缺失的节点功能，模板无法保存');
-        return;
-      }
-      const sanitizedNodes = sanitizeNodePayload(payload);
-      if (import.meta.env.DEV) {
-        console.debug('[workflow-template] save nodes payload', { nodes: sanitizedNodes });
-      }
-      await workflowTemplateApi.saveNodes(packageDetail.id, sanitizedNodes);
-      message.success('节点编排已保存，模板包信息未改动');
-      await loadNodes();
+      const payload = sortNodes(nodes).map((node, index) => ({
+        ...node,
+        sequence: index + 1,
+        inputFields: (node.inputFields || []).map((field, fieldIndex) => ({
+          ...normalizeFieldConfig(field, false),
+          displayOrder: Number(field.displayOrder ?? fieldIndex + 1),
+        })),
+        outputFields: (node.outputFields || []).map((field, fieldIndex) => ({
+          ...normalizeFieldConfig(field, true),
+          displayOrder: Number(field.displayOrder ?? fieldIndex + 1),
+        })),
+        recommendedTemplates: (node.recommendedTemplates || []).map((item, recommendationIndex) => ({
+          ...normalizeRecommendation(item),
+          displayOrder: Number(item.displayOrder ?? recommendationIndex + 1),
+        })),
+      }));
+      await workflowTemplateApi.saveNodes(packageDetail.id, payload);
+      message.success('模板节点配置已保存');
+      await loadPage();
     } catch (error: any) {
-      message.error(error?.message || error?.response?.data?.message || '节点编排保存失败');
+      message.error(error?.response?.data?.message || '模板节点保存失败');
     } finally {
       setSaving(false);
     }
@@ -572,424 +298,645 @@ export default function AdminWorkflowTemplateEditorPage() {
     if (!packageDetail) return;
     try {
       await workflowTemplateApi.updatePackageStatus(packageDetail.id, status);
-      setPackageDetail((prev: any) => ({ ...prev, status }));
+      setPackageDetail((prev) => (prev ? { ...prev, status } : prev));
       message.success(status === 'ACTIVE' ? '已启用（ACTIVE）' : '已停用（DISABLED）');
     } catch (error: any) {
       message.error(error?.response?.data?.message || '状态切换失败');
     }
   };
 
-  const canvasLayers = useMemo(() => {
-    if (!visibleLayeredNodes.length) return [{ level: 0, items: [] as TreeNodeItem[] }];
-    const lastLevel = visibleLayeredNodes[visibleLayeredNodes.length - 1]?.level ?? 0;
-    return [...visibleLayeredNodes, { level: lastLevel + 1, items: [] as TreeNodeItem[] }];
-  }, [visibleLayeredNodes]);
-  const canvasContentWidth = useMemo(() => Math.max(canvasLayers.length * 278 + 24, 1200), [canvasLayers.length]);
-
   return (
-    <div className="page-fill" style={{ gap: 10, minWidth: 0 }}>
-      <Card className="page-card" bodyStyle={{ minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12, gap: 12 }}>
+    <div className="page-fill" style={{ gap: 12, minWidth: 0 }}>
+      <Card className="page-card" bodyStyle={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {loading ? null : packageDetail ? (
           <>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                gap: 12,
-                minWidth: 0,
-                flex: '0 0 auto',
-                padding: '0 4px 2px',
-              }}
-            >
-              <div
-                style={{
-                  minWidth: 0,
-                  minHeight: 32,
-                  flex: 1,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: '#111827',
-                  lineHeight: 1.4,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {packageDetail ? `流程管理：${packageDetail.name}` : '流程管理'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0 }}>
+                <Typography.Title level={4} style={{ margin: 0 }}>
+                  {packageDetail.name}
+                </Typography.Title>
+                <Space size={8} wrap style={{ marginTop: 8 }}>
+                  <Tag>{packageDetail.code}</Tag>
+                  <Tag>版本 {packageDetail.version || 1}</Tag>
+                  <Tag color={packageDetail.status === 'ACTIVE' ? 'green' : 'default'}>
+                    {packageDetail.status === 'ACTIVE' ? '启用' : '停用'}
+                  </Tag>
+                  {packageDetail.allowCreateAsNormal ? <Tag color="blue">普通流程</Tag> : null}
+                  {packageDetail.allowCreateAsSubflow ? <Tag color="gold">子流程</Tag> : null}
+                </Space>
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  alignItems: 'center',
-                  gap: 8,
-                  flexWrap: 'wrap',
-                  minHeight: 36,
-                  flex: '0 0 auto',
-                  marginTop: 0,
-                }}
-              >
+              <Space wrap>
                 <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/admin/workflow-templates')}>
                   返回列表
                 </Button>
                 <Button icon={<ReloadOutlined />} onClick={() => void loadPage()}>
                   重载
                 </Button>
-                {packageDetail?.status === 'ACTIVE' ? (
-                  <Button onClick={() => void updatePackageStatus('DISABLED')}>停用（DISABLED）</Button>
+                {packageDetail.status === 'ACTIVE' ? (
+                  <Button onClick={() => void updatePackageStatus('DISABLED')}>停用</Button>
                 ) : (
-                  <Button onClick={() => void updatePackageStatus('ACTIVE')}>启用（ACTIVE）</Button>
+                  <Button onClick={() => void updatePackageStatus('ACTIVE')}>启用</Button>
                 )}
-                <Button type="primary" loading={saving} onClick={() => void saveNodesOnly()}>
-                  保存整包节点
+                <Button type="primary" loading={saving} onClick={() => void saveNodes()}>
+                  保存模板节点
                 </Button>
-              </div>
-            </div>
-
-            {validationErrors.length ? (
-              <Alert
-                type="error"
-                showIcon
-                message="节点结构校验未通过"
-                description={
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {validationErrors.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                }
-              />
-            ) : null}
-
-            {bindingInvalidItems.length ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="当前模板包含不可绑定的节点功能"
-                description={
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {bindingInvalidItems.map((item) => (
-                      <div key={item.moduleDefinitionId}>
-                        {item.message || `节点功能不可绑定：${item.name || item.moduleDefinitionId}`}
-                      </div>
-                    ))}
-                  </div>
-                }
-              />
-            ) : null}
-
-            <div
-              style={{
-                flex: 1,
-                minWidth: 0,
-                width: '100%',
-                minHeight: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                padding: 12,
-                borderRadius: 20,
-                border: '1px solid #dbe3ef',
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.98) 100%)',
-              }}
-            >
-              <div
-                className="workflow-template-editor__canvas-scroll"
-                style={{
-                  flex: 1,
-                  height: '100%',
-                  minHeight: 0,
-                  minWidth: 0,
-                  maxWidth: '100%',
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
-                  padding: '0 12px 8px',
-                  scrollbarGutter: 'stable both-edges',
-                  WebkitOverflowScrolling: 'touch',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 18,
-                    height: '100%',
-                    minHeight: '100%',
-                    alignItems: 'stretch',
-                    width: canvasContentWidth,
-                    minWidth: canvasContentWidth,
-                    paddingRight: 24,
-                  }}
-                >
-                  {canvasLayers.map((layer) => {
-                    const addMode: AddNodeMode =
-                      layer.level === 0
-                        ? 'ROOT'
-                        : layer.items.length > 0
-                          ? 'PARALLEL'
-                          : 'CHILD';
-                    const addDisabled = layer.level > 0 && !canvasLayers.find((item) => item.level === layer.level - 1)?.items.length;
-                    return (
-                      <div
-                        key={layer.level}
-                        style={{
-                          width: 260,
-                          flex: '0 0 260px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          minHeight: 0,
-                          height: '100%',
-                          gap: 10,
-                          paddingInline: 4,
-                          position: 'relative',
-                        }}
-                      >
-                        <div style={{ position: 'relative', height: 20, marginBottom: 4 }}>
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 10,
-                              left: 0,
-                              right: 0,
-                              borderTop: '1px dashed #cbd5e1',
-                            }}
-                          />
-                          <button
-                            type="button"
-                            disabled={addDisabled}
-                            onClick={() => openAddNodeModal(addMode, layer.level)}
-                            style={{
-                              position: 'absolute',
-                              left: '50%',
-                              top: 0,
-                              transform: 'translateX(-50%)',
-                              width: 24,
-                              height: 24,
-                              borderRadius: 999,
-                              border: '1px solid #cbd5e1',
-                              background: addDisabled ? '#f8fafc' : '#fff',
-                              color: addDisabled ? '#cbd5e1' : '#0f172a',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: addDisabled ? 'not-allowed' : 'pointer',
-                              padding: 0,
-                              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.06)',
-                            }}
-                          >
-                            <PlusOutlined style={{ fontSize: 10 }} />
-                          </button>
-                        </div>
-                        {layer.level > 0 ? (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: -9,
-                              top: 20,
-                              bottom: 0,
-                              borderLeft: '1px dashed #cbd5e1',
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className="workflow-template-editor__layer-scroll"
-                          style={{
-                            flex: 1,
-                            height: '100%',
-                            minHeight: 0,
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            padding: '4px 4px 40px',
-                            scrollbarGutter: 'stable',
-                            WebkitOverflowScrolling: 'touch',
-                          }}
-                        >
-                          <Space direction="vertical" size={12} style={{ width: '100%', paddingBottom: 12 }}>
-                            {layer.items.map((node) => {
-                              const module = moduleDefinitionMap.get(node.module_definition_id);
-                              const nodeFeature = nodeFeatureMap.get(String(node.module_definition_id));
-                              const bindingIssue = bindingInvalidMap.get(String(node.module_definition_id));
-                              const active = node.id === selectedNodeId;
-                              return (
-                                <div
-                                  key={node.id}
-                                  onClick={() => setSelectedNodeId(node.id)}
-                                  style={{
-                                    padding: 16,
-                                    minHeight: 200,
-                                    borderRadius: 18,
-                                    border: active ? '2px solid #2563eb' : '1px solid #dbe3ef',
-                                    background: active ? 'linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)' : '#fff',
-                                    boxShadow: active ? '0 12px 28px rgba(37, 99, 235, 0.12)' : '0 8px 16px rgba(15, 23, 42, 0.05)',
-                                    cursor: 'pointer',
-                                    position: 'relative',
-                                  }}
-                                >
-                                  <Button
-                                    type="text"
-                                    danger
-                                    size="small"
-                                    icon={<DeleteOutlined />}
-                                    aria-label="删除节点"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      confirmDeleteNode(node);
-                                    }}
-                                    style={{ position: 'absolute', top: 10, right: 10 }}
-                                  />
-                                  <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 700, whiteSpace: 'pre-line', paddingRight: 32 }}>
-                                    {node.display_name || '未命名节点'}
-                                  </div>
-                                  <div style={{ marginTop: 10, color: '#64748b', fontSize: 13 }}>
-                                    {module?.name || node.module_definition_id || '未绑定模块'}
-                                  </div>
-                                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                    <Tag color={nodeFeature?.status === 'ACTIVE' ? 'green' : 'default'}>
-                                      {nodeFeature?.status || 'DISABLED'}
-                                    </Tag>
-                                    {module?.node_type ? <Tag>{module.node_type}</Tag> : null}
-                                  </div>
-                                  {bindingIssue ? (
-                                    <div style={{ marginTop: 10, color: '#dc2626', fontSize: 12, lineHeight: 1.6 }}>
-                                      {bindingIssue.message || '当前节点功能不可绑定'}
-                                    </div>
-                                  ) : null}
-                                  <div style={{ marginTop: 14, color: '#94a3b8', fontSize: 12 }}>{node.id}</div>
-                                </div>
-                              );
-                            })}
-                            {!layer.items.length ? (
-                              <div
-                                style={{
-                                  minHeight: 180,
-                                  borderRadius: 16,
-                                  border: '1px dashed #cbd5e1',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#94a3b8',
-                                  background: 'rgba(255,255,255,0.72)',
-                                  textAlign: 'center',
-                                  padding: 16,
-                                }}
-                              >
-                                当前层还没有节点
-                              </div>
-                            ) : null}
-                          </Space>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                </div>
-              </div>
-            </div>
-
-            <Modal
-              title={modeLabel(pendingAddMode)}
-              open={addNodeModalOpen}
-              onCancel={closeAddNodeModal}
-              onOk={confirmAddNode}
-              okText="加入画布"
-              cancelText="取消"
-              destroyOnHidden
-            >
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                <Alert
-                  type="info"
-                  showIcon
-                  message={
-                    pendingAddTargetLevel === 0
-                      ? '加入后会进入第一列'
-                      : `加入后会进入第 ${pendingAddTargetLevel! + 1} 列`
-                  }
-                />
-                <Input
-                  placeholder="搜索模块节点"
-                  value={moduleKeyword}
-                  onChange={(e) => setModuleKeyword(e.target.value)}
-                />
-                <div
-                  style={{
-                    maxHeight: 320,
-                    overflow: 'auto',
-                    padding: 4,
-                    borderRadius: 12,
-                    border: '1px solid #eef2f7',
-                    background: '#f8fafc',
-                  }}
-                >
-                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                    {addableModuleDefinitions.map((item) => {
-                      const active = String(item.id) === String(pendingModuleDefinitionId || '');
-                      const nodeFeature = nodeFeatureMap.get(String(item.id));
-                      const disabled = nodeFeature?.status === 'DISABLED';
-                      const matchedRecommendation = recommendations.find((recommendation) => {
-                        const moduleId = String(
-                          recommendation.recommended_module_definition_id ||
-                            recommendation.recommendedModuleDefinitionId ||
-                            recommendation.module_definition_id ||
-                            '',
-                        );
-                        return moduleId === String(item.id);
-                      });
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => {
-                            if (disabled) return;
-                            setPendingModuleDefinitionId(String(item.id));
-                          }}
-                          style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '12px 14px',
-                            borderRadius: 12,
-                            border: active ? '1px solid #2563eb' : '1px solid #e5e7eb',
-                            background: active ? 'linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)' : '#fff',
-                            cursor: disabled ? 'not-allowed' : 'pointer',
-                            opacity: disabled ? 0.56 : 1,
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                            <div>
-                              <div style={{ fontWeight: 700 }}>{item.name}</div>
-                              <div style={{ marginTop: 4, color: '#64748b', fontSize: 12 }}>{item.code}</div>
-                            </div>
-                            <Space size={6}>
-                              <Tag color={nodeFeature?.status === 'ACTIVE' ? 'green' : 'default'} style={{ marginInlineEnd: 0 }}>
-                                {nodeFeature?.status || 'DISABLED'}
-                              </Tag>
-                              <Tag style={{ marginInlineEnd: 0 }}>{item.node_type || item.nodeType || 'MODULE'}</Tag>
-                            </Space>
-                          </div>
-                          {matchedRecommendation ? (
-                            <div style={{ marginTop: 8, color: '#1d4ed8', fontSize: 12 }}>
-                              {matchedRecommendation.rule_note || matchedRecommendation.ruleNote || '规则推荐'}
-                            </div>
-                          ) : null}
-                          {disabled ? (
-                            <div style={{ marginTop: 8, color: '#dc2626', fontSize: 12 }}>
-                              节点功能已停用，当前不可加入模板
-                            </div>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                    {!addableModuleDefinitions.length ? (
-                      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可选模块节点" />
-                    ) : null}
-                  </Space>
-                </div>
               </Space>
-            </Modal>
+            </div>
+
+            <Alert
+              type="info"
+              showIcon
+              message="模板管理边界"
+              description="此页面只管理工作流模板、模板节点、节点输入输出字段、是否允许派生子流程，以及可选推荐模板；不暴露运行时实例、聊天群、父子实例关系等概念。"
+            />
+
+            <Row gutter={12} align="stretch">
+              <Col xs={24} lg={10}>
+                <Card
+                  title="全局字段定义"
+                  extra={
+                    <Space>
+                      <Button size="small" icon={<ReloadOutlined />} onClick={() => void loadPage()}>
+                        刷新
+                      </Button>
+                      <Button size="small" type="primary" icon={<PlusOutlined />} onClick={openCreateFieldModal}>
+                        新建字段
+                      </Button>
+                    </Space>
+                  }
+                  bodyStyle={{ padding: 0 }}
+                >
+                  <Table
+                    rowKey="fieldKey"
+                    dataSource={[...fieldDefinitions].sort((a, b) => a.displayOrder - b.displayOrder || a.fieldKey.localeCompare(b.fieldKey))}
+                    pagination={false}
+                    size="small"
+                    scroll={{ y: 360 }}
+                    columns={[
+                      {
+                        title: '字段',
+                        dataIndex: 'fieldKey',
+                        render: (_: any, row: WorkflowTemplateFieldDefinition) => (
+                          <div>
+                            <div style={{ fontWeight: 700 }}>{row.fieldKey}</div>
+                            <div style={{ color: '#666', fontSize: 12 }}>{row.name}</div>
+                          </div>
+                        ),
+                      },
+                      { title: '类型', dataIndex: 'fieldType', width: 90 },
+                      {
+                        title: '状态',
+                        dataIndex: 'enabled',
+                        width: 90,
+                        render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '启用' : '停用'}</Tag>,
+                      },
+                      {
+                        title: '操作',
+                        key: 'action',
+                        width: 140,
+                        render: (_: any, row: WorkflowTemplateFieldDefinition) => (
+                          <Space size={4}>
+                            <Button type="link" size="small" onClick={() => openEditFieldModal(row)}>
+                              编辑
+                            </Button>
+                            <Popconfirm
+                              title="删除字段定义"
+                              description={`确定删除字段 ${row.fieldKey} 吗？`}
+                              okText="删除"
+                              cancelText="取消"
+                              okButtonProps={{ danger: true }}
+                              onConfirm={() => void deleteFieldDefinition(row.fieldKey)}
+                            >
+                              <Button type="link" size="small" danger>
+                                删除
+                              </Button>
+                            </Popconfirm>
+                          </Space>
+                        ),
+                      },
+                    ]}
+                  />
+                </Card>
+              </Col>
+
+              <Col xs={24} lg={14}>
+                <Card
+                  title="模板节点"
+                  extra={
+                    <Button type="primary" icon={<PlusOutlined />} onClick={addNode}>
+                      添加节点
+                    </Button>
+                  }
+                >
+                  {!nodes.length ? (
+                    <Empty description="当前模板还没有节点，先添加一个默认节点" />
+                  ) : (
+                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                      {sortNodes(nodes).map((node) => {
+                        const active = node.id === selectedNodeId;
+                        return (
+                          <Card
+                            key={node.id}
+                            size="small"
+                            hoverable
+                            onClick={() => setSelectedNodeId(node.id)}
+                            style={{
+                              borderColor: active ? '#1677ff' : undefined,
+                              boxShadow: active ? '0 0 0 1px rgba(22,119,255,0.12)' : undefined,
+                            }}
+                            title={
+                              <Space>
+                                <Tag color="blue">{node.sequence}</Tag>
+                                <span>{node.name || '未命名节点'}</span>
+                              </Space>
+                            }
+                            extra={
+                              <Popconfirm
+                                title="删除模板节点"
+                                description={`确定删除节点“${node.name || node.code || node.id}”吗？`}
+                                okText="删除"
+                                cancelText="取消"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => deleteNode(node.id)}
+                              >
+                                <Button type="text" danger icon={<DeleteOutlined />} />
+                              </Popconfirm>
+                            }
+                          >
+                            <Space wrap>
+                              <Tag>{node.code}</Tag>
+                              <Tag>{node.nodeType}</Tag>
+                              {node.isMainPath ? <Tag color="green">主链路</Tag> : <Tag>非主链路</Tag>}
+                              {node.allowAppendNextNode ? <Tag color="gold">可追加后续节点</Tag> : null}
+                              {node.allowDeriveSubflow ? <Tag color="purple">可派生子流程</Tag> : null}
+                            </Space>
+                          </Card>
+                        );
+                      })}
+                    </Space>
+                  )}
+                </Card>
+              </Col>
+            </Row>
+
+            {selectedNode ? (
+              <Card title={`节点配置：${selectedNode.name || selectedNode.code || selectedNode.id}`}>
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Row gutter={12}>
+                    <Col xs={24} md={8}>
+                      <div style={{ marginBottom: 6 }}>节点名称</div>
+                      <Input
+                        value={selectedNode.name}
+                        onChange={(event) => updateNode(selectedNode.id, (node) => ({ ...node, name: event.target.value }))}
+                        maxLength={64}
+                      />
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <div style={{ marginBottom: 6 }}>节点编码</div>
+                      <Input
+                        value={selectedNode.code}
+                        onChange={(event) => updateNode(selectedNode.id, (node) => ({ ...node, code: event.target.value.toUpperCase() }))}
+                        maxLength={64}
+                      />
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <div style={{ marginBottom: 6 }}>节点类型</div>
+                      <Input
+                        value={selectedNode.nodeType}
+                        onChange={(event) => updateNode(selectedNode.id, (node) => ({ ...node, nodeType: event.target.value.toUpperCase() }))}
+                        maxLength={64}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Row gutter={12}>
+                    <Col xs={24} md={8}>
+                      <div style={{ marginBottom: 6 }}>顺序</div>
+                      <InputNumber
+                        min={1}
+                        precision={0}
+                        style={{ width: '100%' }}
+                        value={selectedNode.sequence}
+                        onChange={(value) => updateNode(selectedNode.id, (node) => ({ ...node, sequence: Number(value || 1) }))}
+                      />
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <div style={{ marginBottom: 6 }}>版本</div>
+                      <InputNumber
+                        min={1}
+                        precision={0}
+                        style={{ width: '100%' }}
+                        value={selectedNode.version || 1}
+                        onChange={(value) => updateNode(selectedNode.id, (node) => ({ ...node, version: Number(value || 1) }))}
+                      />
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <div style={{ marginBottom: 6 }}>主链路</div>
+                      <Switch
+                        checked={selectedNode.isMainPath}
+                        onChange={(checked) => updateNode(selectedNode.id, (node) => ({ ...node, isMainPath: checked }))}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Space wrap>
+                    <Checkbox
+                      checked={selectedNode.allowAppendNextNode}
+                      onChange={(event) => updateNode(selectedNode.id, (node) => ({ ...node, allowAppendNextNode: event.target.checked }))}
+                    >
+                      允许实例内追加后续节点
+                    </Checkbox>
+                    <Checkbox
+                      checked={selectedNode.allowDeriveSubflow}
+                      onChange={(event) => updateNode(selectedNode.id, (node) => ({ ...node, allowDeriveSubflow: event.target.checked }))}
+                    >
+                      允许从该节点派生子工作流
+                    </Checkbox>
+                  </Space>
+
+                  <Divider style={{ margin: 0 }} />
+
+                  <Typography.Title level={5} style={{ margin: 0 }}>
+                    节点输入字段
+                  </Typography.Title>
+                  <Form layout="vertical">
+                    <Form.List
+                      name="inputFields"
+                      initialValue={selectedNode.inputFields}
+                    >
+                      {() => (
+                        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                          {(selectedNode.inputFields || []).map((field, index) => (
+                            <Card key={`input-${index}`} size="small">
+                              <Row gutter={8}>
+                                <Col xs={24} md={8}>
+                                  <div style={{ marginBottom: 6 }}>字段 key</div>
+                                  <Select
+                                    showSearch
+                                    value={field.fieldKey}
+                                    options={fieldOptions}
+                                    onChange={(value) =>
+                                      updateNode(selectedNode.id, (node) => ({
+                                        ...node,
+                                        inputFields: node.inputFields.map((item, itemIndex) =>
+                                          itemIndex === index ? { ...item, fieldKey: value } : item,
+                                        ),
+                                      }))
+                                    }
+                                  />
+                                </Col>
+                                <Col xs={24} md={6}>
+                                  <div style={{ marginBottom: 6 }}>展示名称</div>
+                                  <Input
+                                    value={field.displayName ?? undefined}
+                                    onChange={(event) =>
+                                      updateNode(selectedNode.id, (node) => ({
+                                        ...node,
+                                        inputFields: node.inputFields.map((item, itemIndex) =>
+                                          itemIndex === index ? { ...item, displayName: event.target.value } : item,
+                                        ),
+                                      }))
+                                    }
+                                  />
+                                </Col>
+                                <Col xs={24} md={4}>
+                                  <div style={{ marginBottom: 6 }}>排序</div>
+                                  <InputNumber
+                                    min={0}
+                                    precision={0}
+                                    style={{ width: '100%' }}
+                                    value={field.displayOrder}
+                                    onChange={(value) =>
+                                      updateNode(selectedNode.id, (node) => ({
+                                        ...node,
+                                        inputFields: node.inputFields.map((item, itemIndex) =>
+                                          itemIndex === index ? { ...item, displayOrder: Number(value || 0) } : item,
+                                        ),
+                                      }))
+                                    }
+                                  />
+                                </Col>
+                                <Col xs={24} md={4}>
+                                  <div style={{ marginBottom: 6 }}>必填</div>
+                                  <Switch
+                                    checked={field.required}
+                                    onChange={(checked) =>
+                                      updateNode(selectedNode.id, (node) => ({
+                                        ...node,
+                                        inputFields: node.inputFields.map((item, itemIndex) =>
+                                          itemIndex === index ? { ...item, required: checked } : item,
+                                        ),
+                                      }))
+                                    }
+                                  />
+                                </Col>
+                                <Col xs={24} md={2}>
+                                  <div style={{ marginBottom: 6 }}>只读</div>
+                                  <Switch
+                                    checked={Boolean(field.readOnly)}
+                                    onChange={(checked) =>
+                                      updateNode(selectedNode.id, (node) => ({
+                                        ...node,
+                                        inputFields: node.inputFields.map((item, itemIndex) =>
+                                          itemIndex === index ? { ...item, readOnly: checked } : item,
+                                        ),
+                                      }))
+                                    }
+                                  />
+                                </Col>
+                              </Row>
+                              <Button
+                                type="link"
+                                danger
+                                style={{ paddingInline: 0, marginTop: 8 }}
+                                onClick={() =>
+                                  updateNode(selectedNode.id, (node) => ({
+                                    ...node,
+                                    inputFields: node.inputFields.filter((_, itemIndex) => itemIndex !== index),
+                                  }))
+                                }
+                              >
+                                删除输入字段
+                              </Button>
+                            </Card>
+                          ))}
+                          <Button
+                            icon={<PlusOutlined />}
+                            onClick={() =>
+                              updateNode(selectedNode.id, (node) => ({
+                                ...node,
+                                inputFields: [...node.inputFields, normalizeFieldConfig({}, false)],
+                              }))
+                            }
+                          >
+                            添加输入字段
+                          </Button>
+                        </Space>
+                      )}
+                    </Form.List>
+                  </Form>
+
+                  <Divider style={{ margin: 0 }} />
+
+                  <Typography.Title level={5} style={{ margin: 0 }}>
+                    节点输出字段
+                  </Typography.Title>
+                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                    {(selectedNode.outputFields || []).map((field, index) => (
+                      <Card key={`output-${index}`} size="small">
+                        <Row gutter={8}>
+                          <Col xs={24} md={8}>
+                            <div style={{ marginBottom: 6 }}>字段 key</div>
+                            <Select
+                              showSearch
+                              value={field.fieldKey}
+                              options={fieldOptions}
+                              onChange={(value) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  outputFields: node.outputFields.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, fieldKey: value } : item,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={6}>
+                            <div style={{ marginBottom: 6 }}>展示名称</div>
+                            <Input
+                              value={field.displayName ?? undefined}
+                              onChange={(event) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  outputFields: node.outputFields.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, displayName: event.target.value } : item,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={4}>
+                            <div style={{ marginBottom: 6 }}>排序</div>
+                            <InputNumber
+                              min={0}
+                              precision={0}
+                              style={{ width: '100%' }}
+                              value={field.displayOrder}
+                              onChange={(value) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  outputFields: node.outputFields.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, displayOrder: Number(value || 0) } : item,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={3}>
+                            <div style={{ marginBottom: 6 }}>必填</div>
+                            <Switch
+                              checked={field.required}
+                              onChange={(checked) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  outputFields: node.outputFields.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, required: checked } : item,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={3}>
+                            <div style={{ marginBottom: 6 }}>允许回写父流程</div>
+                            <Switch
+                              checked={Boolean(field.allowWriteBackParent)}
+                              onChange={(checked) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  outputFields: node.outputFields.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, allowWriteBackParent: checked } : item,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                        </Row>
+                        <Button
+                          type="link"
+                          danger
+                          style={{ paddingInline: 0, marginTop: 8 }}
+                          onClick={() =>
+                            updateNode(selectedNode.id, (node) => ({
+                              ...node,
+                              outputFields: node.outputFields.filter((_, itemIndex) => itemIndex !== index),
+                            }))
+                          }
+                        >
+                          删除输出字段
+                        </Button>
+                      </Card>
+                    ))}
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() =>
+                        updateNode(selectedNode.id, (node) => ({
+                          ...node,
+                          outputFields: [...node.outputFields, normalizeFieldConfig({}, true)],
+                        }))
+                      }
+                    >
+                      添加输出字段
+                    </Button>
+                  </Space>
+
+                  <Divider style={{ margin: 0 }} />
+
+                  <Typography.Title level={5} style={{ margin: 0 }}>
+                    推荐工作流模板
+                  </Typography.Title>
+                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                    {(selectedNode.recommendedTemplates || []).map((item, index) => (
+                      <Card key={`recommendation-${index}`} size="small">
+                        <Row gutter={8}>
+                          <Col xs={24} md={8}>
+                            <div style={{ marginBottom: 6 }}>推荐模板 ID</div>
+                            <Input
+                              value={item.recommendedWorkflowTemplateId}
+                              placeholder="填写目标工作流模板 ID"
+                              onChange={(event) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  recommendedTemplates: node.recommendedTemplates.map((current, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...current, recommendedWorkflowTemplateId: event.target.value }
+                                      : current,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={9}>
+                            <div style={{ marginBottom: 6 }}>推荐原因</div>
+                            <Input
+                              value={item.reason ?? undefined}
+                              onChange={(event) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  recommendedTemplates: node.recommendedTemplates.map((current, itemIndex) =>
+                                    itemIndex === index ? { ...current, reason: event.target.value } : current,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={3}>
+                            <div style={{ marginBottom: 6 }}>排序</div>
+                            <InputNumber
+                              min={0}
+                              precision={0}
+                              style={{ width: '100%' }}
+                              value={item.displayOrder}
+                              onChange={(value) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  recommendedTemplates: node.recommendedTemplates.map((current, itemIndex) =>
+                                    itemIndex === index ? { ...current, displayOrder: Number(value || 0) } : current,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                          <Col xs={24} md={4}>
+                            <div style={{ marginBottom: 6 }}>启用</div>
+                            <Switch
+                              checked={item.enabled}
+                              onChange={(checked) =>
+                                updateNode(selectedNode.id, (node) => ({
+                                  ...node,
+                                  recommendedTemplates: node.recommendedTemplates.map((current, itemIndex) =>
+                                    itemIndex === index ? { ...current, enabled: checked } : current,
+                                  ),
+                                }))
+                              }
+                            />
+                          </Col>
+                        </Row>
+                        <Button
+                          type="link"
+                          danger
+                          style={{ paddingInline: 0, marginTop: 8 }}
+                          onClick={() =>
+                            updateNode(selectedNode.id, (node) => ({
+                              ...node,
+                              recommendedTemplates: node.recommendedTemplates.filter((_, itemIndex) => itemIndex !== index),
+                            }))
+                          }
+                        >
+                          删除推荐配置
+                        </Button>
+                      </Card>
+                    ))}
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() =>
+                        updateNode(selectedNode.id, (node) => ({
+                          ...node,
+                          recommendedTemplates: [...node.recommendedTemplates, normalizeRecommendation({ enabled: true })],
+                        }))
+                      }
+                    >
+                      添加推荐模板
+                    </Button>
+                  </Space>
+                </Space>
+              </Card>
+            ) : null}
           </>
-        ) : (
-          <Empty description="模板包不存在" />
-        )}
+        ) : null}
       </Card>
+
+      <Modal
+        title={editingField ? '编辑全局字段定义' : '新建全局字段定义'}
+        open={fieldModalOpen}
+        onCancel={closeFieldModal}
+        onOk={() => void saveFieldDefinition()}
+        confirmLoading={fieldSaving}
+        destroyOnClose
+      >
+        <Form<FieldDefinitionFormValues> form={fieldForm} layout="vertical">
+          <Form.Item
+            name="fieldKey"
+            label="字段 key"
+            rules={[
+              { required: true, message: '请输入字段 key' },
+              { pattern: /^[a-z][a-z0-9_]*$/, message: '字段 key 仅支持小写字母、数字与下划线，且必须字母开头' },
+            ]}
+          >
+            <Input disabled={Boolean(editingField)} />
+          </Form.Item>
+          <Form.Item name="name" label="字段名称" rules={[{ required: true, message: '请输入字段名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="fieldType" label="字段类型" rules={[{ required: true, message: '请选择字段类型' }]}>
+            <Select options={fieldTypeOptions} />
+          </Form.Item>
+          <Form.Item name="description" label="字段说明">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="groupKey" label="分组标识">
+            <Input />
+          </Form.Item>
+          <Form.Item name="displayOrder" label="排序值">
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="enabled" label="启用" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item name="sensitive" label="敏感字段" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -153,39 +153,69 @@ export interface WorkflowTemplatePositionOption {
 
 export interface WorkflowTemplatePackageSummary {
   id: string;
+  code: string;
   name: string;
   positionId?: string | null;
   positionIds?: string[];
   positionName?: string | null;
   positionNames?: string[];
-  sceneCategory?: string | null;
+  applicableSubjectType?: string | null;
   description?: string | null;
   status: WorkflowTemplateStatus;
   sortOrder?: number;
-  tags?: any[];
-  meta?: Record<string, any>;
+  allowCreateAsNormal?: boolean;
+  allowCreateAsSubflow?: boolean;
   version?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
-export type WorkflowRelationType = 'SEQUENCE' | 'PARALLEL';
-
 export type WorkflowNodeFeatureStatus = 'ACTIVE' | 'DISABLED';
 
 export interface WorkflowTemplatePackageNodePayload {
   id: string;
-  package_id?: string;
-  module_definition_id: string;
-  parent_package_node_id: string | null;
-  sort_order: number;
-  display_name: string;
-  hierarchy_level: number;
-  relation_type: WorkflowRelationType;
-  branch_group_key: string | null;
-  branch_order: number | null;
-  meta: Record<string, any>;
+  templateId?: string;
+  name: string;
+  code: string;
+  nodeType: string;
+  sequence: number;
+  isMainPath: boolean;
+  allowAppendNextNode: boolean;
+  allowDeriveSubflow: boolean;
+  inputFields: WorkflowTemplateNodeFieldConfigPayload[];
+  outputFields: WorkflowTemplateNodeFieldConfigPayload[];
+  recommendedTemplates: WorkflowTemplateNodeRecommendationPayload[];
   version?: number;
+}
+
+export interface WorkflowTemplateNodeFieldConfigPayload {
+  fieldKey: string;
+  displayName?: string | null;
+  displayOrder: number;
+  required: boolean;
+  readOnly?: boolean;
+  allowWriteBackParent?: boolean;
+}
+
+export interface WorkflowTemplateNodeRecommendationPayload {
+  recommendedWorkflowTemplateId: string;
+  reason?: string | null;
+  displayOrder: number;
+  enabled: boolean;
+}
+
+export interface WorkflowTemplateFieldDefinition {
+  id: string;
+  fieldKey: string;
+  name: string;
+  fieldType: string;
+  description?: string | null;
+  enabled: boolean;
+  sensitive: boolean;
+  groupKey?: string | null;
+  displayOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const authApi = {
@@ -329,26 +359,30 @@ export const portalApi = {
 };
 
 export const workflowTemplateApi = {
-  listPackages: (params?: { positionId?: string; sceneCategory?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
+  listPackages: (params?: { positionId?: string; applicableSubjectType?: string; status?: WorkflowTemplateStatus }) => api.get('/admin/workflow-templates/packages', { params }),
   listPositions: () => api.get('/admin/workflow-templates/positions'),
   getPackage: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}`),
   createPackage: (data: {
     name: string;
-    positionIds: string[];
-    sceneCategory?: string;
+    code: string;
+    version?: number;
+    positionIds?: string[];
+    applicableSubjectType?: string;
     description?: string;
     sortOrder?: number;
-    tags?: string[];
-    meta?: Record<string, any>;
+    allowCreateAsNormal?: boolean;
+    allowCreateAsSubflow?: boolean;
   }) => api.post('/admin/workflow-templates/packages', data),
   updatePackage: (id: string | number, data: {
     name: string;
+    code: string;
+    version?: number;
     positionIds?: string[];
-    sceneCategory?: string | null;
+    applicableSubjectType?: string | null;
     description?: string;
     sortOrder?: number;
-    tags?: string[];
-    meta?: Record<string, any>;
+    allowCreateAsNormal?: boolean;
+    allowCreateAsSubflow?: boolean;
   }) => api.put(`/admin/workflow-templates/packages/${id}`, data),
   updatePackageStatus: (id: string | number, status: WorkflowTemplateStatus) => api.put(`/admin/workflow-templates/packages/${id}/status`, { status }),
   deletePackage: (id: string | number) => api.delete(`/admin/workflow-templates/packages/${id}`),
@@ -356,9 +390,28 @@ export const workflowTemplateApi = {
   listAvailablePackages: (params?: { positionId?: string }) => api.get('/workflows/template-packages', { params }),
   listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),
   saveNodes: (id: string | number, nodes: WorkflowTemplatePackageNodePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
-  listModuleDefinitions: (params?: { nodeType?: string; roleKey?: string; positionKey?: string }) => api.get('/admin/workflow-templates/module-definitions', { params }),
-  listModuleFields: (id: string | number) => api.get(`/admin/workflow-templates/module-definitions/${id}/fields`),
-  listRecommendations: (params?: { sceneCategory?: string; currentModuleDefinitionId?: string; currentNodeType?: string }) => api.get('/admin/workflow-templates/recommendations', { params }),
+  listFieldDefinitions: (params?: { enabled?: boolean; keyword?: string }) => api.get('/admin/workflow-templates/field-definitions', { params }),
+  createFieldDefinition: (data: {
+    fieldKey: string;
+    name: string;
+    fieldType: string;
+    description?: string;
+    enabled?: boolean;
+    sensitive?: boolean;
+    groupKey?: string;
+    displayOrder?: number;
+  }) => api.post('/admin/workflow-templates/field-definitions', data),
+  updateFieldDefinition: (fieldKey: string, data: {
+    fieldKey?: string;
+    name: string;
+    fieldType: string;
+    description?: string;
+    enabled?: boolean;
+    sensitive?: boolean;
+    groupKey?: string;
+    displayOrder?: number;
+  }) => api.put(`/admin/workflow-templates/field-definitions/${fieldKey}`, data),
+  deleteFieldDefinition: (fieldKey: string) => api.delete(`/admin/workflow-templates/field-definitions/${fieldKey}`),
 };
 
 export const workflowNodeFeatureApi = {
