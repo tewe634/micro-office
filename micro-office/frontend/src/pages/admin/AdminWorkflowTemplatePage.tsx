@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd';
-import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { WorkflowTemplatePackageSummary, WorkflowTemplatePositionOption, WorkflowTemplateStatus } from '../../api';
 import { workflowTemplateApi } from '../../api';
+import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const positionLabel = (record: WorkflowTemplatePackageSummary) => {
   const names = record.positionNames?.filter(Boolean) || [];
@@ -22,6 +23,8 @@ export default function AdminWorkflowTemplatePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<WorkflowTemplatePackageSummary | null>(null);
   const [saving, setSaving] = useState(false);
+  const [current, setCurrent] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
 
   const loadPage = async () => {
@@ -57,6 +60,18 @@ export default function AdminWorkflowTemplatePage() {
         return (a.name || '').localeCompare(b.name || '', 'zh-CN');
       });
   }, [packages, positionId, status]);
+
+  const pagedPackages = useMemo(() => {
+    const start = (current - 1) * pageSize;
+    return filteredPackages.slice(start, start + pageSize);
+  }, [current, filteredPackages, pageSize]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredPackages.length / pageSize));
+    if (current > totalPages) {
+      setCurrent(totalPages);
+    }
+  }, [current, filteredPackages.length, pageSize]);
 
   const closeModal = () => {
     setModalOpen(false);
@@ -131,19 +146,6 @@ export default function AdminWorkflowTemplatePage() {
     }
   };
 
-  const handleCopy = async (record: WorkflowTemplatePackageSummary) => {
-    try {
-      const response: any = await workflowTemplateApi.copyPackage(record.id);
-      message.success('工作流模板已复制');
-      await loadPage();
-      if (response.data?.id) {
-        nav(`/admin/workflow-templates/${response.data.id}`);
-      }
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || '工作流模板复制失败');
-    }
-  };
-
   const handleDelete = async (record: WorkflowTemplatePackageSummary) => {
     try {
       await workflowTemplateApi.deletePackage(record.id);
@@ -159,14 +161,9 @@ export default function AdminWorkflowTemplatePage() {
       <Card
         title="流程管理"
         extra={
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void loadPage()}>
-              刷新
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-              新建工作流模板
-            </Button>
-          </Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+            新建工作流模板
+          </Button>
         }
       >
         <Space style={{ marginBottom: 16 }} wrap>
@@ -175,7 +172,10 @@ export default function AdminWorkflowTemplatePage() {
             placeholder="按岗位筛选"
             style={{ width: 220 }}
             value={positionId}
-            onChange={(value) => setPositionId(value)}
+            onChange={(value) => {
+              setPositionId(value);
+              setCurrent(1);
+            }}
             options={positionOptions.map((item) => ({ value: item.id, label: item.name }))}
           />
           <Select
@@ -183,7 +183,10 @@ export default function AdminWorkflowTemplatePage() {
             placeholder="按状态筛选"
             style={{ width: 180 }}
             value={status}
-            onChange={(value) => setStatus(value)}
+            onChange={(value) => {
+              setStatus(value);
+              setCurrent(1);
+            }}
             options={[
               { label: '启用', value: 'ACTIVE' },
               { label: '停用', value: 'DISABLED' },
@@ -194,12 +197,27 @@ export default function AdminWorkflowTemplatePage() {
         <Table
           rowKey="id"
           loading={loading}
-          dataSource={filteredPackages}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 1460 }}
+          dataSource={pagedPackages}
+          pagination={{
+            current,
+            pageSize,
+            total: filteredPackages.length,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: formatPaginationTotal,
+            locale: paginationLocale,
+            onChange: (page, size) => {
+              setCurrent(page);
+              setPageSize(size);
+            },
+            onShowSizeChange: (page, size) => {
+              setCurrent(page);
+              setPageSize(size);
+            },
+          }}
+          scroll={{ x: 1280 }}
           columns={[
             { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true },
-            { title: '模板编码', dataIndex: 'code', width: 180 },
             {
               title: '关联岗位',
               dataIndex: 'positionNames',
@@ -236,9 +254,6 @@ export default function AdminWorkflowTemplatePage() {
                   </Button>
                   <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
                     编辑模板
-                  </Button>
-                  <Button type="link" icon={<CopyOutlined />} onClick={() => void handleCopy(row)}>
-                    复制
                   </Button>
                   <Popconfirm
                     title="删除工作流模板"

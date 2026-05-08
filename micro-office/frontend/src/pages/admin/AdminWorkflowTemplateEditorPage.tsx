@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Checkbox,
@@ -339,13 +338,6 @@ export default function AdminWorkflowTemplateEditorPage() {
                 </Button>
               </Space>
             </div>
-
-            <Alert
-              type="info"
-              showIcon
-              message="模板管理边界"
-              description="此页面只管理工作流模板、模板节点、节点输入输出字段、是否允许派生子流程，以及可选推荐模板；不暴露运行时实例、聊天群、父子实例关系等概念。"
-            />
 
             <Row gutter={12} align="stretch">
               <Col xs={24} lg={10}>
