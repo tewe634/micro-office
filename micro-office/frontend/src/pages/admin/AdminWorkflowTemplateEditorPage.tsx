@@ -307,7 +307,7 @@ export default function AdminWorkflowTemplateEditorPage() {
         outputFields,
       }));
     } catch (error: any) {
-      message.error(error?.response?.data?.message || '节点能力字段加载失败');
+      message.error(error?.response?.data?.message || '节点模板字段加载失败');
     } finally {
       setBindingNodeId((current) => (current === nodeId ? null : current));
     }
@@ -467,7 +467,7 @@ export default function AdminWorkflowTemplateEditorPage() {
                             <Space wrap>
                               <Tag>{node.code}</Tag>
                               <Tag>{formatWorkflowNodeTypeLabel(node.nodeType)}</Tag>
-                              {moduleName ? <Tag color="cyan">{moduleName}</Tag> : <Tag>未绑定节点能力</Tag>}
+                              {moduleName ? <Tag color="cyan">{moduleName}</Tag> : <Tag>未选择节点模板</Tag>}
                               {moduleStatus ? <Tag color={moduleStatus === 'ACTIVE' ? 'green' : 'default'}>{moduleStatus}</Tag> : null}
                               {node.isMainPath ? <Tag color="green">主链路</Tag> : <Tag>非主链路</Tag>}
                               {node.allowAppendNextNode ? <Tag color="gold">可追加后续节点</Tag> : null}
@@ -485,16 +485,16 @@ export default function AdminWorkflowTemplateEditorPage() {
                 {selectedNode ? (
                   <Card title={`节点配置：${selectedNode.name || selectedNode.code || selectedNode.id}`}>
                     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                      <Card size="small" title="节点能力来源">
+                      <Card size="small" title="节点模板来源">
                         <Space direction="vertical" size={12} style={{ width: '100%' }}>
                           <div>
-                            <div style={{ marginBottom: 6 }}>绑定节点能力</div>
+                            <div style={{ marginBottom: 6 }}>选择节点模板</div>
                             <Select
                               showSearch
                               allowClear
                               optionFilterProp="label"
                               style={{ width: '100%' }}
-                              placeholder="请选择节点管理中的节点能力"
+                              placeholder="请选择节点管理中的节点模板"
                               value={selectedNode.moduleDefinitionId || undefined}
                               options={moduleDefinitionOptions}
                               loading={bindingNodeId === selectedNode.id}
@@ -507,7 +507,7 @@ export default function AdminWorkflowTemplateEditorPage() {
                             {selectedModuleStatus ? <Tag color={selectedModuleStatus === 'ACTIVE' ? 'green' : 'default'}>{selectedModuleStatus}</Tag> : null}
                           </Space>
                           <Typography.Text type="secondary">
-                            节点输入/输出字段能力统一在“节点管理”维护；模板编辑页只维护当前模板中的流转配置与输出回写策略。
+                            节点输入/输出字段模板统一在“节点管理”维护；流程编辑页只维护当前流程中的流转配置与输出回写策略。
                           </Typography.Text>
                         </Space>
                       </Card>
@@ -578,7 +578,7 @@ export default function AdminWorkflowTemplateEditorPage() {
                         </Space>
                       </Card>
 
-                      <Card size="small" title="节点能力字段（只读展示）">
+                      <Card size="small" title="节点模板字段（只读展示）">
                         <Space direction="vertical" size={16} style={{ width: '100%' }}>
                           <div>
                             <Typography.Title level={5} style={{ margin: 0, marginBottom: 8 }}>
@@ -613,7 +613,7 @@ export default function AdminWorkflowTemplateEditorPage() {
                             ) : (
                               <Empty
                                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                description={selectedNode.moduleDefinitionId ? '该节点能力暂无输入字段' : '当前节点未绑定节点能力'}
+                                description={selectedNode.moduleDefinitionId ? '该节点模板暂无输入字段' : '当前节点未选择节点模板'}
                               />
                             )}
                           </div>
@@ -662,7 +662,7 @@ export default function AdminWorkflowTemplateEditorPage() {
                             ) : (
                               <Empty
                                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                description={selectedNode.moduleDefinitionId ? '该节点能力暂无输出字段' : '当前节点未绑定节点能力'}
+                                description={selectedNode.moduleDefinitionId ? '该节点模板暂无输出字段' : '当前节点未选择节点模板'}
                               />
                             )}
                           </div>
