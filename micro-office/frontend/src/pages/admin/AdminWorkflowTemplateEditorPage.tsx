@@ -379,9 +379,10 @@ export default function AdminWorkflowTemplateEditorPage() {
   const selectedCapabilityLabel = selectedNode?.moduleDefinitionId ? (selectedModuleDefinition ? capabilityOptionLabel(selectedModuleDefinition) : selectedModuleName || selectedNode.moduleDefinitionId) : undefined;
 
   return (
-    <div className="page-fill" style={{ gap: 12, minWidth: 0 }}>
-      <Card className="page-card" bodyStyle={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {loading ? null : packageDetail ? (
+    <div className="page-fill" style={{ gap: 12, minWidth: 0, overflow: 'hidden' }}>
+      <Card className="page-card" bodyStyle={{ padding: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="page-card-scroll" style={{ padding: 12, paddingRight: 8 }}>
+          {loading ? null : packageDetail ? (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ minWidth: 0 }}>
@@ -778,6 +779,7 @@ export default function AdminWorkflowTemplateEditorPage() {
             </Row>
           </>
         ) : null}
+        </div>
       </Card>
     </div>
   );
