@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Checkbox,
@@ -118,6 +119,7 @@ export default function AdminWorkflowTemplateEditorPage() {
   const [nodes, setNodes] = useState<NodeEditorItem[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [fieldDefinitions, setFieldDefinitions] = useState<WorkflowTemplateFieldDefinition[]>([]);
+  const [workflowTemplateOptionsSource, setWorkflowTemplateOptionsSource] = useState<WorkflowTemplatePackageSummary[]>([]);
   const [fieldModalOpen, setFieldModalOpen] = useState(false);
   const [fieldSaving, setFieldSaving] = useState(false);
   const [editingField, setEditingField] = useState<WorkflowTemplateFieldDefinition | null>(null);
@@ -138,14 +140,28 @@ export default function AdminWorkflowTemplateEditorPage() {
       }));
   }, [fieldDefinitions]);
 
+  const workflowTemplateOptions = useMemo(() => {
+    return [...workflowTemplateOptionsSource]
+      .sort((a, b) => {
+        const sortDiff = (a.sortOrder ?? 100) - (b.sortOrder ?? 100);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '', 'zh-CN');
+      })
+      .map((item) => ({
+        value: item.id,
+        label: `${item.name} · ${item.code}`,
+      }));
+  }, [workflowTemplateOptionsSource]);
+
   const loadPage = async () => {
     if (!packageId) return;
     setLoading(true);
     try {
-      const [detailResponse, nodesResponse, fieldDefinitionsResponse]: any = await Promise.all([
+      const [detailResponse, nodesResponse, fieldDefinitionsResponse, packagesResponse]: any = await Promise.all([
         workflowTemplateApi.getPackage(packageId),
         workflowTemplateApi.listNodes(packageId),
         workflowTemplateApi.listFieldDefinitions(),
+        workflowTemplateApi.listPackages(),
       ]);
       const detail = detailResponse.data;
       if (!detail) {
@@ -156,6 +172,7 @@ export default function AdminWorkflowTemplateEditorPage() {
       setNodes(normalizedNodes);
       setSelectedNodeId((current) => normalizedNodes.find((item) => item.id === current)?.id || normalizedNodes[0]?.id || null);
       setFieldDefinitions(fieldDefinitionsResponse.data || []);
+      setWorkflowTemplateOptionsSource((packagesResponse.data || []).filter((item: WorkflowTemplatePackageSummary) => item.id !== detail.id));
     } catch (error: any) {
       message.error(error?.message || error?.response?.data?.message || '工作流模板详情加载失败');
       nav('/admin/workflow-templates');
@@ -338,6 +355,13 @@ export default function AdminWorkflowTemplateEditorPage() {
                 </Button>
               </Space>
             </div>
+
+            <Alert
+              type="info"
+              showIcon
+              message="模板管理边界"
+              description="此页面只管理工作流模板、模板节点、节点输入输出字段、是否允许派生子流程，以及可选推荐模板；不暴露运行时实例、聊天群、父子实例关系等概念。"
+            />
 
             <Row gutter={12} align="stretch">
               <Col xs={24} lg={10}>
@@ -778,16 +802,19 @@ export default function AdminWorkflowTemplateEditorPage() {
                       <Card key={`recommendation-${index}`} size="small">
                         <Row gutter={8}>
                           <Col xs={24} md={8}>
-                            <div style={{ marginBottom: 6 }}>推荐模板 ID</div>
-                            <Input
-                              value={item.recommendedWorkflowTemplateId}
-                              placeholder="填写目标工作流模板 ID"
-                              onChange={(event) =>
+                            <div style={{ marginBottom: 6 }}>推荐工作流模板</div>
+                            <Select
+                              value={item.recommendedWorkflowTemplateId || undefined}
+                              placeholder="请选择目标工作流模板"
+                              showSearch
+                              optionFilterProp="label"
+                              options={workflowTemplateOptions}
+                              onChange={(value) =>
                                 updateNode(selectedNode.id, (node) => ({
                                   ...node,
                                   recommendedTemplates: node.recommendedTemplates.map((current, itemIndex) =>
                                     itemIndex === index
-                                      ? { ...current, recommendedWorkflowTemplateId: event.target.value }
+                                      ? { ...current, recommendedWorkflowTemplateId: String(value || '') }
                                       : current,
                                   ),
                                 }))
