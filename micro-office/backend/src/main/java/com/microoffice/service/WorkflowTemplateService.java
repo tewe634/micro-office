@@ -117,7 +117,7 @@ public class WorkflowTemplateService {
     public Map<String, Object> updatePackageInfo(String id, WorkflowTemplatePackageSaveRequest request, String userId) {
         requireRequest(request);
         Map<String, Object> current = loadPackageOrThrow(id);
-        int version = 1;
+        int version = asInt(current.get("version"), 1);
         String code = asString(current.get("code"));
         ensureTemplateCodeVersionUnique(code, version, id);
         List<String> positionIds = normalizePositionIds(request);
@@ -1237,7 +1237,7 @@ public class WorkflowTemplateService {
         for (int index = 0; index < 1000; index += 1) {
             String candidate = index == 0 ? prefix : prefix + "_" + String.format("%03d", index);
             Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM mo_workflow_recommendation_packages WHERE code = ? AND version = 1",
+                "SELECT COUNT(*) FROM mo_workflow_recommendation_packages WHERE code = ?",
                 Integer.class,
                 candidate
             );
