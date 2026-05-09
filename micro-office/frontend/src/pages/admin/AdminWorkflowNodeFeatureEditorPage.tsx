@@ -27,6 +27,7 @@ type FieldItem = {
   description: string;
   dataType: string;
   required: boolean;
+  readOnly: boolean;
   fieldScope: 'INPUT' | 'OUTPUT';
   sortOrder: number;
   defaultValueText: string;
@@ -123,6 +124,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
         description: item.schemaMeta?.description || '',
         dataType: item.dataType || 'string',
         required: Boolean(item.required),
+        readOnly: Boolean(item.readOnly),
         fieldScope: item.fieldScope === 'OUTPUT' ? 'OUTPUT' : 'INPUT',
         sortOrder: Number(item.sortOrder || 100),
         defaultValueText: item.defaultValue === undefined ? '' : JSON.stringify(item.defaultValue),
@@ -189,6 +191,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
       label: item.label.trim(),
       dataType: item.dataType,
       required: item.required,
+      readOnly: item.fieldScope === 'INPUT' ? item.readOnly : undefined,
       fieldScope: item.fieldScope,
       sortOrder: Number(item.sortOrder || 100),
       defaultValue: item.defaultValueText.trim() ? JSON.parse(item.defaultValueText) : null,
@@ -270,6 +273,7 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
         description: '',
         dataType: 'string',
         required: false,
+        readOnly: false,
         fieldScope,
         sortOrder: prev.length + 100,
         defaultValueText: '',
@@ -401,6 +405,21 @@ export default function AdminWorkflowNodeFeatureEditorPage() {
                         render: (_: unknown, row: FieldItem) => {
                           const index = fields.indexOf(row);
                           return <Select style={{ width: '100%' }} value={row.required ? 'Y' : 'N'} options={[{ value: 'Y', label: '是' }, { value: 'N', label: '否' }]} onChange={(value) => updateField(index, (field) => ({ ...field, required: value === 'Y' }))} />;
+                        },
+                      },
+                      {
+                        title: '只读',
+                        width: 80,
+                        render: (_: unknown, row: FieldItem) => {
+                          const index = fields.indexOf(row);
+                          return (
+                            <Select
+                              style={{ width: '100%' }}
+                              value={row.readOnly ? 'Y' : 'N'}
+                              options={[{ value: 'Y', label: '是' }, { value: 'N', label: '否' }]}
+                              onChange={(value) => updateField(index, (field) => ({ ...field, readOnly: value === 'Y' }))}
+                            />
+                          );
                         },
                       },
                       {

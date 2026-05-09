@@ -173,6 +173,11 @@ export type WorkflowNodeFeatureStatus = 'ACTIVE' | 'DISABLED';
 export interface WorkflowTemplatePackageNodePayload {
   id: string;
   templateId?: string;
+  moduleDefinitionId?: string | null;
+  moduleDefinitionCode?: string | null;
+  moduleDefinitionName?: string | null;
+  moduleDefinitionStatus?: WorkflowNodeFeatureStatus | null;
+  capabilityBound?: boolean;
   name: string;
   code: string;
   nodeType: string;
@@ -187,11 +192,27 @@ export interface WorkflowTemplatePackageNodePayload {
 
 export interface WorkflowTemplateNodeFieldConfigPayload {
   fieldKey: string;
+  label?: string | null;
+  dataType?: string | null;
+  sortOrder?: number;
+  description?: string | null;
+  fieldScope?: 'INPUT' | 'OUTPUT' | string;
+  capabilityDerived?: boolean;
   displayName?: string | null;
   displayOrder: number;
   required: boolean;
   readOnly?: boolean;
   allowWriteBackParent?: boolean;
+}
+
+export interface WorkflowNodeFeatureSummary {
+  id: string;
+  code: string;
+  name: string;
+  nodeType: string;
+  status: WorkflowNodeFeatureStatus;
+  sortOrder?: number;
+  version?: number;
 }
 
 export interface WorkflowTemplateNodeRecommendationPayload {

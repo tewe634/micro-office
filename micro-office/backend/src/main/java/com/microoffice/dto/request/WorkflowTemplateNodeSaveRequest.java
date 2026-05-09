@@ -11,6 +11,8 @@ public class WorkflowTemplateNodeSaveRequest {
     private String id;
     @JsonAlias({"template_id", "package_id"})
     private String templateId;
+    @JsonAlias("module_definition_id")
+    private String moduleDefinitionId;
     private String name;
     private String code;
     private String nodeType;

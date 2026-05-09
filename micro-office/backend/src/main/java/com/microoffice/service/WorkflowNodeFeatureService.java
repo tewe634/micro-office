@@ -261,7 +261,11 @@ public class WorkflowNodeFeatureService {
                 Boolean.TRUE.equals(field.get("required")),
                 normalizeFieldScope(asString(field.get("fieldScope"))),
                 asInt(field.get("sortOrder"), 100),
-                toJson(normalizeSchemaMeta(schemaMeta, defaultValue)),
+                toJson(normalizeSchemaMeta(
+                    schemaMeta,
+                    defaultValue,
+                    "INPUT".equalsIgnoreCase(asString(field.get("fieldScope"))) ? Boolean.TRUE.equals(field.get("readOnly")) : null
+                )),
                 userId,
                 userId
             );
@@ -295,6 +299,9 @@ public class WorkflowNodeFeatureService {
             item.put("fieldScope", asString(row.get("field_scope")));
             item.put("sortOrder", asInt(row.get("sort_order"), 100));
             item.put("defaultValue", schemaMeta.get("defaultValue"));
+            if ("INPUT".equalsIgnoreCase(asString(row.get("field_scope")))) {
+                item.put("readOnly", Boolean.TRUE.equals(schemaMeta.get("readOnly")));
+            }
             item.put("schemaMeta", schemaMeta);
             item.put("createdAt", row.get("created_at"));
             item.put("updatedAt", row.get("updated_at"));
@@ -316,7 +323,11 @@ public class WorkflowNodeFeatureService {
             String dataType = normalizeFieldDataType(field.getDataType());
             Object defaultValue = field.getDefaultValue();
             validateDefaultValueType(dataType, defaultValue);
-            Map<String, Object> schemaMeta = normalizeSchemaMeta(asMap(field.getSchemaMeta()), defaultValue);
+            Map<String, Object> schemaMeta = normalizeSchemaMeta(
+                asMap(field.getSchemaMeta()),
+                defaultValue,
+                "INPUT".equals(scope) ? field.getReadOnly() : null
+            );
 
             jdbc.update(
                 "INSERT INTO mo_module_fields (id, module_definition_id, field_key, label, data_type, required, field_scope, sort_order, schema_meta, created_by, updated_by) " +
@@ -494,7 +505,13 @@ public class WorkflowNodeFeatureService {
             requireText(field.getLabel(), "label 不能为空");
             normalizeSortOrder(field.getSortOrder());
             validateDefaultValueType(dataType, field.getDefaultValue());
-            asMap(field.getSchemaMeta());
+            Map<String, Object> schemaMeta = asMap(field.getSchemaMeta());
+            if ("INPUT".equals(scope) && schemaMeta.containsKey("allowWriteBackParent")) {
+                throw new ResponseStatusException(BAD_REQUEST, "节点输入字段 schemaMeta 不支持 allowWriteBackParent");
+            }
+            if ("OUTPUT".equals(scope) && Boolean.TRUE.equals(field.getReadOnly())) {
+                throw new ResponseStatusException(BAD_REQUEST, "节点输出字段不支持 readOnly");
+            }
         }
     }
 
@@ -958,12 +975,17 @@ public class WorkflowNodeFeatureService {
         return result;
     }
 
-    private Map<String, Object> normalizeSchemaMeta(Map<String, Object> schemaMeta, Object defaultValue) {
+    private Map<String, Object> normalizeSchemaMeta(Map<String, Object> schemaMeta, Object defaultValue, Boolean readOnly) {
         Map<String, Object> result = new LinkedHashMap<>(schemaMeta == null ? Map.of() : schemaMeta);
         if (defaultValue == null) {
             result.remove("defaultValue");
         } else {
             result.put("defaultValue", defaultValue);
+        }
+        if (readOnly == null) {
+            result.remove("readOnly");
+        } else {
+            result.put("readOnly", Boolean.TRUE.equals(readOnly));
         }
         return result;
     }

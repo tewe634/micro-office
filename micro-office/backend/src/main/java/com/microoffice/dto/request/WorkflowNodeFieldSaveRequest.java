@@ -13,6 +13,7 @@ public class WorkflowNodeFieldSaveRequest {
     private String label;
     private String dataType;
     private Boolean required;
+    private Boolean readOnly;
     private Integer sortOrder;
     private Object defaultValue;
     private Map<String, Object> schemaMeta = new LinkedHashMap<>();
