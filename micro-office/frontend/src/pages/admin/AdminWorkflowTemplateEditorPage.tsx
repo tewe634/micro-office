@@ -149,7 +149,7 @@ export default function AdminWorkflowTemplateEditorPage() {
       })
       .map((item) => ({
         value: item.id,
-        label: `${item.name} · ${item.code}`,
+        label: item.name,
       }));
   }, [workflowTemplateOptionsSource]);
 
