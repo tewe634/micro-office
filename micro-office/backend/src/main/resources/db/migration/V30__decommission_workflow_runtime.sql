@@ -71,16 +71,8 @@ BEGIN
     END IF;
 END $$;
 
--- 删除 workflow runtime 基表。
+-- PV1.1.18 起 workflow runtime 基表为 Web/H5/后台共用实例事实源，不再删除。
+-- 仅清理废弃 AI 预填表；其余 mo_workflow* 实例表保留。
 DROP TABLE IF EXISTS mo_workflow_node_ai_prefill CASCADE;
-DROP TABLE IF EXISTS mo_workflow_node_assignees CASCADE;
-DROP TABLE IF EXISTS mo_workflow_node_form_data CASCADE;
-DROP TABLE IF EXISTS mo_workflow_runtime_caches CASCADE;
-DROP TABLE IF EXISTS mo_workflow_branch_group_members CASCADE;
-DROP TABLE IF EXISTS mo_workflow_edges CASCADE;
-DROP TABLE IF EXISTS mo_workflow_subflows CASCADE;
-DROP TABLE IF EXISTS mo_workflow_branch_groups CASCADE;
-DROP TABLE IF EXISTS mo_workflow_nodes CASCADE;
-DROP TABLE IF EXISTS mo_workflows CASCADE;
 
 COMMIT;

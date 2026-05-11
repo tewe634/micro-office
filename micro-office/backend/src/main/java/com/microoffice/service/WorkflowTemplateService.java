@@ -284,9 +284,8 @@ public class WorkflowTemplateService {
         ensurePackageExists(packageId);
         List<Map<String, Object>> rows = jdbc.queryForList(
             "SELECT n.id, n.package_id, n.module_definition_id, n.display_name, n.code, n.node_type, n.sort_order, n.is_main_path, n.allow_append_next_node, n.allow_derive_subflow, n.version, " +
-                "d.code AS module_definition_code, d.name AS module_definition_name, d.is_active AS module_definition_active " +
+                "n.module_definition_id AS module_definition_code, n.display_name AS module_definition_name, true AS module_definition_active " +
                 "FROM mo_workflow_recommendation_package_nodes n " +
-                "LEFT JOIN mo_module_definitions d ON d.id = n.module_definition_id " +
                 "WHERE package_id = ? ORDER BY sort_order, id",
             packageId
         );
@@ -304,21 +303,12 @@ public class WorkflowTemplateService {
         }
         Map<String, List<Map<String, Object>>> inputFieldMap = loadNodeFieldConfigMap(nodeIds, true);
         Map<String, List<Map<String, Object>>> outputFieldMap = loadNodeFieldConfigMap(nodeIds, false);
-        Map<String, List<Map<String, Object>>> capabilityFieldMap = loadCapabilityFieldMap(moduleDefinitionIds);
         Map<String, List<Map<String, Object>>> recommendationMap = loadNodeRecommendationMap(nodeIds);
         for (Map<String, Object> node : nodes) {
             String nodeId = asString(node.get("id"));
-            String moduleDefinitionId = asString(node.get("moduleDefinitionId"));
-            if (hasText(moduleDefinitionId)) {
-                Map<String, Map<String, Object>> outputOverrideMap = indexFieldConfigByKey(outputFieldMap.getOrDefault(nodeId, List.of()));
-                node.put("inputFields", deriveCapabilityBackedFields(moduleDefinitionId, capabilityFieldMap, "INPUT", Map.of()));
-                node.put("outputFields", deriveCapabilityBackedFields(moduleDefinitionId, capabilityFieldMap, "OUTPUT", outputOverrideMap));
-                node.put("capabilityBound", true);
-            } else {
-                node.put("inputFields", inputFieldMap.getOrDefault(nodeId, List.of()));
-                node.put("outputFields", outputFieldMap.getOrDefault(nodeId, List.of()));
-                node.put("capabilityBound", false);
-            }
+            node.put("inputFields", inputFieldMap.getOrDefault(nodeId, List.of()));
+            node.put("outputFields", outputFieldMap.getOrDefault(nodeId, List.of()));
+            node.put("capabilityBound", false);
             node.put("recommendedTemplates", recommendationMap.getOrDefault(nodeId, List.of()));
         }
         return nodes;
@@ -328,7 +318,6 @@ public class WorkflowTemplateService {
     public List<Map<String, Object>> saveNodes(String packageId, WorkflowTemplateNodesSaveRequest request, String userId) {
         ensurePackageExists(packageId);
         List<ValidatedTemplateNode> nodes = validateTemplateNodes(packageId, request == null ? List.of() : request.getNodes());
-        syncCapabilityFieldDefinitions(nodes, userId);
         jdbc.update("DELETE FROM mo_workflow_recommendation_package_nodes WHERE package_id = ?", packageId);
 
         for (ValidatedTemplateNode node : nodes.stream().sorted(Comparator.comparingInt(ValidatedTemplateNode::sequence)).toList()) {
@@ -544,19 +533,13 @@ public class WorkflowTemplateService {
         }
 
         LinkedHashSet<String> referencedFieldKeys = new LinkedHashSet<>();
-        LinkedHashSet<String> moduleDefinitionIds = new LinkedHashSet<>();
         LinkedHashSet<String> recommendedTemplateIds = new LinkedHashSet<>();
         for (WorkflowTemplateNodeSaveRequest node : requestNodes) {
-            String moduleDefinitionId = blankToNull(node.getModuleDefinitionId());
-            if (hasText(moduleDefinitionId)) {
-                moduleDefinitionIds.add(moduleDefinitionId);
-            } else {
-                for (WorkflowTemplateNodeFieldConfigSaveRequest field : defaultList(node.getInputFields())) {
-                    referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
-                }
-                for (WorkflowTemplateNodeFieldConfigSaveRequest field : defaultList(node.getOutputFields())) {
-                    referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
-                }
+            for (WorkflowTemplateNodeFieldConfigSaveRequest field : defaultList(node.getInputFields())) {
+                referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
+            }
+            for (WorkflowTemplateNodeFieldConfigSaveRequest field : defaultList(node.getOutputFields())) {
+                referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
             }
             for (WorkflowTemplateNodeRecommendationSaveRequest recommendation : defaultList(node.getRecommendedTemplates())) {
                 if (hasText(recommendation.getRecommendedWorkflowTemplateId())) {
@@ -566,8 +549,6 @@ public class WorkflowTemplateService {
         }
 
         Map<String, Map<String, Object>> fieldDefinitionMap = loadFieldDefinitionsByKeys(referencedFieldKeys);
-        Map<String, Map<String, Object>> moduleDefinitionMap = loadModuleDefinitionsByIds(moduleDefinitionIds);
-        Map<String, List<Map<String, Object>>> capabilityFieldMap = loadCapabilityFieldMap(moduleDefinitionIds);
         ensureRecommendedTemplatesExist(recommendedTemplateIds);
 
         LinkedHashMap<String, ValidatedTemplateNode> validated = new LinkedHashMap<>();
@@ -590,9 +571,6 @@ public class WorkflowTemplateService {
                 throw new ResponseStatusException(BAD_REQUEST, "节点顺序 sequence 不能重复: " + sequence);
             }
             String moduleDefinitionId = blankToNull(node.getModuleDefinitionId());
-            if (hasText(moduleDefinitionId) && !moduleDefinitionMap.containsKey(moduleDefinitionId)) {
-                throw new ResponseStatusException(BAD_REQUEST, "节点功能不存在: " + moduleDefinitionId);
-            }
 
             validated.put(id, new ValidatedTemplateNode(
                 id,
@@ -605,12 +583,8 @@ public class WorkflowTemplateService {
                 node.getIsMainPath() == null || Boolean.TRUE.equals(node.getIsMainPath()),
                 defaultFalse(node.getAllowAppendNextNode()),
                 defaultFalse(node.getAllowDeriveSubflow()),
-                hasText(moduleDefinitionId)
-                    ? deriveCapabilityFieldConfigs(moduleDefinitionId, capabilityFieldMap, defaultList(node.getInputFields()), true)
-                    : validateNodeFieldConfigs(defaultList(node.getInputFields()), fieldDefinitionMap, true),
-                hasText(moduleDefinitionId)
-                    ? deriveCapabilityFieldConfigs(moduleDefinitionId, capabilityFieldMap, defaultList(node.getOutputFields()), false)
-                    : validateNodeFieldConfigs(defaultList(node.getOutputFields()), fieldDefinitionMap, false),
+                validateNodeFieldConfigs(defaultList(node.getInputFields()), fieldDefinitionMap, true),
+                validateNodeFieldConfigs(defaultList(node.getOutputFields()), fieldDefinitionMap, false),
                 validateNodeRecommendations(packageId, defaultList(node.getRecommendedTemplates())),
                 normalizeVersion(node.getVersion())
             ));
@@ -648,46 +622,6 @@ public class WorkflowTemplateService {
                 blankToNull(field.getDisplayName()),
                 displayOrder,
                 false
-            ));
-        }
-        return result;
-    }
-
-    private List<ValidatedNodeFieldConfig> deriveCapabilityFieldConfigs(String moduleDefinitionId,
-                                                                        Map<String, List<Map<String, Object>>> capabilityFieldMap,
-                                                                        List<WorkflowTemplateNodeFieldConfigSaveRequest> requestFields,
-                                                                        boolean inputScope) {
-        List<Map<String, Object>> capabilityFields = capabilityFieldMap.getOrDefault(moduleDefinitionId, List.of());
-        String scope = inputScope ? "INPUT" : "OUTPUT";
-        Map<String, WorkflowTemplateNodeFieldConfigSaveRequest> requestByKey = new LinkedHashMap<>();
-        for (WorkflowTemplateNodeFieldConfigSaveRequest field : requestFields) {
-            if (field == null || !hasText(field.getFieldKey())) {
-                continue;
-            }
-            requestByKey.put(normalizeFieldKey(field.getFieldKey()), field);
-        }
-
-        List<ValidatedNodeFieldConfig> result = new ArrayList<>();
-        for (Map<String, Object> capabilityField : capabilityFields) {
-            if (!scope.equals(asString(capabilityField.get("fieldScope")))) {
-                continue;
-            }
-            String fieldKey = normalizeFieldKey(asString(capabilityField.get("fieldKey")));
-            WorkflowTemplateNodeFieldConfigSaveRequest requestField = requestByKey.get(fieldKey);
-            int displayOrder = asInt(capabilityField.get("sortOrder"), 100);
-            String label = asString(capabilityField.get("label"));
-            result.add(new ValidatedNodeFieldConfig(
-                fieldKey,
-                label,
-                asString(capabilityField.get("dataType")),
-                Boolean.TRUE.equals(capabilityField.get("required")),
-                displayOrder,
-                asString(capabilityField.get("description")),
-                inputScope && Boolean.TRUE.equals(capabilityField.get("readOnly")),
-                !inputScope && requestField != null && defaultFalse(requestField.getAllowWriteBackParent()),
-                label,
-                displayOrder,
-                true
             ));
         }
         return result;
@@ -754,108 +688,6 @@ public class WorkflowTemplateService {
                 item.put("allowWriteBackParent", Boolean.TRUE.equals(row.get("allow_write_back_parent")));
             }
             result.computeIfAbsent(asString(row.get("node_template_id")), ignored -> new ArrayList<>()).add(item);
-        }
-        return result;
-    }
-
-    private Map<String, Map<String, Object>> loadModuleDefinitionsByIds(Collection<String> moduleDefinitionIds) {
-        if (moduleDefinitionIds == null || moduleDefinitionIds.isEmpty()) {
-            return Map.of();
-        }
-        List<String> ids = moduleDefinitionIds.stream().filter(this::hasText).map(String::trim).distinct().toList();
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        StringBuilder sql = new StringBuilder(
-            "SELECT id, code, name, node_type, is_active FROM mo_module_definitions WHERE id IN ("
-        );
-        appendPlaceholders(sql, ids.size());
-        sql.append(")");
-        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
-        for (Map<String, Object> row : jdbc.queryForList(sql.toString(), ids.toArray())) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", asString(row.get("id")));
-            item.put("code", asString(row.get("code")));
-            item.put("name", asString(row.get("name")));
-            item.put("nodeType", asString(row.get("node_type")));
-            item.put("status", Boolean.TRUE.equals(row.get("is_active")) ? "ACTIVE" : "DISABLED");
-            result.put(asString(row.get("id")), item);
-        }
-        return result;
-    }
-
-    private Map<String, List<Map<String, Object>>> loadCapabilityFieldMap(Collection<String> moduleDefinitionIds) {
-        if (moduleDefinitionIds == null || moduleDefinitionIds.isEmpty()) {
-            return Map.of();
-        }
-        List<String> ids = moduleDefinitionIds.stream().filter(this::hasText).map(String::trim).distinct().toList();
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        StringBuilder sql = new StringBuilder(
-            "SELECT module_definition_id, field_key, label, data_type, required, field_scope, sort_order, " +
-                "schema_meta ->> 'description' AS description, " +
-                "CASE WHEN upper(field_scope) = 'INPUT' THEN COALESCE((schema_meta ->> 'readOnly')::boolean, false) ELSE false END AS read_only " +
-                "FROM mo_module_fields WHERE module_definition_id IN ("
-        );
-        appendPlaceholders(sql, ids.size());
-        sql.append(") ORDER BY module_definition_id, field_scope, sort_order, field_key, id");
-
-        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
-        for (Map<String, Object> row : jdbc.queryForList(sql.toString(), ids.toArray())) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("fieldKey", asString(row.get("field_key")));
-            item.put("label", asString(row.get("label")));
-            item.put("dataType", asString(row.get("data_type")));
-            item.put("required", Boolean.TRUE.equals(row.get("required")));
-            item.put("fieldScope", asString(row.get("field_scope")));
-            item.put("sortOrder", asInt(row.get("sort_order"), 100));
-            item.put("description", asString(row.get("description")));
-            item.put("readOnly", Boolean.TRUE.equals(row.get("read_only")));
-            result.computeIfAbsent(asString(row.get("module_definition_id")), ignored -> new ArrayList<>()).add(item);
-        }
-        return result;
-    }
-
-    private Map<String, Map<String, Object>> indexFieldConfigByKey(List<Map<String, Object>> fields) {
-        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
-        for (Map<String, Object> field : fields) {
-            String fieldKey = asString(field.get("fieldKey"));
-            if (hasText(fieldKey)) {
-                result.put(fieldKey, field);
-            }
-        }
-        return result;
-    }
-
-    private List<Map<String, Object>> deriveCapabilityBackedFields(String moduleDefinitionId,
-                                                                   Map<String, List<Map<String, Object>>> capabilityFieldMap,
-                                                                   String scope,
-                                                                   Map<String, Map<String, Object>> flowOverridesByFieldKey) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> field : capabilityFieldMap.getOrDefault(moduleDefinitionId, List.of())) {
-            if (!scope.equals(asString(field.get("fieldScope")))) {
-                continue;
-            }
-            String fieldKey = asString(field.get("fieldKey"));
-            Map<String, Object> override = flowOverridesByFieldKey.getOrDefault(fieldKey, Map.of());
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("fieldKey", fieldKey);
-            item.put("label", asString(field.get("label")));
-            item.put("dataType", asString(field.get("dataType")));
-            item.put("required", Boolean.TRUE.equals(field.get("required")));
-            item.put("sortOrder", asInt(field.get("sortOrder"), 100));
-            item.put("description", asString(field.get("description")));
-            item.put("fieldScope", scope);
-            item.put("displayName", asString(field.get("label")));
-            item.put("displayOrder", asInt(field.get("sortOrder"), 100));
-            item.put("capabilityDerived", true);
-            if ("INPUT".equals(scope)) {
-                item.put("readOnly", Boolean.TRUE.equals(field.get("readOnly")));
-            } else {
-                item.put("allowWriteBackParent", Boolean.TRUE.equals(override.get("allowWriteBackParent")));
-            }
-            result.add(item);
         }
         return result;
     }
@@ -1076,14 +908,8 @@ public class WorkflowTemplateService {
             Integer.class,
             fieldKey
         );
-        Integer capabilityCount = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM mo_module_fields WHERE field_key = ?",
-            Integer.class,
-            fieldKey
-        );
         return (inputCount == null ? 0 : inputCount)
-            + (outputCount == null ? 0 : outputCount)
-            + (capabilityCount == null ? 0 : capabilityCount);
+            + (outputCount == null ? 0 : outputCount);
     }
 
     private List<String> normalizePositionIds(WorkflowTemplatePackageSaveRequest request) {
@@ -1405,42 +1231,6 @@ public class WorkflowTemplateService {
 
     private <T> List<T> defaultList(List<T> value) {
         return value == null ? List.of() : value;
-    }
-
-    private void syncCapabilityFieldDefinitions(List<ValidatedTemplateNode> nodes, String userId) {
-        for (ValidatedTemplateNode node : nodes) {
-            if (!hasText(node.moduleDefinitionId())) {
-                continue;
-            }
-            for (ValidatedNodeFieldConfig field : node.inputFields()) {
-                if (field.capabilityDerived()) {
-                    upsertFieldDefinitionFromCapability(field, userId);
-                }
-            }
-            for (ValidatedNodeFieldConfig field : node.outputFields()) {
-                if (field.capabilityDerived()) {
-                    upsertFieldDefinitionFromCapability(field, userId);
-                }
-            }
-        }
-    }
-
-    private void upsertFieldDefinitionFromCapability(ValidatedNodeFieldConfig field, String userId) {
-        jdbc.update(
-            "INSERT INTO mo_workflow_template_field_definitions (" +
-                "id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_by, updated_by" +
-            ") VALUES (?, ?, ?, ?, ?, TRUE, FALSE, NULL, ?, ?, ?) " +
-                "ON CONFLICT (field_key) DO UPDATE SET " +
-                "name = EXCLUDED.name, field_type = EXCLUDED.field_type, description = EXCLUDED.description, enabled = TRUE, display_order = EXCLUDED.display_order, updated_at = NOW(), updated_by = EXCLUDED.updated_by",
-            UUID.randomUUID().toString(),
-            field.fieldKey(),
-            requireText(field.label(), "节点能力字段 label 不能为空"),
-            normalizeFieldType(field.dataType()),
-            blankToNull(field.description()),
-            field.sortOrder(),
-            userId,
-            userId
-        );
     }
 
     private record ValidatedTemplateNode(

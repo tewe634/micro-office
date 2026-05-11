@@ -88,24 +88,29 @@ CREATE TABLE IF NOT EXISTS public.mo_workflow_template_field_definitions (
 CREATE INDEX IF NOT EXISTS idx_mo_workflow_template_field_definitions_enabled_order
     ON public.mo_workflow_template_field_definitions(enabled, display_order, field_key);
 
-INSERT INTO public.mo_workflow_template_field_definitions (
-    id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_by, updated_by
-)
-SELECT
-    gen_random_uuid()::text,
-    mf.field_key,
-    COALESCE(NULLIF(max(mf.label), ''), mf.field_key),
-    COALESCE(NULLIF(max(mf.data_type), ''), 'string'),
-    NULL,
-    true,
-    false,
-    NULL,
-    COALESCE(min(mf.sort_order), 100),
-    'migrate_v55_workflow_template_admin_refactor',
-    'migrate_v55_workflow_template_admin_refactor'
-FROM public.mo_module_fields mf
-GROUP BY mf.field_key
-ON CONFLICT (field_key) DO NOTHING;
+DO $$
+BEGIN
+    IF to_regclass('public.mo_module_fields') IS NOT NULL THEN
+        INSERT INTO public.mo_workflow_template_field_definitions (
+            id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_by, updated_by
+        )
+        SELECT
+            gen_random_uuid()::text,
+            mf.field_key,
+            COALESCE(NULLIF(max(mf.label), ''), mf.field_key),
+            COALESCE(NULLIF(max(mf.data_type), ''), 'string'),
+            NULL,
+            true,
+            false,
+            NULL,
+            COALESCE(min(mf.sort_order), 100),
+            'migrate_v55_workflow_template_admin_refactor',
+            'migrate_v55_workflow_template_admin_refactor'
+        FROM public.mo_module_fields mf
+        GROUP BY mf.field_key
+        ON CONFLICT (field_key) DO NOTHING;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.mo_workflow_template_node_input_fields (
     id varchar(36) PRIMARY KEY,
@@ -145,53 +150,63 @@ CREATE TABLE IF NOT EXISTS public.mo_workflow_template_node_output_fields (
 CREATE INDEX IF NOT EXISTS idx_mo_workflow_template_node_output_fields_node_order
     ON public.mo_workflow_template_node_output_fields(node_template_id, display_order, field_key);
 
-INSERT INTO public.mo_workflow_template_node_input_fields (
-    id, node_template_id, field_key, display_name, display_order, required, read_only, created_by, updated_by
-)
-SELECT
-    gen_random_uuid()::text,
-    n.id,
-    mf.field_key,
-    NULLIF(mf.label, ''),
-    COALESCE(mf.sort_order, 100),
-    COALESCE(mf.required, false),
-    false,
-    'migrate_v55_workflow_template_admin_refactor',
-    'migrate_v55_workflow_template_admin_refactor'
-FROM public.mo_module_fields mf
-JOIN public.mo_workflow_recommendation_package_nodes n
-  ON n.module_definition_id = mf.module_definition_id
-WHERE upper(mf.field_scope) = 'INPUT'
-  AND EXISTS (
-      SELECT 1
-      FROM public.mo_workflow_template_field_definitions fd
-      WHERE fd.field_key = mf.field_key
-  )
-ON CONFLICT (node_template_id, field_key) DO NOTHING;
+DO $$
+BEGIN
+    IF to_regclass('public.mo_module_fields') IS NOT NULL THEN
+        INSERT INTO public.mo_workflow_template_node_input_fields (
+            id, node_template_id, field_key, display_name, display_order, required, read_only, created_by, updated_by
+        )
+        SELECT
+            gen_random_uuid()::text,
+            n.id,
+            mf.field_key,
+            NULLIF(mf.label, ''),
+            COALESCE(mf.sort_order, 100),
+            COALESCE(mf.required, false),
+            false,
+            'migrate_v55_workflow_template_admin_refactor',
+            'migrate_v55_workflow_template_admin_refactor'
+        FROM public.mo_module_fields mf
+        JOIN public.mo_workflow_recommendation_package_nodes n
+          ON n.module_definition_id = mf.module_definition_id
+        WHERE upper(mf.field_scope) = 'INPUT'
+          AND EXISTS (
+              SELECT 1
+              FROM public.mo_workflow_template_field_definitions fd
+              WHERE fd.field_key = mf.field_key
+          )
+        ON CONFLICT (node_template_id, field_key) DO NOTHING;
+    END IF;
+END $$;
 
-INSERT INTO public.mo_workflow_template_node_output_fields (
-    id, node_template_id, field_key, display_name, display_order, required, allow_write_back_parent, created_by, updated_by
-)
-SELECT
-    gen_random_uuid()::text,
-    n.id,
-    mf.field_key,
-    NULLIF(mf.label, ''),
-    COALESCE(mf.sort_order, 100),
-    COALESCE(mf.required, false),
-    false,
-    'migrate_v55_workflow_template_admin_refactor',
-    'migrate_v55_workflow_template_admin_refactor'
-FROM public.mo_module_fields mf
-JOIN public.mo_workflow_recommendation_package_nodes n
-  ON n.module_definition_id = mf.module_definition_id
-WHERE upper(mf.field_scope) = 'OUTPUT'
-  AND EXISTS (
-      SELECT 1
-      FROM public.mo_workflow_template_field_definitions fd
-      WHERE fd.field_key = mf.field_key
-  )
-ON CONFLICT (node_template_id, field_key) DO NOTHING;
+DO $$
+BEGIN
+    IF to_regclass('public.mo_module_fields') IS NOT NULL THEN
+        INSERT INTO public.mo_workflow_template_node_output_fields (
+            id, node_template_id, field_key, display_name, display_order, required, allow_write_back_parent, created_by, updated_by
+        )
+        SELECT
+            gen_random_uuid()::text,
+            n.id,
+            mf.field_key,
+            NULLIF(mf.label, ''),
+            COALESCE(mf.sort_order, 100),
+            COALESCE(mf.required, false),
+            false,
+            'migrate_v55_workflow_template_admin_refactor',
+            'migrate_v55_workflow_template_admin_refactor'
+        FROM public.mo_module_fields mf
+        JOIN public.mo_workflow_recommendation_package_nodes n
+          ON n.module_definition_id = mf.module_definition_id
+        WHERE upper(mf.field_scope) = 'OUTPUT'
+          AND EXISTS (
+              SELECT 1
+              FROM public.mo_workflow_template_field_definitions fd
+              WHERE fd.field_key = mf.field_key
+          )
+        ON CONFLICT (node_template_id, field_key) DO NOTHING;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.mo_workflow_template_node_recommendations (
     id varchar(36) PRIMARY KEY,
