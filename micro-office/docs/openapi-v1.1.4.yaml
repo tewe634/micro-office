@@ -3,38 +3,6 @@ info:
   title: micro-office V1.1.4 Backend API
   version: "1.1.4"
 paths:
-  /api/admin/workflow-node-features:
-    get:
-      summary: List workflow node features
-    post:
-      summary: Create workflow node feature
-  /api/admin/workflow-node-features/{id}:
-    get:
-      summary: Get workflow node feature detail
-    put:
-      summary: Update workflow node feature
-  /api/admin/workflow-node-features/{id}/status:
-    put:
-      summary: Update workflow node feature status (ACTIVE or DISABLED)
-  /api/admin/workflow-node-features/{id}/copy:
-    post:
-      summary: Copy workflow node feature
-  /api/admin/workflow-node-features/{id}/fields:
-    get:
-      summary: Get field contracts
-    put:
-      summary: Save field contracts
-  /api/admin/workflow-node-features/{id}/behaviors:
-    get:
-      summary: Get behavior config with assignment resolution preview
-    put:
-      summary: Save behavior config
-  /api/admin/workflow-node-features/{id}/references:
-    get:
-      summary: Get template references of node feature
-  /api/admin/workflow-node-features/validate-bindings:
-    post:
-      summary: Validate moduleDefinitionIds before template save
   /api/admin/workflow-templates/packages/{id}/nodes:
     put:
-      summary: Save template nodes (enforce ACTIVE node feature binding)
+      summary: Save template nodes

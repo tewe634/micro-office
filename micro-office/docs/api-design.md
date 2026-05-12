@@ -78,25 +78,21 @@
   - `DELETE /api/admin/workflow-templates/packages/{id}`
   - `PUT /api/admin/workflow-templates/packages/{id}/status`（仅 `ACTIVE|DISABLED`）
   - `POST /api/admin/workflow-templates/packages/{id}/copy`
-  - `GET /api/admin/workflow-templates/packages/{id}/nodes`
-  - `PUT /api/admin/workflow-templates/packages/{id}/nodes`（仅更新 nodes，且请求体仅允许 `{ "nodes": [...] }`）
-  - `GET /api/admin/workflow-templates/module-definitions`
-  - `GET /api/admin/workflow-templates/module-definitions/{id}/fields`
-  - `GET /api/admin/workflow-templates/recommendations`
-  - `PUT /api/admin/workflow-templates/packages/{id}/nodes`（保存前强校验绑定节点功能必须 `ACTIVE`）
-  - 节点功能管理：
-    - `GET /api/admin/workflow-node-features`
-    - `GET /api/admin/workflow-node-features/{id}`
-    - `POST /api/admin/workflow-node-features`
-    - `PUT /api/admin/workflow-node-features/{id}`
-    - `PUT /api/admin/workflow-node-features/{id}/status`（仅 `ACTIVE|DISABLED`）
-    - `POST /api/admin/workflow-node-features/{id}/copy`
-    - `GET /api/admin/workflow-node-features/{id}/fields`
-    - `PUT /api/admin/workflow-node-features/{id}/fields`
-    - `GET /api/admin/workflow-node-features/{id}/behaviors`
-    - `PUT /api/admin/workflow-node-features/{id}/behaviors`
-    - `GET /api/admin/workflow-node-features/{id}/references`
-    - `POST /api/admin/workflow-node-features/validate-bindings`
+  - `GET /api/admin/workflow-templates/packages/{id}/node-graph`
+  - `PUT /api/admin/workflow-templates/packages/{id}/node-graph`
+ - 节点设计：
+  - `GET /api/admin/workflow-node-designs`
+  - `GET /api/admin/workflow-node-designs/{id}`
+  - `POST /api/admin/workflow-node-designs`
+  - `PUT /api/admin/workflow-node-designs/{id}`
+  - `PUT /api/admin/workflow-node-designs/{id}/status`
+  - `DELETE /api/admin/workflow-node-designs/{id}`
+  - `GET /api/admin/workflow-node-designs/{id}/input-fields`
+  - `PUT /api/admin/workflow-node-designs/{id}/input-fields`
+  - `GET /api/admin/workflow-node-designs/{id}/output-fields`
+  - `PUT /api/admin/workflow-node-designs/{id}/output-fields`
+  - `GET /api/admin/workflow-node-designs/{id}/recommendations`
+  - `PUT /api/admin/workflow-node-designs/{id}/recommendations`
 - 模板预览：`GET /api/admin/portal-templates/templates/{id}/preview?entityType=&entityId=`
 - 卡片块定义管理：
   - `GET /api/admin/portal-block-templates`
@@ -159,10 +155,395 @@
   - `POST /api/workflows/from-template` 会校验模板岗位归属；用户岗位与模板绑定岗位无交集时返回 `403`
   - `sceneCategory/scene_category` 退化为可空的推荐作用域兼容字段，不再作为模板主分类字段
 - `POST /api/workflows/from-template` 仅允许 `ACTIVE` 模板实例化；`DISABLED` 模板返回 `400` 明确拒绝。
-- 节点功能状态仅允许 `ACTIVE` 与 `DISABLED`；不支持 `DRAFT`。
-- 模板节点绑定 `DISABLED` 节点功能会被明确拦截并返回可展示错误信息。
-- 行为配置解析链路固定为：`POSITION -> ROLE -> DEFAULT`（岗位优先，角色兜底）。
-- V1.1.5 起：`PUT /packages/{id}/nodes` 若携带 package 字段（如 `name/status/scene_category/position_id/sort_order`）返回 `400`。
+- 当前后端已移除旧 `workflow-node-features` 管理接口，不再暴露旧节点能力、旧字段契约、旧行为配置入口，也不再把 `mo_module_definitions / mo_module_fields` 作为模板管理主路径。
+- V1.1.13 起独立节点设计主模型固定为 `mo_workflow_recommendation_package_nodes` 中 `package_id IS NULL` 的记录。
+- V1.1.13 起工作流模板编排主路径改为 `GET/PUT /api/admin/workflow-templates/packages/{id}/node-graph`，数据落在 `mo_workflow_recommendation_packages.meta.nodeGraph`。
+- V1.1.13 起后端不再往 `mo_workflow_recommendation_package_nodes` 写工作流引用副本；工作流模板详情返回 `nodeGraph` 与装配后的 `nodeGraphDetail.nodeDefinitions`。
+
+## 6. 工作流模板接口协议
+
+### 6.1 模板包列表
+
+- `GET /api/admin/workflow-templates/packages`
+
+query：
+
+- `positionId`：可选，按岗位过滤
+- `status`：可选，仅支持 `ACTIVE | DISABLED`
+
+返回列表项字段：
+
+- `id`
+- `name`
+- `code`
+- `positionId`
+- `positionName`
+- `positionIds`
+- `positionNames`
+- `description`
+- `status`
+- `sortOrder`
+- `allowCreateAsNormal`
+- `allowCreateAsSubflow`
+- `version`
+- `createdAt`
+- `createdBy`
+- `updatedAt`
+- `updatedBy`
+
+### 6.2 模板岗位选项
+
+- `GET /api/admin/workflow-templates/positions`
+
+返回字段：
+
+- `id`
+- `name`
+- `code`
+
+### 6.3 模板包详情
+
+- `GET /api/admin/workflow-templates/packages/{id}`
+
+返回字段与列表项一致：
+
+- `id`
+- `name`
+- `code`
+- `positionId`
+- `positionName`
+- `positionIds`
+- `positionNames`
+- `description`
+- `status`
+- `sortOrder`
+- `allowCreateAsNormal`
+- `allowCreateAsSubflow`
+- `version`
+- `createdAt`
+- `createdBy`
+- `updatedAt`
+- `updatedBy`
+
+### 6.4 新建模板包
+
+- `POST /api/admin/workflow-templates/packages`
+
+body：
+
+```json
+{
+  "name": "销售标准流程",
+  "code": "WF_20260511",
+  "applicableSubjectType": null,
+  "positionId": "optional-position-id",
+  "positionIds": ["optional-position-id-1", "optional-position-id-2"],
+  "description": "模板说明",
+  "version": 1,
+  "allowCreateAsNormal": true,
+  "allowCreateAsSubflow": false,
+  "sortOrder": 100
+}
+```
+
+说明：
+
+- `name` 必填
+- `code` 传空时后端自动生成；传值时按大写模板编码校验
+- `positionId` 与 `positionIds` 可同时传，后端会合并去重
+- `positionIds` 中岗位必须真实存在，否则返回 `400 关联岗位不存在`
+- 默认创建状态为 `DISABLED`
+
+### 6.5 更新模板包
+
+- `PUT /api/admin/workflow-templates/packages/{id}`
+
+body 形状与新建一致。
+
+说明：
+
+- 仅更新 package 基本信息
+- 不在这个接口里保存节点
+
+### 6.6 更新模板包状态
+
+- `PUT /api/admin/workflow-templates/packages/{id}/status`
+
+body：
+
+```json
+{
+  "status": "ACTIVE"
+}
+```
+
+状态枚举：
+
+- `ACTIVE`
+- `DISABLED`
+
+### 6.7 复制模板包
+
+- `POST /api/admin/workflow-templates/packages/{id}/copy`
+
+说明：
+
+- 后端会复制 package、position 绑定、nodes、inputFields、outputFields、recommendedTemplates
+- 新复制出的模板状态固定为 `DISABLED`
+
+### 6.8 删除模板包
+
+- `DELETE /api/admin/workflow-templates/packages/{id}`
+
+返回字段：
+
+- `id`
+- `name`
+- `deletedBy`
+
+### 6.9 模板节点图
+
+- `GET /api/admin/workflow-templates/packages/{id}/node-graph`
+
+返回字段：
+
+- `templateId`
+- `nodeGraph`
+- `nodeDefinitions`
+
+其中：
+
+- `nodeGraph`
+
+```json
+[
+  ["node-id-1"],
+  ["node-id-2", "node-id-3"],
+  ["node-id-4"]
+]
+```
+
+- `nodeDefinitions[]`
+  - `id`
+  - `moduleDefinitionId`
+  - `name`
+  - `code`
+  - `nodeType`
+  - `status`
+  - `version`
+  - `inputFields`
+  - `outputFields`
+  - `recommendedTemplates`
+
+说明：
+
+- 外层数组代表流程层级顺序。
+- 内层数组代表同层节点；单元素为串行，多元素为并行。
+- 后端会按 `nodeGraph` 装配出对应节点定义。
+
+### 6.10 保存模板节点图
+
+- `PUT /api/admin/workflow-templates/packages/{id}/node-graph`
+
+body：
+
+```json
+{
+  "nodeGraph": [
+    ["node-id-1"],
+    ["node-id-2", "node-id-3"],
+    ["node-id-4"]
+  ]
+}
+```
+
+说明：
+
+- 请求体只允许 `nodeGraph`
+- `nodeGraph` 必须是二维数组
+- 不允许空层
+- 所有节点 id 必须命中独立节点设计资源 `/api/admin/workflow-node-designs/{id}`
+- 同一节点在同一模板的 `nodeGraph` 中不能重复
+- 不再支持 `PUT /packages/{id}/nodes` 旧工作流节点副本保存语义
+
+### 6.11 推荐模板读取口径
+
+- 节点推荐模板改由 `GET /api/admin/workflow-node-designs/{id}/recommendations` 读取
+- `recommendedTemplates` 数据来源为 `mo_workflow_template_node_recommendations`
+- 当前不再单独暴露 `GET /api/admin/workflow-templates/recommendations`
+- 前端如需为“推荐工作流模板”提供候选下拉，可直接使用 `GET /api/admin/workflow-templates/packages` 作为候选模板来源
+
+### 6.12 节点设计接口
+
+- `GET /api/admin/workflow-node-designs`
+
+query：
+
+- `status`：可选，`ACTIVE | DISABLED`
+- `keyword`：可选，按 `name/code` 模糊搜索
+
+列表/详情返回字段：
+
+- `id`
+- `moduleDefinitionId`
+- `name`
+- `code`
+- `nodeType`
+- `status`
+- `version`
+- `createdAt`
+- `createdBy`
+- `updatedAt`
+- `updatedBy`
+
+- `POST /api/admin/workflow-node-designs`
+- `PUT /api/admin/workflow-node-designs/{id}`
+
+body：
+
+```json
+{
+  "id": "optional-node-design-id",
+  "moduleDefinitionId": null,
+  "name": "发起申请",
+  "code": "START_APPLY",
+  "nodeType": "TASK",
+  "version": 1
+}
+```
+
+- `PUT /api/admin/workflow-node-designs/{id}/status`
+
+body：
+
+```json
+{
+  "status": "ACTIVE"
+}
+```
+
+- `GET /api/admin/workflow-node-designs/{id}/input-fields`
+- `PUT /api/admin/workflow-node-designs/{id}/input-fields`
+- `GET /api/admin/workflow-node-designs/{id}/output-fields`
+- `PUT /api/admin/workflow-node-designs/{id}/output-fields`
+
+字段 body：
+
+```json
+{
+  "fields": [
+    {
+      "fieldKey": "customer_name",
+      "label": "客户名称",
+      "required": true,
+      "readOnly": false,
+      "sortOrder": 100
+    }
+  ]
+}
+```
+
+说明：
+
+- 输入字段使用 `readOnly`
+- 输出字段沿用同一 body 结构，后端会将 `readOnly` 映射为输出侧写回控制
+- `fieldKey` 必须命中 `mo_workflow_template_field_definitions`
+
+- `GET /api/admin/workflow-node-designs/{id}/recommendations`
+- `PUT /api/admin/workflow-node-designs/{id}/recommendations`
+
+推荐模板 body：
+
+```json
+{
+  "recommendations": [
+    {
+      "recommendedWorkflowTemplateId": "template-id",
+      "reason": "适用于大客户",
+      "displayOrder": 100,
+      "enabled": true
+    }
+  ]
+}
+```
+
+### 6.13 字段字典接口
+
+- `GET /api/admin/workflow-templates/field-definitions`
+- `POST /api/admin/workflow-templates/field-definitions`
+- `PUT /api/admin/workflow-templates/field-definitions/{fieldKey}`
+- `DELETE /api/admin/workflow-templates/field-definitions/{fieldKey}`
+
+字段定义 body：
+
+```json
+{
+  "fieldKey": "customer_name",
+  "name": "客户名称",
+  "fieldType": "string",
+  "description": "客户主名称",
+  "enabled": true,
+  "sensitive": false,
+  "groupKey": "customer",
+  "displayOrder": 100,
+  "meta": {
+    "listSubFields": []
+  }
+}
+```
+
+`fieldType` 枚举：
+
+- `string`
+- `text`
+- `number`
+- `boolean`
+- `date`
+- `datetime`
+- `list`
+- `json`
+
+补充：
+
+- V1.1.14 起字段定义正式支持 `meta.listSubFields`
+- 当 `fieldType = list` 时，可提交：
+
+```json
+{
+  "fieldKey": "expense_items",
+  "name": "费用明细",
+  "fieldType": "list",
+  "description": "费用条目列表",
+  "enabled": true,
+  "sensitive": false,
+  "groupKey": "expense",
+  "displayOrder": 100,
+  "meta": {
+    "listSubFields": [
+      {
+        "fieldKey": "item_name",
+        "name": "项目名称",
+        "fieldType": "string",
+        "required": true,
+        "sortOrder": 100,
+        "description": "条目名称"
+      },
+      {
+        "fieldKey": "amount",
+        "name": "金额",
+        "fieldType": "number",
+        "required": true,
+        "sortOrder": 200,
+        "description": "条目金额"
+      }
+    ]
+  }
+}
+```
+
+- 当 `fieldType != list` 时，`meta.listSubFields` 必须为空
+- 同一字段定义下 `listSubFields[].fieldKey` 不允许重复
+- 首版 `listSubFields[].fieldType` 不允许再次为 `list`
 
 ## 7. OpenAPI（V1.1.4）
 

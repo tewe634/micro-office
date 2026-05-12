@@ -1,11 +1,16 @@
 package com.microoffice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microoffice.dto.request.WorkflowFromTemplateRequest;
+import com.microoffice.dto.request.WorkflowNodeDesignSaveRequest;
+import com.microoffice.dto.request.WorkflowNodeFieldSaveRequest;
+import com.microoffice.dto.request.WorkflowNodeFieldsSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateFieldDefinitionSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateNodeFieldConfigSaveRequest;
+import com.microoffice.dto.request.WorkflowTemplateNodeGraphSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateNodeRecommendationSaveRequest;
-import com.microoffice.dto.request.WorkflowTemplateNodeSaveRequest;
-import com.microoffice.dto.request.WorkflowTemplateNodesSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplatePackageSaveRequest;
 import com.microoffice.dto.response.WorkflowInstantiationResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +47,7 @@ public class WorkflowTemplateService {
     private static final Pattern FIELD_KEY_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*$");
 
     private final JdbcTemplate jdbc;
+    private final ObjectMapper objectMapper;
 
     public List<Map<String, Object>> listPackages(String positionId, String status) {
         List<Object> args = new ArrayList<>();
@@ -60,11 +66,14 @@ public class WorkflowTemplateService {
             args.add(normalizeStatus(status));
         }
         sql.append(" ORDER BY p.sort_order, p.updated_at DESC, p.created_at DESC");
-        return enrichPackagePositionBindings(jdbc.queryForList(sql.toString(), args.toArray()).stream().map(this::toPackageMap).toList());
+        return enrichPackagePositionBindings(jdbc.queryForList(sql.toString(), args.toArray()).stream().map(this::toPackageMap).toList())
+            .stream()
+            .map(this::attachPackageNodeGraphSummary)
+            .toList();
     }
 
     public Map<String, Object> getPackage(String id) {
-        return loadPackageOrThrow(id);
+        return attachPackageNodeGraphDetails(loadPackageOrThrow(id));
     }
 
     public List<Map<String, Object>> listTemplatePositions() {
@@ -94,8 +103,8 @@ public class WorkflowTemplateService {
 
         jdbc.update(
             "INSERT INTO mo_workflow_recommendation_packages (" +
-                "id, name, code, position_id, applicable_subject_type, description, status, sort_order, allow_create_as_normal, allow_create_as_subflow, version, created_by, updated_by" +
-            ") VALUES (?, ?, ?, ?, ?, ?, 'DISABLED', ?, ?, ?, ?, ?, ?)",
+                "id, name, code, position_id, applicable_subject_type, description, status, sort_order, allow_create_as_normal, allow_create_as_subflow, version, meta, created_by, updated_by" +
+            ") VALUES (?, ?, ?, ?, ?, ?, 'DISABLED', ?, ?, ?, ?, ?::jsonb, ?, ?)",
             id,
             requireText(request.getName(), "模板名称不能为空"),
             code,
@@ -106,11 +115,12 @@ public class WorkflowTemplateService {
             defaultTrue(request.getAllowCreateAsNormal()),
             defaultFalse(request.getAllowCreateAsSubflow()),
             version,
+            emptyNodeGraphMetaJson(),
             userId,
             userId
         );
         replacePackagePositionBindings(id, positionIds, userId);
-        return loadPackageOrThrow(id);
+        return getPackage(id);
     }
 
     @Transactional
@@ -141,7 +151,7 @@ public class WorkflowTemplateService {
             id
         );
         replacePackagePositionBindings(id, positionIds, userId);
-        return loadPackageOrThrow(id);
+        return getPackage(id);
     }
 
     @Transactional
@@ -155,12 +165,12 @@ public class WorkflowTemplateService {
         if (updated == 0) {
             throw new ResponseStatusException(NOT_FOUND, "工作流模板不存在");
         }
-        return loadPackageOrThrow(id);
+        return getPackage(id);
     }
 
     @Transactional
     public Map<String, Object> deletePackage(String id, String userId) {
-        Map<String, Object> source = loadPackageOrThrow(id);
+        Map<String, Object> source = getPackage(id);
         int deleted = jdbc.update("DELETE FROM mo_workflow_recommendation_packages WHERE id = ?", id);
         if (deleted == 0) {
             throw new ResponseStatusException(NOT_FOUND, "工作流模板不存在");
@@ -174,15 +184,16 @@ public class WorkflowTemplateService {
 
     @Transactional
     public Map<String, Object> copyPackage(String id, String userId) {
-        Map<String, Object> source = loadPackageOrThrow(id);
+        Map<String, Object> source = getPackage(id);
         String copiedId = UUID.randomUUID().toString();
         String copiedCode = generateCopiedTemplateCode(asString(source.get("code")), asInt(source.get("version"), 1));
         List<String> sourcePositionIds = asStringList(source.get("positionIds"));
+        String copiedMeta = serializePackageMetaGraph(asNodeGraph(source.get("nodeGraph")));
 
         jdbc.update(
             "INSERT INTO mo_workflow_recommendation_packages (" +
-                "id, name, code, position_id, applicable_subject_type, description, status, sort_order, allow_create_as_normal, allow_create_as_subflow, version, created_by, updated_by" +
-            ") VALUES (?, ?, ?, ?, ?, ?, 'DISABLED', ?, ?, ?, ?, ?, ?)",
+                "id, name, code, position_id, applicable_subject_type, description, status, sort_order, allow_create_as_normal, allow_create_as_subflow, version, meta, created_by, updated_by" +
+            ") VALUES (?, ?, ?, ?, ?, ?, 'DISABLED', ?, ?, ?, ?, ?::jsonb, ?, ?)",
             copiedId,
             asString(source.get("name")) + "（复制）",
             copiedCode,
@@ -193,211 +204,38 @@ public class WorkflowTemplateService {
             asBoolean(source.get("allowCreateAsNormal"), true),
             asBoolean(source.get("allowCreateAsSubflow"), false),
             asInt(source.get("version"), 1),
+            copiedMeta,
             userId,
             userId
         );
         replacePackagePositionBindings(copiedId, sourcePositionIds, userId);
-
-        List<Map<String, Object>> sourceNodes = listPackageNodes(id);
-        Map<String, String> nodeIdMap = new LinkedHashMap<>();
-        for (Map<String, Object> node : sourceNodes) {
-            nodeIdMap.put(asString(node.get("id")), UUID.randomUUID().toString());
-        }
-
-        for (Map<String, Object> node : sourceNodes) {
-            String newNodeId = nodeIdMap.get(asString(node.get("id")));
-            jdbc.update(
-                "INSERT INTO mo_workflow_recommendation_package_nodes (" +
-                    "id, package_id, module_definition_id, parent_package_node_id, sort_order, display_name, hierarchy_level, relation_type, branch_group_key, branch_order, " +
-                    "code, node_type, is_main_path, allow_append_next_node, allow_derive_subflow, version, meta, created_by, updated_by" +
-                ") VALUES (?, ?, ?, NULL, ?, ?, 0, 'SEQUENCE', NULL, NULL, ?, ?, ?, ?, ?, ?, '{}'::jsonb, ?, ?)",
-                newNodeId,
-                copiedId,
-                blankToNull(asString(node.get("moduleDefinitionId"))),
-                asInt(node.get("sequence"), 1),
-                requireText(node.get("name"), "节点名称不能为空"),
-                requireText(node.get("code"), "节点编码不能为空"),
-                requireText(node.get("nodeType"), "节点类型不能为空"),
-                asBoolean(node.get("isMainPath"), true),
-                asBoolean(node.get("allowAppendNextNode"), false),
-                asBoolean(node.get("allowDeriveSubflow"), false),
-                asInt(node.get("version"), 1),
-                userId,
-                userId
-            );
-
-            for (Map<String, Object> field : asMapList(node.get("inputFields"))) {
-                jdbc.update(
-                    "INSERT INTO mo_workflow_template_node_input_fields (" +
-                        "id, node_template_id, field_key, display_name, display_order, required, read_only, created_by, updated_by" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(),
-                    newNodeId,
-                    asString(field.get("fieldKey")),
-                    blankToNull(asString(field.get("displayName"))),
-                    asInt(field.get("displayOrder"), 100),
-                    asBoolean(field.get("required"), false),
-                    asBoolean(field.get("readOnly"), false),
-                    userId,
-                    userId
-                );
-            }
-
-            for (Map<String, Object> field : asMapList(node.get("outputFields"))) {
-                jdbc.update(
-                    "INSERT INTO mo_workflow_template_node_output_fields (" +
-                        "id, node_template_id, field_key, display_name, display_order, required, allow_write_back_parent, created_by, updated_by" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(),
-                    newNodeId,
-                    asString(field.get("fieldKey")),
-                    blankToNull(asString(field.get("displayName"))),
-                    asInt(field.get("displayOrder"), 100),
-                    asBoolean(field.get("required"), false),
-                    asBoolean(field.get("allowWriteBackParent"), false),
-                    userId,
-                    userId
-                );
-            }
-
-            for (Map<String, Object> recommendation : asMapList(node.get("recommendedTemplates"))) {
-                jdbc.update(
-                    "INSERT INTO mo_workflow_template_node_recommendations (" +
-                        "id, current_node_template_id, recommended_workflow_template_id, reason, display_order, enabled, created_by, updated_by" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(),
-                    newNodeId,
-                    asString(recommendation.get("recommendedWorkflowTemplateId")),
-                    blankToNull(asString(recommendation.get("reason"))),
-                    asInt(recommendation.get("displayOrder"), 100),
-                    asBoolean(recommendation.get("enabled"), true),
-                    userId,
-                    userId
-                );
-            }
-        }
-
-        return loadPackageOrThrow(copiedId);
+        return getPackage(copiedId);
     }
 
-    public List<Map<String, Object>> listPackageNodes(String packageId) {
-        ensurePackageExists(packageId);
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT n.id, n.package_id, n.module_definition_id, n.display_name, n.code, n.node_type, n.sort_order, n.is_main_path, n.allow_append_next_node, n.allow_derive_subflow, n.version, " +
-                "n.module_definition_id AS module_definition_code, n.display_name AS module_definition_name, true AS module_definition_active " +
-                "FROM mo_workflow_recommendation_package_nodes n " +
-                "WHERE package_id = ? ORDER BY sort_order, id",
-            packageId
-        );
-        List<Map<String, Object>> nodes = new ArrayList<>();
-        List<String> nodeIds = new ArrayList<>();
-        LinkedHashSet<String> moduleDefinitionIds = new LinkedHashSet<>();
-        for (Map<String, Object> row : rows) {
-            Map<String, Object> item = toTemplateNodeMap(row);
-            nodes.add(item);
-            nodeIds.add(asString(row.get("id")));
-            String moduleDefinitionId = asString(row.get("module_definition_id"));
-            if (hasText(moduleDefinitionId)) {
-                moduleDefinitionIds.add(moduleDefinitionId);
-            }
-        }
-        Map<String, List<Map<String, Object>>> inputFieldMap = loadNodeFieldConfigMap(nodeIds, true);
-        Map<String, List<Map<String, Object>>> outputFieldMap = loadNodeFieldConfigMap(nodeIds, false);
-        Map<String, List<Map<String, Object>>> recommendationMap = loadNodeRecommendationMap(nodeIds);
-        for (Map<String, Object> node : nodes) {
-            String nodeId = asString(node.get("id"));
-            node.put("inputFields", inputFieldMap.getOrDefault(nodeId, List.of()));
-            node.put("outputFields", outputFieldMap.getOrDefault(nodeId, List.of()));
-            node.put("capabilityBound", false);
-            node.put("recommendedTemplates", recommendationMap.getOrDefault(nodeId, List.of()));
-        }
-        return nodes;
+    public Map<String, Object> getPackageNodeGraph(String packageId) {
+        Map<String, Object> pkg = loadPackageOrThrow(packageId);
+        return buildNodeGraphResponse(asString(pkg.get("id")), asNodeGraph(pkg.get("nodeGraph")));
     }
 
     @Transactional
-    public List<Map<String, Object>> saveNodes(String packageId, WorkflowTemplateNodesSaveRequest request, String userId) {
+    public Map<String, Object> savePackageNodeGraph(String packageId, WorkflowTemplateNodeGraphSaveRequest request, String userId) {
         ensurePackageExists(packageId);
-        List<ValidatedTemplateNode> nodes = validateTemplateNodes(packageId, request == null ? List.of() : request.getNodes());
-        jdbc.update("DELETE FROM mo_workflow_recommendation_package_nodes WHERE package_id = ?", packageId);
-
-        for (ValidatedTemplateNode node : nodes.stream().sorted(Comparator.comparingInt(ValidatedTemplateNode::sequence)).toList()) {
-            jdbc.update(
-                "INSERT INTO mo_workflow_recommendation_package_nodes (" +
-                    "id, package_id, module_definition_id, parent_package_node_id, sort_order, display_name, hierarchy_level, relation_type, branch_group_key, branch_order, " +
-                    "code, node_type, is_main_path, allow_append_next_node, allow_derive_subflow, version, meta, created_by, updated_by" +
-                ") VALUES (?, ?, ?, NULL, ?, ?, 0, 'SEQUENCE', NULL, NULL, ?, ?, ?, ?, ?, ?, '{}'::jsonb, ?, ?)",
-                node.id(),
-                packageId,
-                node.moduleDefinitionId(),
-                node.sequence(),
-                node.name(),
-                node.code(),
-                node.nodeType(),
-                node.isMainPath(),
-                node.allowAppendNextNode(),
-                node.allowDeriveSubflow(),
-                node.version(),
-                userId,
-                userId
-            );
-
-            for (ValidatedNodeFieldConfig field : node.inputFields()) {
-                jdbc.update(
-                    "INSERT INTO mo_workflow_template_node_input_fields (" +
-                        "id, node_template_id, field_key, display_name, display_order, required, read_only, created_by, updated_by" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(),
-                    node.id(),
-                    field.fieldKey(),
-                    blankToNull(field.displayName()),
-                    field.displayOrder(),
-                    field.required(),
-                    field.readOnly(),
-                    userId,
-                    userId
-                );
-            }
-
-            for (ValidatedNodeFieldConfig field : node.outputFields()) {
-                jdbc.update(
-                    "INSERT INTO mo_workflow_template_node_output_fields (" +
-                        "id, node_template_id, field_key, display_name, display_order, required, allow_write_back_parent, created_by, updated_by" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(),
-                    node.id(),
-                    field.fieldKey(),
-                    blankToNull(field.displayName()),
-                    field.displayOrder(),
-                    field.required(),
-                    field.allowWriteBackParent(),
-                    userId,
-                    userId
-                );
-            }
-
-            for (ValidatedNodeRecommendation recommendation : node.recommendedTemplates()) {
-                jdbc.update(
-                    "INSERT INTO mo_workflow_template_node_recommendations (" +
-                        "id, current_node_template_id, recommended_workflow_template_id, reason, display_order, enabled, created_by, updated_by" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    UUID.randomUUID().toString(),
-                    node.id(),
-                    recommendation.recommendedWorkflowTemplateId(),
-                    recommendation.reason(),
-                    recommendation.displayOrder(),
-                    recommendation.enabled(),
-                    userId,
-                    userId
-                );
-            }
-        }
-        return listPackageNodes(packageId);
+        List<List<String>> nodeGraph = validateNodeGraph(request == null ? null : request.getNodeGraph());
+        jdbc.update(
+            "UPDATE mo_workflow_recommendation_packages " +
+                "SET meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{nodeGraph}', ?::jsonb, TRUE), updated_at = NOW(), updated_by = ? " +
+                "WHERE id = ?",
+            serializeNodeGraph(nodeGraph),
+            userId,
+            packageId
+        );
+        return getPackageNodeGraph(packageId);
     }
 
     public List<Map<String, Object>> listFieldDefinitions(Boolean enabled, String keyword) {
         List<Object> args = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-            "SELECT id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_at, updated_at " +
+            "SELECT id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, meta, created_at, updated_at " +
                 "FROM mo_workflow_template_field_definitions WHERE 1=1"
         );
         if (enabled != null) {
@@ -420,25 +258,220 @@ public class WorkflowTemplateService {
         return result;
     }
 
+    public List<Map<String, Object>> listNodeDesigns(String status, String keyword) {
+        List<Object> args = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+            "SELECT DISTINCT n.id, n.module_definition_id, n.display_name, n.code, n.node_type, n.version, n.created_at, n.created_by, n.updated_at, n.updated_by, " +
+                "COALESCE(n.meta ->> 'status', 'ACTIVE') AS status " +
+                "FROM mo_workflow_recommendation_package_nodes n " +
+                "WHERE n.package_id IS NULL"
+        );
+        if (hasText(keyword)) {
+            sql.append(" AND (n.display_name ILIKE ? OR n.code ILIKE ?)");
+            String like = "%" + keyword.trim() + "%";
+            args.add(like);
+            args.add(like);
+        }
+        if (hasText(status)) {
+            sql.append(" AND COALESCE(n.meta ->> 'status', 'ACTIVE') = ?");
+            args.add(normalizeStatus(status));
+        }
+        sql.append(" ORDER BY n.updated_at DESC, n.created_at DESC, n.id");
+        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            result.add(toNodeDesignMap(row));
+        }
+        return result;
+    }
+
+    public Map<String, Object> getNodeDesign(String id) {
+        Map<String, Object> node = loadNodeDesignOrThrow(id);
+        node.put("inputFields", listNodeDesignFields(id, true));
+        node.put("outputFields", listNodeDesignFields(id, false));
+        node.put("recommendedTemplates", listNodeDesignRecommendations(id));
+        return node;
+    }
+
+    @Transactional
+    public Map<String, Object> createNodeDesign(WorkflowNodeDesignSaveRequest request, String userId) {
+        requireRequest(request);
+        String id = normalizeNodeId(request.getId());
+        ensureNodeDesignCodeUnique(normalizeNodeCode(request.getCode()), null);
+        jdbc.update(
+            "INSERT INTO mo_workflow_recommendation_package_nodes (" +
+                "id, package_id, module_definition_id, parent_package_node_id, sort_order, display_name, hierarchy_level, relation_type, branch_group_key, branch_order, " +
+                "code, node_type, is_main_path, allow_append_next_node, allow_derive_subflow, version, meta, created_by, updated_by" +
+            ") VALUES (?, NULL, ?, NULL, 0, ?, 0, 'SEQUENCE', NULL, NULL, ?, ?, TRUE, FALSE, FALSE, ?, jsonb_build_object('status', 'ACTIVE'), ?, ?)",
+            id,
+            blankToNull(request.getModuleDefinitionId()),
+            requireText(request.getName(), "节点名称不能为空"),
+            normalizeNodeCode(request.getCode()),
+            normalizeNodeType(request.getNodeType()),
+            normalizeVersion(request.getVersion()),
+            userId,
+            userId
+        );
+        return getNodeDesign(id);
+    }
+
+    @Transactional
+    public Map<String, Object> updateNodeDesign(String id, WorkflowNodeDesignSaveRequest request, String userId) {
+        requireRequest(request);
+        Map<String, Object> current = loadNodeDesignOrThrow(id);
+        String code = normalizeNodeCode(request.getCode());
+        ensureNodeDesignCodeUnique(code, id);
+        jdbc.update(
+            "UPDATE mo_workflow_recommendation_package_nodes " +
+                "SET module_definition_id = ?, display_name = ?, code = ?, node_type = ?, version = ?, updated_at = NOW(), updated_by = ? " +
+                "WHERE id = ? AND package_id IS NULL",
+            blankToNull(request.getModuleDefinitionId()),
+            requireText(request.getName(), "节点名称不能为空"),
+            code,
+            normalizeNodeType(request.getNodeType()),
+            normalizeVersion(request.getVersion() == null ? asInt(current.get("version"), 1) : request.getVersion()),
+            userId,
+            id
+        );
+        return getNodeDesign(id);
+    }
+
+    @Transactional
+    public Map<String, Object> updateNodeDesignStatus(String id, String status, String userId) {
+        Map<String, Object> current = loadNodeDesignOrThrow(id);
+        String normalizedStatus = normalizeStatus(status);
+        jdbc.update(
+            "UPDATE mo_workflow_recommendation_package_nodes " +
+                "SET meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('status', ?), updated_at = NOW(), updated_by = ? " +
+                "WHERE id = ? AND package_id IS NULL",
+            normalizedStatus,
+            userId,
+            id
+        );
+        return getNodeDesign(id);
+    }
+
+    @Transactional
+    public Map<String, Object> deleteNodeDesign(String id, String userId) {
+        Map<String, Object> source = loadNodeDesignOrThrow(id);
+        ensureNodeDesignNotReferencedByAnyTemplate(id);
+        jdbc.update("DELETE FROM mo_workflow_template_node_input_fields WHERE node_template_id = ?", id);
+        jdbc.update("DELETE FROM mo_workflow_template_node_output_fields WHERE node_template_id = ?", id);
+        jdbc.update("DELETE FROM mo_workflow_template_node_recommendations WHERE current_node_template_id = ?", id);
+        int deleted = jdbc.update("DELETE FROM mo_workflow_recommendation_package_nodes WHERE id = ? AND package_id IS NULL", id);
+        if (deleted == 0) {
+            throw new ResponseStatusException(NOT_FOUND, "节点定义不存在");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", id);
+        result.put("name", asString(source.get("name")));
+        result.put("deletedBy", userId);
+        return result;
+    }
+
+    public List<Map<String, Object>> listNodeDesignFields(String nodeId, boolean inputScope) {
+        loadNodeDesignOrThrow(nodeId);
+        return loadNodeFieldConfigMap(List.of(nodeId), inputScope).getOrDefault(nodeId, List.of());
+    }
+
+    @Transactional
+    public List<Map<String, Object>> saveNodeDesignFields(String nodeId,
+                                                          WorkflowNodeFieldsSaveRequest request,
+                                                          boolean inputScope,
+                                                          String userId) {
+        loadNodeDesignOrThrow(nodeId);
+        List<WorkflowNodeFieldSaveRequest> requestFields = request == null ? List.of() : defaultList(request.getFields());
+        List<ValidatedNodeFieldConfig> fields = validateNodeDesignFields(requestFields, inputScope);
+        String table = inputScope ? "mo_workflow_template_node_input_fields" : "mo_workflow_template_node_output_fields";
+        jdbc.update("DELETE FROM " + table + " WHERE node_template_id = ?", nodeId);
+        for (ValidatedNodeFieldConfig field : fields) {
+            if (inputScope) {
+                jdbc.update(
+                    "INSERT INTO mo_workflow_template_node_input_fields (" +
+                        "id, node_template_id, field_key, display_name, display_order, required, read_only, created_by, updated_by" +
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID().toString(),
+                    nodeId,
+                    field.fieldKey(),
+                    blankToNull(field.displayName()),
+                    field.displayOrder(),
+                    field.required(),
+                    field.readOnly(),
+                    userId,
+                    userId
+                );
+            } else {
+                jdbc.update(
+                    "INSERT INTO mo_workflow_template_node_output_fields (" +
+                        "id, node_template_id, field_key, display_name, display_order, required, allow_write_back_parent, created_by, updated_by" +
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    UUID.randomUUID().toString(),
+                    nodeId,
+                    field.fieldKey(),
+                    blankToNull(field.displayName()),
+                    field.displayOrder(),
+                    field.required(),
+                    field.allowWriteBackParent(),
+                    userId,
+                    userId
+                );
+            }
+        }
+        return listNodeDesignFields(nodeId, inputScope);
+    }
+
+    public List<Map<String, Object>> listNodeDesignRecommendations(String nodeId) {
+        loadNodeDesignOrThrow(nodeId);
+        return loadNodeRecommendationMap(List.of(nodeId)).getOrDefault(nodeId, List.of());
+    }
+
+    @Transactional
+    public List<Map<String, Object>> saveNodeDesignRecommendations(String nodeId,
+                                                                   com.microoffice.dto.request.WorkflowNodeRecommendationsSaveRequest request,
+                                                                   String userId) {
+        loadNodeDesignOrThrow(nodeId);
+        List<ValidatedNodeRecommendation> recommendations = validateNodeRecommendations(nodeId, request == null ? List.of() : defaultList(request.getRecommendations()));
+        jdbc.update("DELETE FROM mo_workflow_template_node_recommendations WHERE current_node_template_id = ?", nodeId);
+        for (ValidatedNodeRecommendation recommendation : recommendations) {
+            jdbc.update(
+                "INSERT INTO mo_workflow_template_node_recommendations (" +
+                    "id, current_node_template_id, recommended_workflow_template_id, reason, display_order, enabled, created_by, updated_by" +
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                UUID.randomUUID().toString(),
+                nodeId,
+                recommendation.recommendedWorkflowTemplateId(),
+                recommendation.reason(),
+                recommendation.displayOrder(),
+                recommendation.enabled(),
+                userId,
+                userId
+            );
+        }
+        return listNodeDesignRecommendations(nodeId);
+    }
+
     @Transactional
     public Map<String, Object> createFieldDefinition(WorkflowTemplateFieldDefinitionSaveRequest request, String userId) {
         requireFieldDefinitionRequest(request);
         String fieldKey = normalizeFieldKey(request.getFieldKey());
         ensureFieldKeyUnique(fieldKey, null);
+        String fieldType = normalizeFieldType(request.getFieldType());
+        String metaJson = serializeFieldDefinitionMeta(validateFieldDefinitionListSubFields(fieldType, request.getMeta()));
         String id = UUID.randomUUID().toString();
         jdbc.update(
             "INSERT INTO mo_workflow_template_field_definitions (" +
-                "id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_by, updated_by" +
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, meta, created_by, updated_by" +
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)",
             id,
             fieldKey,
             requireText(request.getName(), "字段名称不能为空"),
-            normalizeFieldType(request.getFieldType()),
+            fieldType,
             blankToNull(request.getDescription()),
             defaultTrue(request.getEnabled()),
             defaultFalse(request.getSensitive()),
             blankToNull(request.getGroupKey()),
             normalizeSortOrder(request.getDisplayOrder()),
+            metaJson,
             userId,
             userId
         );
@@ -453,17 +486,20 @@ public class WorkflowTemplateService {
         if (!normalizedFieldKey.equals(bodyFieldKey)) {
             throw new ResponseStatusException(BAD_REQUEST, "fieldKey 一旦创建后不支持直接修改");
         }
+        String fieldType = normalizeFieldType(request.getFieldType());
+        String metaJson = serializeFieldDefinitionMeta(validateFieldDefinitionListSubFields(fieldType, request.getMeta()));
         int updated = jdbc.update(
             "UPDATE mo_workflow_template_field_definitions " +
-                "SET name = ?, field_type = ?, description = ?, enabled = ?, sensitive = ?, group_key = ?, display_order = ?, updated_at = NOW(), updated_by = ? " +
+                "SET name = ?, field_type = ?, description = ?, enabled = ?, sensitive = ?, group_key = ?, display_order = ?, meta = ?::jsonb, updated_at = NOW(), updated_by = ? " +
                 "WHERE field_key = ?",
             requireText(request.getName(), "字段名称不能为空"),
-            normalizeFieldType(request.getFieldType()),
+            fieldType,
             blankToNull(request.getDescription()),
             defaultTrue(request.getEnabled()),
             defaultFalse(request.getSensitive()),
             blankToNull(request.getGroupKey()),
             normalizeSortOrder(request.getDisplayOrder()),
+            metaJson,
             userId,
             normalizedFieldKey
         );
@@ -527,70 +563,29 @@ public class WorkflowTemplateService {
         throw new ResponseStatusException(GONE, "当前版本不再由模板管理模块直接创建运行时工作流实例");
     }
 
-    private List<ValidatedTemplateNode> validateTemplateNodes(String packageId, List<WorkflowTemplateNodeSaveRequest> requestNodes) {
-        if (requestNodes == null || requestNodes.isEmpty()) {
-            throw new ResponseStatusException(BAD_REQUEST, "模板节点列表不能为空");
+    private List<List<String>> validateNodeGraph(List<List<String>> requestNodeGraph) {
+        if (requestNodeGraph == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "nodeGraph 不能为空");
         }
-
-        LinkedHashSet<String> referencedFieldKeys = new LinkedHashSet<>();
-        LinkedHashSet<String> recommendedTemplateIds = new LinkedHashSet<>();
-        for (WorkflowTemplateNodeSaveRequest node : requestNodes) {
-            for (WorkflowTemplateNodeFieldConfigSaveRequest field : defaultList(node.getInputFields())) {
-                referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
+        List<List<String>> nodeGraph = new ArrayList<>();
+        LinkedHashSet<String> dedup = new LinkedHashSet<>();
+        for (int layerIndex = 0; layerIndex < requestNodeGraph.size(); layerIndex += 1) {
+            List<String> layer = requestNodeGraph.get(layerIndex);
+            if (layer == null || layer.isEmpty()) {
+                throw new ResponseStatusException(BAD_REQUEST, "nodeGraph 第 " + (layerIndex + 1) + " 层不能为空");
             }
-            for (WorkflowTemplateNodeFieldConfigSaveRequest field : defaultList(node.getOutputFields())) {
-                referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
-            }
-            for (WorkflowTemplateNodeRecommendationSaveRequest recommendation : defaultList(node.getRecommendedTemplates())) {
-                if (hasText(recommendation.getRecommendedWorkflowTemplateId())) {
-                    recommendedTemplateIds.add(recommendation.getRecommendedWorkflowTemplateId().trim());
+            List<String> normalizedLayer = new ArrayList<>();
+            for (String rawNodeId : layer) {
+                String nodeId = requireText(rawNodeId, "nodeGraph 节点 id 不能为空");
+                loadNodeDesignOrThrow(nodeId);
+                if (!dedup.add(nodeId)) {
+                    throw new ResponseStatusException(BAD_REQUEST, "nodeGraph 中节点不能重复: " + nodeId);
                 }
+                normalizedLayer.add(nodeId);
             }
+            nodeGraph.add(Collections.unmodifiableList(normalizedLayer));
         }
-
-        Map<String, Map<String, Object>> fieldDefinitionMap = loadFieldDefinitionsByKeys(referencedFieldKeys);
-        ensureRecommendedTemplatesExist(recommendedTemplateIds);
-
-        LinkedHashMap<String, ValidatedTemplateNode> validated = new LinkedHashMap<>();
-        LinkedHashSet<String> codeSet = new LinkedHashSet<>();
-        LinkedHashSet<Integer> sequenceSet = new LinkedHashSet<>();
-
-        int fallbackSequence = 1;
-        for (WorkflowTemplateNodeSaveRequest node : requestNodes) {
-            String id = normalizeNodeId(node.getId());
-            if (validated.containsKey(id)) {
-                throw new ResponseStatusException(BAD_REQUEST, "节点 ID 重复: " + id);
-            }
-            String code = normalizeNodeCode(node.getCode());
-            if (!codeSet.add(code)) {
-                throw new ResponseStatusException(BAD_REQUEST, "节点编码重复: " + code);
-            }
-            int sequence = node.getSequence() == null ? fallbackSequence : normalizePositiveInt(node.getSequence(), "sequence 不能小于 1");
-            fallbackSequence = sequence + 1;
-            if (!sequenceSet.add(sequence)) {
-                throw new ResponseStatusException(BAD_REQUEST, "节点顺序 sequence 不能重复: " + sequence);
-            }
-            String moduleDefinitionId = blankToNull(node.getModuleDefinitionId());
-
-            validated.put(id, new ValidatedTemplateNode(
-                id,
-                packageId,
-                moduleDefinitionId,
-                requireText(node.getName(), "节点名称不能为空"),
-                code,
-                normalizeNodeType(node.getNodeType()),
-                sequence,
-                node.getIsMainPath() == null || Boolean.TRUE.equals(node.getIsMainPath()),
-                defaultFalse(node.getAllowAppendNextNode()),
-                defaultFalse(node.getAllowDeriveSubflow()),
-                validateNodeFieldConfigs(defaultList(node.getInputFields()), fieldDefinitionMap, true),
-                validateNodeFieldConfigs(defaultList(node.getOutputFields()), fieldDefinitionMap, false),
-                validateNodeRecommendations(packageId, defaultList(node.getRecommendedTemplates())),
-                normalizeVersion(node.getVersion())
-            ));
-        }
-
-        return new ArrayList<>(validated.values());
+        return Collections.unmodifiableList(nodeGraph);
     }
 
     private List<ValidatedNodeFieldConfig> validateNodeFieldConfigs(List<WorkflowTemplateNodeFieldConfigSaveRequest> fields,
@@ -625,6 +620,27 @@ public class WorkflowTemplateService {
             ));
         }
         return result;
+    }
+
+    private List<ValidatedNodeFieldConfig> validateNodeDesignFields(List<com.microoffice.dto.request.WorkflowNodeFieldSaveRequest> fields,
+                                                                    boolean inputScope) {
+        LinkedHashSet<String> referencedFieldKeys = new LinkedHashSet<>();
+        for (com.microoffice.dto.request.WorkflowNodeFieldSaveRequest field : fields) {
+            referencedFieldKeys.add(normalizeFieldKey(field.getFieldKey()));
+        }
+        Map<String, Map<String, Object>> fieldDefinitionMap = loadFieldDefinitionsByKeys(referencedFieldKeys);
+        List<WorkflowTemplateNodeFieldConfigSaveRequest> requestFields = new ArrayList<>();
+        for (com.microoffice.dto.request.WorkflowNodeFieldSaveRequest field : fields) {
+            WorkflowTemplateNodeFieldConfigSaveRequest item = new WorkflowTemplateNodeFieldConfigSaveRequest();
+            item.setFieldKey(field.getFieldKey());
+            item.setDisplayName(field.getLabel());
+            item.setDisplayOrder(field.getSortOrder());
+            item.setRequired(field.getRequired());
+            item.setReadOnly(inputScope ? field.getReadOnly() : null);
+            item.setAllowWriteBackParent(inputScope ? null : defaultFalse(field.getReadOnly()));
+            requestFields.add(item);
+        }
+        return validateNodeFieldConfigs(requestFields, fieldDefinitionMap, inputScope);
     }
 
     private List<ValidatedNodeRecommendation> validateNodeRecommendations(String packageId,
@@ -722,6 +738,199 @@ public class WorkflowTemplateService {
         return result;
     }
 
+    private Map<String, Object> buildNodeGraphResponse(String packageId, List<List<String>> nodeGraph) {
+        Map<String, Map<String, Object>> nodeDefinitionMap = loadNodeDefinitionsByIds(flattenNodeGraph(nodeGraph));
+        List<Map<String, Object>> nodeDefinitions = new ArrayList<>();
+        for (String nodeId : flattenNodeGraph(nodeGraph)) {
+            Map<String, Object> node = nodeDefinitionMap.get(nodeId);
+            if (node != null) {
+                nodeDefinitions.add(node);
+            }
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("templateId", packageId);
+        result.put("nodeGraph", nodeGraph);
+        result.put("nodeDefinitions", nodeDefinitions);
+        return result;
+    }
+
+    private Map<String, Object> attachPackageNodeGraphSummary(Map<String, Object> item) {
+        List<List<String>> nodeGraph = asNodeGraph(item.get("nodeGraph"));
+        item.put("nodeGraph", nodeGraph);
+        item.put("nodeGraphLayerCount", nodeGraph.size());
+        item.put("nodeGraphNodeCount", flattenNodeGraph(nodeGraph).size());
+        return item;
+    }
+
+    private Map<String, Object> attachPackageNodeGraphDetails(Map<String, Object> item) {
+        List<List<String>> nodeGraph = asNodeGraph(item.get("nodeGraph"));
+        item.put("nodeGraph", nodeGraph);
+        item.put("nodeGraphDetail", buildNodeGraphResponse(asString(item.get("id")), nodeGraph));
+        return item;
+    }
+
+    private List<String> flattenNodeGraph(List<List<String>> nodeGraph) {
+        List<String> nodeIds = new ArrayList<>();
+        for (List<String> layer : defaultList(nodeGraph)) {
+            nodeIds.addAll(defaultList(layer));
+        }
+        return nodeIds;
+    }
+
+    private Map<String, Map<String, Object>> loadNodeDefinitionsByIds(List<String> nodeIds) {
+        List<String> normalized = nodeIds.stream().filter(this::hasText).distinct().toList();
+        if (normalized.isEmpty()) {
+            return Map.of();
+        }
+        StringBuilder sql = new StringBuilder(
+            "SELECT id, module_definition_id, display_name, code, node_type, version, created_at, created_by, updated_at, updated_by, " +
+                "COALESCE(meta ->> 'status', 'ACTIVE') AS status " +
+                "FROM mo_workflow_recommendation_package_nodes WHERE package_id IS NULL AND id IN ("
+        );
+        appendPlaceholders(sql, normalized.size());
+        sql.append(")");
+        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(sql.toString(), normalized.toArray())) {
+            Map<String, Object> item = toNodeDesignMap(row);
+            String nodeId = asString(item.get("id"));
+            item.put("inputFields", listNodeDesignFields(nodeId, true));
+            item.put("outputFields", listNodeDesignFields(nodeId, false));
+            item.put("recommendedTemplates", listNodeDesignRecommendations(nodeId));
+            result.put(nodeId, item);
+        }
+        return result;
+    }
+
+    private Map<String, Object> parseMeta(String rawMeta) {
+        if (!hasText(rawMeta)) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            return objectMapper.readValue(rawMeta, new TypeReference<LinkedHashMap<String, Object>>() {});
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "模板 meta 结构无法解析");
+        }
+    }
+
+    private Map<String, Object> parseFieldDefinitionMeta(String rawMeta) {
+        Map<String, Object> parsed = parseMeta(rawMeta);
+        List<Map<String, Object>> normalizedSubFields = new ArrayList<>();
+        Object rawListSubFields = parsed.get("listSubFields");
+        if (rawListSubFields instanceof List<?> list) {
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> map)) {
+                    continue;
+                }
+                Map<String, Object> subField = new LinkedHashMap<>();
+                subField.put("fieldKey", asString(map.get("fieldKey")));
+                subField.put("name", asString(map.get("name")));
+                subField.put("fieldType", asString(map.get("fieldType")));
+                subField.put("required", asBoolean(map.get("required"), false));
+                subField.put("sortOrder", asInt(map.get("sortOrder"), 100));
+                subField.put("description", asString(map.get("description")));
+                normalizedSubFields.add(subField);
+            }
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("listSubFields", normalizedSubFields);
+        return normalized;
+    }
+
+    private Map<String, Object> validateFieldDefinitionListSubFields(String fieldType,
+                                                                     WorkflowTemplateFieldDefinitionSaveRequest.Meta meta) {
+        List<WorkflowTemplateFieldDefinitionSaveRequest.ListSubField> subFields =
+            meta == null ? List.of() : defaultList(meta.getListSubFields());
+        if (!"list".equals(fieldType)) {
+            if (!subFields.isEmpty()) {
+                throw new ResponseStatusException(BAD_REQUEST, "非 list 字段不得保存 listSubFields");
+            }
+            return Map.of("listSubFields", List.of());
+        }
+        LinkedHashSet<String> dedup = new LinkedHashSet<>();
+        List<Map<String, Object>> normalizedSubFields = new ArrayList<>();
+        int fallbackSortOrder = 100;
+        for (WorkflowTemplateFieldDefinitionSaveRequest.ListSubField subField : subFields) {
+            if (subField == null) {
+                throw new ResponseStatusException(BAD_REQUEST, "listSubFields 不能包含空项");
+            }
+            String subFieldKey = normalizeFieldKey(subField.getFieldKey());
+            if (!dedup.add(subFieldKey)) {
+                throw new ResponseStatusException(BAD_REQUEST, "listSubFields.fieldKey 不能重复: " + subFieldKey);
+            }
+            String subFieldType = normalizeFieldType(subField.getFieldType());
+            if ("list".equals(subFieldType)) {
+                throw new ResponseStatusException(BAD_REQUEST, "首版 list 子字段不允许再次为 list 类型");
+            }
+            int sortOrder = subField.getSortOrder() == null ? fallbackSortOrder : normalizeSortOrder(subField.getSortOrder());
+            fallbackSortOrder = sortOrder + 1;
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            normalized.put("fieldKey", subFieldKey);
+            normalized.put("name", requireText(subField.getName(), "listSubFields.name 不能为空"));
+            normalized.put("fieldType", subFieldType);
+            normalized.put("required", defaultFalse(subField.getRequired()));
+            normalized.put("sortOrder", sortOrder);
+            normalized.put("description", blankToNull(subField.getDescription()));
+            normalizedSubFields.add(normalized);
+        }
+        return Map.of("listSubFields", normalizedSubFields);
+    }
+
+    private String serializeFieldDefinitionMeta(Map<String, Object> meta) {
+        try {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            normalized.put("listSubFields", meta == null ? List.of() : asMapList(meta.get("listSubFields")));
+            return objectMapper.writeValueAsString(normalized);
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "字段定义 meta 序列化失败");
+        }
+    }
+
+    private List<List<String>> extractNodeGraph(String rawMeta) {
+        Map<String, Object> meta = parseMeta(rawMeta);
+        return asNodeGraph(meta.get("nodeGraph"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<List<String>> asNodeGraph(Object value) {
+        if (!(value instanceof List<?> outer)) {
+            return List.of();
+        }
+        List<List<String>> result = new ArrayList<>();
+        for (Object layerObj : outer) {
+            if (!(layerObj instanceof List<?> inner)) {
+                throw new ResponseStatusException(BAD_REQUEST, "nodeGraph 必须是二维数组");
+            }
+            List<String> layer = new ArrayList<>();
+            for (Object nodeId : inner) {
+                layer.add(asString(nodeId));
+            }
+            result.add(layer);
+        }
+        return result;
+    }
+
+    private String emptyNodeGraphMetaJson() {
+        return "{\"nodeGraph\":[]}";
+    }
+
+    private String serializeNodeGraph(List<List<String>> nodeGraph) {
+        try {
+            return objectMapper.writeValueAsString(nodeGraph == null ? List.of() : nodeGraph);
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "nodeGraph 序列化失败");
+        }
+    }
+
+    private String serializePackageMetaGraph(List<List<String>> nodeGraph) {
+        try {
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("nodeGraph", nodeGraph == null ? List.of() : nodeGraph);
+            return objectMapper.writeValueAsString(meta);
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "模板 meta 序列化失败");
+        }
+    }
+
     private Map<String, Map<String, Object>> loadFieldDefinitionsByKeys(Collection<String> fieldKeys) {
         if (fieldKeys == null || fieldKeys.isEmpty()) {
             return Map.of();
@@ -766,7 +975,7 @@ public class WorkflowTemplateService {
         try {
             Map<String, Object> row = jdbc.queryForMap(
                 "SELECT id, name, code, position_id, applicable_subject_type, description, status, sort_order, " +
-                    "allow_create_as_normal, allow_create_as_subflow, created_at, created_by, updated_at, updated_by, version " +
+                    "allow_create_as_normal, allow_create_as_subflow, created_at, created_by, updated_at, updated_by, version, meta " +
                     "FROM mo_workflow_recommendation_packages WHERE id = ?",
                 id
             );
@@ -779,7 +988,7 @@ public class WorkflowTemplateService {
     private Map<String, Object> loadFieldDefinitionOrThrow(String fieldKey) {
         try {
             return toFieldDefinitionMap(jdbc.queryForMap(
-                "SELECT id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_at, updated_at " +
+                "SELECT id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, meta, created_at, updated_at " +
                     "FROM mo_workflow_template_field_definitions WHERE field_key = ?",
                 fieldKey
             ));
@@ -803,6 +1012,8 @@ public class WorkflowTemplateService {
         item.put("allowCreateAsNormal", Boolean.TRUE.equals(row.get("allow_create_as_normal")));
         item.put("allowCreateAsSubflow", Boolean.TRUE.equals(row.get("allow_create_as_subflow")));
         item.put("version", asInt(row.get("version"), 1));
+        item.put("meta", parseMeta(asString(row.get("meta"))));
+        item.put("nodeGraph", extractNodeGraph(asString(row.get("meta"))));
         item.put("createdAt", row.get("created_at"));
         item.put("createdBy", asString(row.get("created_by")));
         item.put("updatedAt", row.get("updated_at"));
@@ -810,22 +1021,19 @@ public class WorkflowTemplateService {
         return item;
     }
 
-    private Map<String, Object> toTemplateNodeMap(Map<String, Object> row) {
+    private Map<String, Object> toNodeDesignMap(Map<String, Object> row) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", asString(row.get("id")));
-        item.put("templateId", asString(row.get("package_id")));
         item.put("moduleDefinitionId", asString(row.get("module_definition_id")));
-        item.put("moduleDefinitionCode", asString(row.get("module_definition_code")));
-        item.put("moduleDefinitionName", asString(row.get("module_definition_name")));
-        item.put("moduleDefinitionStatus", row.get("module_definition_active") == null ? null : (Boolean.TRUE.equals(row.get("module_definition_active")) ? "ACTIVE" : "DISABLED"));
         item.put("name", asString(row.get("display_name")));
         item.put("code", asString(row.get("code")));
         item.put("nodeType", asString(row.get("node_type")));
-        item.put("sequence", asInt(row.get("sort_order"), 1));
-        item.put("isMainPath", Boolean.TRUE.equals(row.get("is_main_path")));
-        item.put("allowAppendNextNode", Boolean.TRUE.equals(row.get("allow_append_next_node")));
-        item.put("allowDeriveSubflow", Boolean.TRUE.equals(row.get("allow_derive_subflow")));
+        item.put("status", hasText(asString(row.get("status"))) ? asString(row.get("status")) : "ACTIVE");
         item.put("version", asInt(row.get("version"), 1));
+        item.put("createdAt", row.get("created_at"));
+        item.put("createdBy", asString(row.get("created_by")));
+        item.put("updatedAt", row.get("updated_at"));
+        item.put("updatedBy", asString(row.get("updated_by")));
         return item;
     }
 
@@ -840,9 +1048,25 @@ public class WorkflowTemplateService {
         item.put("sensitive", Boolean.TRUE.equals(row.get("sensitive")));
         item.put("groupKey", asString(row.get("group_key")));
         item.put("displayOrder", asInt(row.get("display_order"), 100));
+        item.put("meta", parseFieldDefinitionMeta(asString(row.get("meta"))));
         item.put("createdAt", row.get("created_at"));
         item.put("updatedAt", row.get("updated_at"));
         return item;
+    }
+
+    private Map<String, Object> loadNodeDesignOrThrow(String id) {
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                "SELECT id, module_definition_id, display_name, code, node_type, version, created_at, created_by, updated_at, updated_by, " +
+                    "COALESCE(meta ->> 'status', 'ACTIVE') AS status " +
+                    "FROM mo_workflow_recommendation_package_nodes " +
+                    "WHERE id = ? AND package_id IS NULL",
+                id
+            );
+            return toNodeDesignMap(row);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ResponseStatusException(NOT_FOUND, "节点定义不存在");
+        }
     }
 
     private void ensurePackageExists(String packageId) {
@@ -853,6 +1077,35 @@ public class WorkflowTemplateService {
         );
         if (count == null || count == 0) {
             throw new ResponseStatusException(NOT_FOUND, "工作流模板不存在");
+        }
+    }
+
+    private void ensureNodeDesignCodeUnique(String code, String excludeId) {
+        StringBuilder sql = new StringBuilder(
+            "SELECT COUNT(*) FROM mo_workflow_recommendation_package_nodes " +
+                "WHERE code = ? AND package_id IS NULL"
+        );
+        List<Object> args = new ArrayList<>();
+        args.add(code);
+        if (hasText(excludeId)) {
+            sql.append(" AND id <> ?");
+            args.add(excludeId);
+        }
+        Integer count = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
+        if (count != null && count > 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "节点编码已存在");
+        }
+    }
+
+    private void ensureNodeDesignNotReferencedByAnyTemplate(String id) {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM mo_workflow_recommendation_packages " +
+                "WHERE jsonb_path_exists(COALESCE(meta, '{}'::jsonb), '$.nodeGraph[*][*] ? (@ == $nodeId)', jsonb_build_object('nodeId', to_jsonb(?::text)))",
+            Integer.class,
+            id
+        );
+        if (count != null && count > 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "节点定义已被工作流引用，无法删除");
         }
     }
 
@@ -1231,24 +1484,6 @@ public class WorkflowTemplateService {
 
     private <T> List<T> defaultList(List<T> value) {
         return value == null ? List.of() : value;
-    }
-
-    private record ValidatedTemplateNode(
-        String id,
-        String packageId,
-        String moduleDefinitionId,
-        String name,
-        String code,
-        String nodeType,
-        int sequence,
-        boolean isMainPath,
-        boolean allowAppendNextNode,
-        boolean allowDeriveSubflow,
-        List<ValidatedNodeFieldConfig> inputFields,
-        List<ValidatedNodeFieldConfig> outputFields,
-        List<ValidatedNodeRecommendation> recommendedTemplates,
-        int version
-    ) {
     }
 
     private record ValidatedNodeFieldConfig(

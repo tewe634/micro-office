@@ -1,7 +1,7 @@
 package com.microoffice.controller;
 
 import com.microoffice.dto.request.WorkflowTemplateFieldDefinitionSaveRequest;
-import com.microoffice.dto.request.WorkflowTemplateNodesSaveRequest;
+import com.microoffice.dto.request.WorkflowTemplateNodeGraphSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplatePackageSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateStatusUpdateRequest;
 import com.microoffice.dto.response.ApiResponse;
@@ -107,24 +107,18 @@ public class AdminWorkflowTemplateController {
         return ApiResponse.ok(workflowTemplateService.copyPackage(id, userId));
     }
 
-    /**
-     * 查询模板节点配置。
-     */
-    @GetMapping("/packages/{id}/nodes")
-    public ApiResponse<List<Map<String, Object>>> listPackageNodes(@PathVariable String id, Authentication auth) {
+    @GetMapping("/packages/{id}/node-graph")
+    public ApiResponse<Map<String, Object>> getPackageNodeGraph(@PathVariable String id, Authentication auth) {
         requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.listPackageNodes(id));
+        return ApiResponse.ok(workflowTemplateService.getPackageNodeGraph(id));
     }
 
-    /**
-     * 整包覆盖保存模板节点配置。
-     */
-    @PutMapping("/packages/{id}/nodes")
-    public ApiResponse<List<Map<String, Object>>> savePackageNodes(@PathVariable String id,
-                                                                   @RequestBody WorkflowTemplateNodesSaveRequest body,
-                                                                   Authentication auth) {
+    @PutMapping("/packages/{id}/node-graph")
+    public ApiResponse<Map<String, Object>> savePackageNodeGraph(@PathVariable String id,
+                                                                 @RequestBody WorkflowTemplateNodeGraphSaveRequest body,
+                                                                 Authentication auth) {
         String userId = requireAdmin(auth);
-        return ApiResponse.ok(workflowTemplateService.saveNodes(id, body, userId));
+        return ApiResponse.ok(workflowTemplateService.savePackageNodeGraph(id, body, userId));
     }
 
     /**
