@@ -99,9 +99,15 @@ BEGIN
             CHECK (
                 NOT (meta ? 'nodeGraph')
                 OR (
-                    jsonb_typeof(meta->'nodeGraph') = 'array'
-                    AND NOT jsonb_path_exists(meta, '$.nodeGraph[*] ? (@.type() != "array")')
-                    AND NOT jsonb_path_exists(meta, '$.nodeGraph[*][*] ? (@.type() != "string")')
+                    jsonb_typeof(meta -> 'nodeGraph') = 'array'
+                    AND NOT jsonb_path_exists(
+                        meta,
+                        '$.nodeGraph[*].type() ? (@ != "array")'
+                    )
+                    AND NOT jsonb_path_exists(
+                        meta,
+                        '$.nodeGraph[*][*].type() ? (@ != "string")'
+                    )
                 )
             );
     END IF;

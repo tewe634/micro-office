@@ -19,11 +19,15 @@ ALTER TABLE IF EXISTS mo_todos
     DROP CONSTRAINT IF EXISTS fk_todos_workflow_node,
     DROP CONSTRAINT IF EXISTS todos_node_id_fkey,
     DROP CONSTRAINT IF EXISTS fk_todos_workflow_project,
-    DROP CONSTRAINT IF EXISTS todos_workflow_id_fkey;
+    DROP CONSTRAINT IF EXISTS todos_workflow_id_fkey,
+    DROP CONSTRAINT IF EXISTS ck_todos_scope,
+    DROP CONSTRAINT IF EXISTS ck_todos_scope_v114;
 
 ALTER TABLE IF EXISTS mo_conversations
     DROP CONSTRAINT IF EXISTS conversations_workflow_id_fkey,
-    DROP CONSTRAINT IF EXISTS fk_conversations_workflow_project;
+    DROP CONSTRAINT IF EXISTS fk_conversations_workflow_project,
+    DROP CONSTRAINT IF EXISTS ck_conversations_scope,
+    DROP CONSTRAINT IF EXISTS ck_mo_conversations_scope_v129;
 
 -- 保留待办/会话记录，但清空已下线 workflow 引用，避免留下悬空 ID。
 DO $$
@@ -51,6 +55,9 @@ BEGIN
 END $$;
 
 DO $$
+DECLARE
+    has_project_workflow boolean := false;
+    has_project_general boolean := false;
 BEGIN
     IF EXISTS (
         SELECT 1
@@ -59,15 +66,38 @@ BEGIN
           AND table_name = 'mo_conversations'
           AND column_name = 'workflow_id'
     ) THEN
-        UPDATE mo_conversations
-        SET type = CASE
-                WHEN workflow_id IS NOT NULL AND type = 'PROJECT_WORKFLOW'::mo_conversation_type
-                    THEN 'PROJECT_GENERAL'::mo_conversation_type
-                ELSE type
-            END,
-            workflow_id = NULL,
-            updated_at = NOW()
-        WHERE workflow_id IS NOT NULL;
+        SELECT EXISTS (
+                   SELECT 1
+                   FROM pg_type t
+                   JOIN pg_enum e ON e.enumtypid = t.oid
+                   WHERE t.typname = 'mo_conversation_type'
+                     AND e.enumlabel = 'PROJECT_WORKFLOW'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM pg_type t
+                   JOIN pg_enum e ON e.enumtypid = t.oid
+                   WHERE t.typname = 'mo_conversation_type'
+                     AND e.enumlabel = 'PROJECT_GENERAL'
+               )
+          INTO has_project_workflow, has_project_general;
+
+        IF has_project_workflow AND has_project_general THEN
+            UPDATE mo_conversations
+            SET type = CASE
+                    WHEN workflow_id IS NOT NULL AND type::text = 'PROJECT_WORKFLOW'
+                        THEN 'PROJECT_GENERAL'::mo_conversation_type
+                    ELSE type
+                END,
+                workflow_id = NULL,
+                updated_at = NOW()
+            WHERE workflow_id IS NOT NULL;
+        ELSE
+            UPDATE mo_conversations
+            SET workflow_id = NULL,
+                updated_at = NOW()
+            WHERE workflow_id IS NOT NULL;
+        END IF;
     END IF;
 END $$;
 

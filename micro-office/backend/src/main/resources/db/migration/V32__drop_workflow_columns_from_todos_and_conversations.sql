@@ -3,6 +3,8 @@
 
 BEGIN;
 
+DROP VIEW IF EXISTS project_node_conversation_details;
+DROP VIEW IF EXISTS mo_project_node_conversation_details;
 DROP VIEW IF EXISTS todos;
 DROP VIEW IF EXISTS conversations;
 
