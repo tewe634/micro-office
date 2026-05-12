@@ -33,8 +33,9 @@ const pageTitles: Record<string, string> = {
   '/admin/external-accounts': '账号绑定',
   '/admin/permissions': '权限配置',
   '/admin/sales-collab': '协同配置',
-  '/admin/workflow-node-features': '节点管理',
   '/admin/workflow-templates': '流程管理',
+  '/admin/workflow-template-fields': '流程字段字典',
+  '/admin/workflow-node-designs': '节点设计',
   '/admin/daily-entries': '日常条目管理',
   '/admin/portal-block-templates': '门户卡片管理',
   '/admin/portal-templates': '门户管理',
@@ -46,8 +47,9 @@ const adminChildren = [
   { key: '/admin/external-accounts', label: '账号绑定' },
   { key: '/admin/permissions', label: '权限配置' },
   { key: '/admin/sales-collab', label: '协同配置' },
-  { key: '/admin/workflow-node-features', label: '节点管理' },
+  { key: '/admin/workflow-node-designs', label: '节点设计' },
   { key: '/admin/workflow-templates', label: '流程管理' },
+  { key: '/admin/workflow-template-fields', label: '流程字段字典' },
   { key: '/admin/daily-entries', label: '日常条目管理' },
   { key: '/admin/portal-block-templates', label: '门户卡片管理' },
   { key: '/admin/portal-templates', label: '门户管理' },
@@ -58,8 +60,9 @@ function resolveSelectedKey(pathname: string) {
   if (pathname.startsWith('/admin/daily-entries')) return '/admin/daily-entries';
   if (pathname.startsWith('/admin/portal-block-templates')) return '/admin/portal-block-templates';
   if (pathname.startsWith('/admin/portal-templates')) return '/admin/portal-templates';
+  if (pathname.startsWith('/admin/workflow-node-designs')) return '/admin/workflow-node-designs';
+  if (pathname.startsWith('/admin/workflow-template-fields')) return '/admin/workflow-template-fields';
   if (pathname.startsWith('/admin/workflow-templates')) return '/admin/workflow-templates';
-  if (pathname.startsWith('/admin/workflow-node-features')) return '/admin/workflow-node-features';
   if (pathname.startsWith('/admin/sales-collab')) return '/admin/sales-collab';
   if (pathname.startsWith('/admin/permissions')) return '/admin/permissions';
   if (pathname.startsWith('/admin')) return '/admin';
@@ -77,8 +80,10 @@ function resolvePageTitle(pathname: string) {
   if (/^\/admin\/portal-templates\/[^/]+$/.test(pathname)) return '门户管理';
   if (/^\/admin\/portal-block-templates\/[^/]+$/.test(pathname)) return '门户卡片管理';
   if (/^\/admin\/daily-entries\/[^/]+$/.test(pathname)) return '日常条目管理';
+  if (/^\/admin\/workflow-node-designs\/[^/]+$/.test(pathname)) return '节点详情';
+  if (pathname === '/admin/workflow-node-designs') return '节点设计';
+  if (pathname === '/admin/workflow-template-fields') return '流程字段字典';
   if (/^\/admin\/workflow-templates\/[^/]+$/.test(pathname)) return '流程管理';
-  if (/^\/admin\/workflow-node-features\/[^/]+$/.test(pathname)) return '节点管理';
   return pageTitles[pathname] || '东华微办公';
 }
 

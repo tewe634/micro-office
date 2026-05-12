@@ -83,6 +83,8 @@ export default function AdminWorkflowTemplatePage() {
     setEditingRecord(null);
     form.resetFields();
     form.setFieldsValue({
+      code: undefined,
+      applicableSubjectType: undefined,
       sortOrder: 100,
       positionIds: [],
       allowCreateAsNormal: true,
@@ -95,6 +97,8 @@ export default function AdminWorkflowTemplatePage() {
     setEditingRecord(record);
     form.setFieldsValue({
       name: record.name,
+      code: record.code,
+      applicableSubjectType: record.applicableSubjectType ?? undefined,
       positionIds: record.positionIds || [],
       description: record.description,
       sortOrder: record.sortOrder ?? 100,
@@ -108,10 +112,15 @@ export default function AdminWorkflowTemplatePage() {
     try {
       const values = await form.validateFields();
       setSaving(true);
+      const positionIds = values.positionIds || [];
       const payload = {
         name: values.name,
-        positionIds: values.positionIds || [],
+        code: values.code || undefined,
+        applicableSubjectType: values.applicableSubjectType ?? null,
+        positionId: positionIds[0] || undefined,
+        positionIds,
         description: values.description,
+        version: editingRecord?.version ?? 1,
         sortOrder: values.sortOrder ?? 100,
         allowCreateAsNormal: values.allowCreateAsNormal ?? true,
         allowCreateAsSubflow: values.allowCreateAsSubflow ?? false,
@@ -250,7 +259,7 @@ export default function AdminWorkflowTemplatePage() {
               render: (_: any, row: WorkflowTemplatePackageSummary) => (
                 <Space wrap>
                   <Button type="link" onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>
-                    编辑节点
+                    编排工作流
                   </Button>
                   <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
                     编辑模板
@@ -295,11 +304,12 @@ export default function AdminWorkflowTemplatePage() {
           <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入模板名称' }]}>
             <Input maxLength={64} placeholder="例如：销售经理跟单流" />
           </Form.Item>
-          {!editingRecord ? (
-            <Form.Item label="模板编码">
-              <Input value="系统自动生成" disabled />
-            </Form.Item>
-          ) : null}
+          <Form.Item name="code" label="模板编码">
+            <Input maxLength={64} placeholder={editingRecord ? '可选，不填则保持原值' : '可选，不填则由后端自动生成'} />
+          </Form.Item>
+          <Form.Item name="applicableSubjectType" label="适用主体类型">
+            <Input maxLength={64} placeholder="可选，例如 CUSTOMER / PROJECT" />
+          </Form.Item>
           <Form.Item name="positionIds" label="关联岗位">
             <Select
               mode="multiple"

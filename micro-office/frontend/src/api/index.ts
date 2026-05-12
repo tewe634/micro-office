@@ -155,6 +155,7 @@ export interface WorkflowTemplatePackageSummary {
   id: string;
   code: string;
   name: string;
+  applicableSubjectType?: string | null;
   positionId?: string | null;
   positionIds?: string[];
   positionName?: string | null;
@@ -164,11 +165,11 @@ export interface WorkflowTemplatePackageSummary {
   sortOrder?: number;
   allowCreateAsNormal?: boolean;
   allowCreateAsSubflow?: boolean;
+  meta?: Record<string, any>;
+  version?: number;
   createdAt?: string;
   updatedAt?: string;
 }
-
-export type WorkflowNodeFeatureStatus = 'ACTIVE' | 'DISABLED';
 
 export interface WorkflowTemplatePackageNodePayload {
   id: string;
@@ -176,8 +177,9 @@ export interface WorkflowTemplatePackageNodePayload {
   moduleDefinitionId?: string | null;
   moduleDefinitionCode?: string | null;
   moduleDefinitionName?: string | null;
-  moduleDefinitionStatus?: WorkflowNodeFeatureStatus | null;
+  moduleDefinitionStatus?: WorkflowTemplateStatus | null;
   capabilityBound?: boolean;
+  version?: number;
   name: string;
   code: string;
   nodeType: string;
@@ -205,18 +207,10 @@ export interface WorkflowTemplateNodeFieldConfigPayload {
   allowWriteBackParent?: boolean;
 }
 
-export interface WorkflowNodeFeatureSummary {
-  id: string;
-  code: string;
-  name: string;
-  nodeType: string;
-  status: WorkflowNodeFeatureStatus;
-  sortOrder?: number;
-  version?: number;
-}
-
 export interface WorkflowTemplateNodeRecommendationPayload {
   recommendedWorkflowTemplateId: string;
+  recommendedWorkflowTemplateName?: string | null;
+  recommendedWorkflowTemplateStatus?: WorkflowTemplateStatus | null;
   reason?: string | null;
   displayOrder: number;
   enabled: boolean;
@@ -232,8 +226,52 @@ export interface WorkflowTemplateFieldDefinition {
   sensitive: boolean;
   groupKey?: string | null;
   displayOrder: number;
+  meta?: Record<string, any>;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface WorkflowNodeDesignSummary {
+  id: string;
+  moduleDefinitionId?: string | null;
+  name: string;
+  code: string;
+  nodeType: string;
+  status: WorkflowTemplateStatus;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkflowNodeFieldSavePayload {
+  id?: string;
+  fieldScope?: 'INPUT' | 'OUTPUT' | string;
+  fieldKey: string;
+  label?: string | null;
+  dataType?: string | null;
+  required?: boolean;
+  readOnly?: boolean;
+  sortOrder?: number;
+  defaultValue?: any;
+  schemaMeta?: Record<string, any>;
+}
+
+export interface WorkflowTemplateNodeReferencePayload {
+  id?: string;
+  nodeId: string;
+  sequence: number;
+  isMainPath: boolean;
+  allowAppendNextNode: boolean;
+  allowDeriveSubflow: boolean;
+  version?: number;
+}
+
+export type WorkflowTemplateNodeGraph = string[][];
+
+export interface WorkflowTemplateNodeGraphResponse {
+  templateId: string;
+  nodeGraph: WorkflowTemplateNodeGraph;
+  nodeDefinitions: WorkflowNodeDesignSummary[];
 }
 
 export const authApi = {
@@ -382,16 +420,26 @@ export const workflowTemplateApi = {
   getPackage: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}`),
   createPackage: (data: {
     name: string;
+    code?: string;
+    applicableSubjectType?: string | null;
+    positionId?: string | null;
     positionIds?: string[];
     description?: string;
+    meta?: Record<string, any>;
+    version?: number;
     sortOrder?: number;
     allowCreateAsNormal?: boolean;
     allowCreateAsSubflow?: boolean;
   }) => api.post('/admin/workflow-templates/packages', data),
   updatePackage: (id: string | number, data: {
     name: string;
+    code?: string;
+    applicableSubjectType?: string | null;
+    positionId?: string | null;
     positionIds?: string[];
     description?: string;
+    meta?: Record<string, any>;
+    version?: number;
     sortOrder?: number;
     allowCreateAsNormal?: boolean;
     allowCreateAsSubflow?: boolean;
@@ -400,8 +448,10 @@ export const workflowTemplateApi = {
   deletePackage: (id: string | number) => api.delete(`/admin/workflow-templates/packages/${id}`),
   copyPackage: (id: string | number, data?: { name?: string }) => api.post(`/admin/workflow-templates/packages/${id}/copy`, data),
   listAvailablePackages: (params?: { positionId?: string }) => api.get('/workflows/template-packages', { params }),
+  getNodeGraph: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/node-graph`),
+  saveNodeGraph: (id: string | number, nodeGraph: WorkflowTemplateNodeGraph) => api.put(`/admin/workflow-templates/packages/${id}/node-graph`, { nodeGraph }),
   listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),
-  saveNodes: (id: string | number, nodes: WorkflowTemplatePackageNodePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
+  saveNodes: (id: string | number, nodes: WorkflowTemplateNodeReferencePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
   listFieldDefinitions: (params?: { enabled?: boolean; keyword?: string }) => api.get('/admin/workflow-templates/field-definitions', { params }),
   createFieldDefinition: (data: {
     fieldKey: string;
@@ -412,6 +462,7 @@ export const workflowTemplateApi = {
     sensitive?: boolean;
     groupKey?: string;
     displayOrder?: number;
+    meta?: Record<string, any>;
   }) => api.post('/admin/workflow-templates/field-definitions', data),
   updateFieldDefinition: (fieldKey: string, data: {
     fieldKey?: string;
@@ -422,49 +473,22 @@ export const workflowTemplateApi = {
     sensitive?: boolean;
     groupKey?: string;
     displayOrder?: number;
+    meta?: Record<string, any>;
   }) => api.put(`/admin/workflow-templates/field-definitions/${fieldKey}`, data),
   deleteFieldDefinition: (fieldKey: string) => api.delete(`/admin/workflow-templates/field-definitions/${fieldKey}`),
 };
 
-export const workflowNodeFeatureApi = {
-  list: (params?: {
-    current?: number;
-    size?: number;
-    status?: WorkflowNodeFeatureStatus;
-    nodeType?: string;
-    keyword?: string;
-  }) => api.get('/admin/workflow-node-features', { params }),
-  detail: (id: string | number) => api.get(`/admin/workflow-node-features/${id}`),
-  create: (data: {
-    code: string;
-    name: string;
-    sourceModuleId?: string;
-    sourceSystem?: string;
-    nodeType: string;
-    version?: number;
-    sortOrder?: number;
-  }) => api.post('/admin/workflow-node-features', data),
-  update: (id: string | number, data: {
-    code: string;
-    name: string;
-    sourceModuleId?: string;
-    sourceSystem?: string;
-    nodeType: string;
-    version?: number;
-    sortOrder?: number;
-  }) => api.put(`/admin/workflow-node-features/${id}`, data),
-  updateStatus: (id: string | number, status: WorkflowNodeFeatureStatus) => api.put(`/admin/workflow-node-features/${id}/status`, { status }),
-  delete: (id: string | number) => api.delete(`/admin/workflow-node-features/${id}`),
-  copy: (id: string | number) => api.post(`/admin/workflow-node-features/${id}/copy`),
-  listFields: (id: string | number) => api.get(`/admin/workflow-node-features/${id}/fields`),
-  saveFields: (id: string | number, fields: any[]) => api.put(`/admin/workflow-node-features/${id}/fields`, { fields }),
-  getBehaviors: (id: string | number, params?: { positionKey?: string; roleKey?: string }) => api.get(`/admin/workflow-node-features/${id}/behaviors`, { params }),
-  saveBehaviors: (id: string | number, data: {
-    assignment?: Record<string, any>;
-    sla?: Record<string, any>;
-    actionPermissions?: string[];
-    triggers?: Record<string, any>;
-  }) => api.put(`/admin/workflow-node-features/${id}/behaviors`, data),
-  references: (id: string | number) => api.get(`/admin/workflow-node-features/${id}/references`),
-  validateBindings: (moduleDefinitionIds: string[]) => api.post('/admin/workflow-node-features/validate-bindings', { moduleDefinitionIds }),
+export const workflowNodeDesignApi = {
+  list: (params?: { status?: WorkflowTemplateStatus; keyword?: string }) => api.get('/admin/workflow-node-designs', { params }),
+  detail: (id: string | number) => api.get(`/admin/workflow-node-designs/${id}`),
+  create: (data: { id?: string; moduleDefinitionId?: string | null; name: string; code: string; nodeType: string; version?: number }) => api.post('/admin/workflow-node-designs', data),
+  update: (id: string | number, data: { id?: string; moduleDefinitionId?: string | null; name: string; code: string; nodeType: string; version?: number }) => api.put(`/admin/workflow-node-designs/${id}`, data),
+  updateStatus: (id: string | number, status: WorkflowTemplateStatus) => api.put(`/admin/workflow-node-designs/${id}/status`, { status }),
+  delete: (id: string | number) => api.delete(`/admin/workflow-node-designs/${id}`),
+  listInputFields: (id: string | number) => api.get(`/admin/workflow-node-designs/${id}/input-fields`),
+  saveInputFields: (id: string | number, fields: WorkflowNodeFieldSavePayload[]) => api.put(`/admin/workflow-node-designs/${id}/input-fields`, { fields }),
+  listOutputFields: (id: string | number) => api.get(`/admin/workflow-node-designs/${id}/output-fields`),
+  saveOutputFields: (id: string | number, fields: WorkflowNodeFieldSavePayload[]) => api.put(`/admin/workflow-node-designs/${id}/output-fields`, { fields }),
+  listRecommendations: (id: string | number) => api.get(`/admin/workflow-node-designs/${id}/recommendations`),
+  saveRecommendations: (id: string | number, recommendations: WorkflowTemplateNodeRecommendationPayload[]) => api.put(`/admin/workflow-node-designs/${id}/recommendations`, { recommendations }),
 };

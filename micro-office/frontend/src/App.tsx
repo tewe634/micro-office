@@ -15,8 +15,6 @@ const ProductPage = lazy(() => import('./pages/product/ProductPage'));
 const AdminPermissionPage = lazy(() => import('./pages/admin/AdminPermissionPage'));
 const AdminExternalAccountPage = lazy(() => import('./pages/admin/AdminExternalAccountPage'));
 const AdminSalesCollabPage = lazy(() => import('./pages/admin/AdminSalesCollabPage'));
-const AdminWorkflowNodeFeaturePage = lazy(() => import('./pages/admin/AdminWorkflowNodeFeaturePage'));
-const AdminWorkflowNodeFeatureEditorPage = lazy(() => import('./pages/admin/AdminWorkflowNodeFeatureEditorPage'));
 const AdminPortalBlockTemplatePage = lazy(() => import('./pages/admin/AdminPortalBlockTemplatePage'));
 const AdminPortalBlockTemplateEditorPage = lazy(() => import('./pages/admin/AdminPortalBlockTemplateEditorPage'));
 const AdminPortalTemplatePage = lazy(() => import('./pages/admin/AdminPortalTemplatePage'));
@@ -24,6 +22,9 @@ const AdminPortalTemplateEditorPage = lazy(() => import('./pages/admin/AdminPort
 const AdminPortalTemplatePreviewPage = lazy(() => import('./pages/admin/AdminPortalTemplatePreviewPage'));
 const AdminWorkflowTemplatePage = lazy(() => import('./pages/admin/AdminWorkflowTemplatePage'));
 const AdminWorkflowTemplateEditorPage = lazy(() => import('./pages/admin/AdminWorkflowTemplateEditorPage'));
+const AdminWorkflowTemplateFieldDefinitionPage = lazy(() => import('./pages/admin/AdminWorkflowTemplateFieldDefinitionPage'));
+const AdminWorkflowNodeDesignPage = lazy(() => import('./pages/admin/AdminWorkflowNodeDesignPage'));
+const AdminWorkflowNodeDesignDetailPage = lazy(() => import('./pages/admin/AdminWorkflowNodeDesignDetailPage'));
 const AdminDailyEntryPage = lazy(() => import('./pages/admin/AdminDailyEntryPage'));
 const PortalPage = lazy(() => import('./pages/portal/PortalPage'));
 
@@ -190,12 +191,13 @@ export default function App() {
               <Route path="admin/external-accounts" element={<MenuRouteGuard menuKey="/admin/external-accounts"><AdminExternalAccountPage /></MenuRouteGuard>} />
               <Route path="admin/permissions" element={<MenuRouteGuard menuKey="/admin/permissions"><AdminPermissionPage /></MenuRouteGuard>} />
               <Route path="admin/sales-collab" element={<MenuRouteGuard menuKey="/admin/sales-collab"><AdminSalesCollabPage /></MenuRouteGuard>} />
-              <Route path="admin/workflow-node-features" element={<MenuRouteGuard menuKey="/admin/workflow-node-features"><AdminWorkflowNodeFeaturePage /></MenuRouteGuard>} />
-              <Route path="admin/workflow-node-features/:id" element={<MenuRouteGuard menuKey="/admin/workflow-node-features"><AdminWorkflowNodeFeatureEditorPage /></MenuRouteGuard>} />
               <Route path="admin/portal-block-templates" element={<MenuRouteGuard menuKey="/admin/portal-block-templates"><AdminPortalBlockTemplatePage /></MenuRouteGuard>} />
               <Route path="admin/portal-block-templates/:id" element={<MenuRouteGuard menuKey="/admin/portal-block-templates"><AdminPortalBlockTemplateEditorPage /></MenuRouteGuard>} />
               <Route path="admin/workflow-templates" element={<MenuRouteGuard menuKey="/admin/workflow-templates"><AdminWorkflowTemplatePage /></MenuRouteGuard>} />
               <Route path="admin/workflow-templates/:id" element={<MenuRouteGuard menuKey="/admin/workflow-templates"><AdminWorkflowTemplateEditorPage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-template-fields" element={<MenuRouteGuard menuKey="/admin/workflow-template-fields"><AdminWorkflowTemplateFieldDefinitionPage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-node-designs" element={<MenuRouteGuard menuKey="/admin/workflow-node-designs"><AdminWorkflowNodeDesignPage /></MenuRouteGuard>} />
+              <Route path="admin/workflow-node-designs/:id" element={<MenuRouteGuard menuKey="/admin/workflow-node-designs"><AdminWorkflowNodeDesignDetailPage /></MenuRouteGuard>} />
               <Route path="admin/daily-entries" element={<MenuRouteGuard menuKey="/admin/daily-entries"><AdminDailyEntryPage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplatePage /></MenuRouteGuard>} />
               <Route path="admin/portal-templates/:id/preview" element={<MenuRouteGuard menuKey="/admin/portal-templates"><AdminPortalTemplatePreviewPage /></MenuRouteGuard>} />
