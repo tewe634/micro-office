@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { WorkflowNodeDesignSummary, WorkflowTemplateStatus } from '../../api';
 import { workflowNodeDesignApi } from '../../api';
-import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
+import FixedTablePage from '../../components/FixedTablePage';
+import { formatPaginationTotal, formatWorkflowNodeTypeLabel, paginationLocale } from '../../constants/ui';
 
 export default function AdminWorkflowNodeDesignPage() {
   const nav = useNavigate();
@@ -36,10 +37,22 @@ export default function AdminWorkflowNodeDesignPage() {
     void loadList();
   }, [keyword, status]);
 
+  const sortedRecords = useMemo(
+    () => [...records].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN')),
+    [records],
+  );
+
   const pagedRecords = useMemo(() => {
     const start = (current - 1) * pageSize;
-    return records.slice(start, start + pageSize);
-  }, [current, records, pageSize]);
+    return sortedRecords.slice(start, start + pageSize);
+  }, [current, sortedRecords, pageSize]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(sortedRecords.length / pageSize));
+    if (current > totalPages) {
+      setCurrent(totalPages);
+    }
+  }, [current, sortedRecords.length, pageSize]);
 
   const closeModal = () => {
     setModalOpen(false);
@@ -103,94 +116,127 @@ export default function AdminWorkflowNodeDesignPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+    <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
+        className="page-card"
         title="节点设计"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
             新建节点
           </Button>
         }
+        bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
-        <Space style={{ marginBottom: 16 }} wrap>
-          <Input
-            allowClear
-            placeholder="按节点名称 / 编码筛选"
-            style={{ width: 260 }}
-            value={keyword}
-            onChange={(event) => {
-              setKeyword(event.target.value || undefined);
-              setCurrent(1);
-            }}
-          />
-          <Select
-            allowClear
-            placeholder="按状态筛选"
-            style={{ width: 180 }}
-            value={status}
-            onChange={(value) => {
-              setStatus(value);
-              setCurrent(1);
-            }}
-            options={[
-              { label: '启用', value: 'ACTIVE' },
-              { label: '停用', value: 'DISABLED' },
-            ]}
-          />
-        </Space>
-
-        <Table
-          rowKey="id"
-          loading={loading}
-          dataSource={pagedRecords}
-          pagination={{
-            current,
-            pageSize,
-            total: records.length,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: formatPaginationTotal,
-            locale: paginationLocale,
-            onChange: (page, size) => {
-              setCurrent(page);
-              setPageSize(size);
-            },
-            onShowSizeChange: (page, size) => {
-              setCurrent(page);
-              setPageSize(size);
-            },
-          }}
-          columns={[
-            { title: '节点名称', dataIndex: 'name', width: 200 },
-            { title: '节点编码', dataIndex: 'code', width: 180 },
-            { title: '节点类型', dataIndex: 'nodeType', width: 140 },
-            { title: '状态', dataIndex: 'status', width: 100, render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value === 'ACTIVE' ? '启用' : '停用'}</Tag> },
-            {
-              title: '操作',
-              width: 320,
-              render: (_: unknown, row: WorkflowNodeDesignSummary) => (
-                <Space wrap>
-                  <Button type="link" onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>查看</Button>
-                  <Button type="link" icon={<EditOutlined />} onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>编辑</Button>
-                  {row.status === 'ACTIVE' ? (
-                    <Button type="link" danger onClick={() => void handleUpdateStatus(row, 'DISABLED')}>停用</Button>
-                  ) : (
-                    <Button type="link" onClick={() => void handleUpdateStatus(row, 'ACTIVE')}>启用</Button>
-                  )}
-                  <Popconfirm
-                    title="删除节点定义"
-                    description={`确定删除“${row.name}”吗？`}
-                    okText="删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => void handleDelete(row)}
-                  >
-                    <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
-                  </Popconfirm>
-                </Space>
-              ),
-            },
-          ]}
+        <FixedTablePage
+          top={
+            <div className="page-toolbar">
+              <Space wrap>
+                <Input
+                  allowClear
+                  placeholder="按节点名称 / 编码筛选"
+                  style={{ width: 260 }}
+                  value={keyword}
+                  onChange={(event) => {
+                    setKeyword(event.target.value || undefined);
+                    setCurrent(1);
+                  }}
+                />
+                <Select
+                  allowClear
+                  placeholder="按状态筛选"
+                  style={{ width: 180 }}
+                  value={status}
+                  onChange={(value) => {
+                    setStatus(value);
+                    setCurrent(1);
+                  }}
+                  options={[
+                    { label: '启用', value: 'ACTIVE' },
+                    { label: '停用', value: 'DISABLED' },
+                  ]}
+                />
+                <Button onClick={() => void loadList()}>刷新列表</Button>
+              </Space>
+            </div>
+          }
+          table={
+            <Table
+              rowKey="id"
+              loading={loading}
+              size="small"
+              pagination={false}
+              dataSource={pagedRecords}
+              tableLayout="fixed"
+              scroll={{ x: 1320, y: 'calc(100dvh - 360px)' }}
+              columns={[
+                {
+                  title: '序号',
+                  key: 'index',
+                  width: 72,
+                  fixed: 'left',
+                  render: (_: unknown, __: WorkflowNodeDesignSummary, index: number) => (current - 1) * pageSize + index + 1,
+                },
+                {
+                  title: '节点名称',
+                  dataIndex: 'name',
+                  width: 220,
+                  fixed: 'left',
+                  render: (value: string, row: WorkflowNodeDesignSummary) => (
+                    <Button type="link" style={{ paddingInline: 0, fontWeight: 600 }} onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>
+                      {value}
+                    </Button>
+                  ),
+                },
+                { title: '节点编码', dataIndex: 'code', width: 180 },
+                { title: '节点类型', dataIndex: 'nodeType', width: 140, render: (value: string) => formatWorkflowNodeTypeLabel(value) },
+                { title: '模块定义 ID', dataIndex: 'moduleDefinitionId', width: 220, ellipsis: true, render: (value?: string | null) => value || '-' },
+                { title: '版本号', dataIndex: 'version', width: 100, render: (value?: number) => value ?? 1 },
+                { title: '状态', dataIndex: 'status', width: 100, render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value === 'ACTIVE' ? '启用' : '停用'}</Tag> },
+                {
+                  title: '操作',
+                  width: 320,
+                  fixed: 'right',
+                  render: (_: unknown, row: WorkflowNodeDesignSummary) => (
+                    <Space wrap>
+                      <Button type="link" onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>查看</Button>
+                      <Button type="link" icon={<EditOutlined />} onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>编辑</Button>
+                      {row.status === 'ACTIVE' ? (
+                        <Button type="link" danger onClick={() => void handleUpdateStatus(row, 'DISABLED')}>停用</Button>
+                      ) : (
+                        <Button type="link" onClick={() => void handleUpdateStatus(row, 'ACTIVE')}>启用</Button>
+                      )}
+                      <Popconfirm
+                        title="删除节点定义"
+                        description={`确定删除“${row.name}”吗？`}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => void handleDelete(row)}
+                      >
+                        <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+                      </Popconfirm>
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          }
+          pagination={
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={pageSize}
+              total={sortedRecords.length}
+              showSizeChanger
+              showQuickJumper
+              pageSizeOptions={['10', '20', '50', '100']}
+              showTotal={formatPaginationTotal}
+              onChange={(page, size) => {
+                setCurrent(page);
+                setPageSize(size);
+              }}
+            />
+          }
         />
       </Card>
 
@@ -220,6 +266,6 @@ export default function AdminWorkflowNodeDesignPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </Space>
+    </div>
   );
 }

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import type { WorkflowTemplateFieldDefinition } from '../../api';
 import { workflowTemplateApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const fieldTypeOptions = [
@@ -167,13 +168,13 @@ export default function AdminWorkflowTemplateFieldDefinitionPage() {
               listSubFields: [...listChildFields]
                 .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
                 .map((item, index) => ({
-                fieldKey: item.fieldKey.trim(),
-                name: item.name.trim(),
-                fieldType: item.fieldType,
-                required: Boolean(item.required),
-                sortOrder: Number(item.sortOrder ?? index + 1),
-                description: item.description?.trim() || undefined,
-              })),
+                  fieldKey: item.fieldKey.trim(),
+                  name: item.name.trim(),
+                  fieldType: item.fieldType,
+                  required: Boolean(item.required),
+                  sortOrder: Number(item.sortOrder ?? index + 1),
+                  description: item.description?.trim() || undefined,
+                })),
             }
           : undefined,
       };
@@ -205,99 +206,137 @@ export default function AdminWorkflowTemplateFieldDefinitionPage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+    <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
+        className="page-card"
         title="流程字段字典"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
             新建字段定义
           </Button>
         }
+        bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
-        <Space style={{ marginBottom: 16 }} wrap>
-          <Input
-            allowClear
-            placeholder="按字段 key / 名称筛选"
-            style={{ width: 260 }}
-            value={keyword}
-            onChange={(event) => {
-              setKeyword(event.target.value || undefined);
-              setCurrent(1);
-            }}
-          />
-          <Select
-            allowClear
-            placeholder="按状态筛选"
-            style={{ width: 180 }}
-            value={enabled}
-            onChange={(value) => {
-              setEnabled(value);
-              setCurrent(1);
-            }}
-            options={[
-              { label: '启用', value: true },
-              { label: '停用', value: false },
-            ]}
-          />
-        </Space>
-
-        <Table
-          rowKey="fieldKey"
-          loading={loading}
-          dataSource={pagedRecords}
-          pagination={{
-            current,
-            pageSize,
-            total: filteredRecords.length,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: formatPaginationTotal,
-            locale: paginationLocale,
-            onChange: (page, size) => {
-              setCurrent(page);
-              setPageSize(size);
-            },
-            onShowSizeChange: (page, size) => {
-              setCurrent(page);
-              setPageSize(size);
-            },
-          }}
-          scroll={{ x: 1280 }}
-          columns={[
-            { title: '字段 Key', dataIndex: 'fieldKey', width: 220 },
-            { title: '字段名称', dataIndex: 'name', width: 180 },
-            { title: '字段类型', dataIndex: 'fieldType', width: 120, render: (value: string) => <Tag>{value}</Tag> },
-            { title: '分组', dataIndex: 'groupKey', width: 140, render: (value?: string | null) => value || '-' },
-            { title: '排序值', dataIndex: 'displayOrder', width: 100 },
-            { title: '敏感字段', dataIndex: 'sensitive', width: 100, render: (value: boolean) => (value ? '是' : '否') },
-            { title: '状态', dataIndex: 'enabled', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '启用' : '停用'}</Tag> },
-            { title: '说明', dataIndex: 'description', ellipsis: true },
-            {
-              title: '操作',
-              key: 'action',
-              width: 220,
-              fixed: 'right',
-              render: (_: unknown, row: WorkflowTemplateFieldDefinition) => (
-                <Space wrap>
-                  <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
-                    编辑
-                  </Button>
-                  <Popconfirm
-                    title="删除字段定义"
-                    description={`确定删除“${row.name}”吗？`}
-                    okText="删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => void handleDelete(row)}
-                  >
-                    <Button type="link" danger icon={<DeleteOutlined />}>
-                      删除
+        <FixedTablePage
+          top={
+            <div className="page-toolbar">
+              <Space wrap>
+                <Input
+                  allowClear
+                  placeholder="按字段 key / 名称筛选"
+                  style={{ width: 260 }}
+                  value={keyword}
+                  onChange={(event) => {
+                    setKeyword(event.target.value || undefined);
+                    setCurrent(1);
+                  }}
+                />
+                <Select
+                  allowClear
+                  placeholder="按状态筛选"
+                  style={{ width: 180 }}
+                  value={enabled}
+                  onChange={(value) => {
+                    setEnabled(value);
+                    setCurrent(1);
+                  }}
+                  options={[
+                    { label: '启用', value: true },
+                    { label: '停用', value: false },
+                  ]}
+                />
+                <Button onClick={() => void loadPage()}>刷新列表</Button>
+              </Space>
+            </div>
+          }
+          table={
+            <Table
+              rowKey="fieldKey"
+              loading={loading}
+              size="small"
+              pagination={false}
+              dataSource={pagedRecords}
+              tableLayout="fixed"
+              scroll={{ x: 1400, y: 'calc(100dvh - 360px)' }}
+              columns={[
+                {
+                  title: '序号',
+                  key: 'index',
+                  width: 72,
+                  fixed: 'left',
+                  render: (_: unknown, __: WorkflowTemplateFieldDefinition, index: number) => (current - 1) * pageSize + index + 1,
+                },
+                {
+                  title: '字段 Key',
+                  dataIndex: 'fieldKey',
+                  width: 220,
+                  fixed: 'left',
+                  render: (value: string, row: WorkflowTemplateFieldDefinition) => (
+                    <Button type="link" style={{ paddingInline: 0, fontWeight: 600 }} onClick={() => openEditModal(row)}>
+                      {value}
                     </Button>
-                  </Popconfirm>
-                </Space>
-              ),
-            },
-          ]}
+                  ),
+                },
+                {
+                  title: '字段名称',
+                  dataIndex: 'name',
+                  width: 180,
+                  render: (value: string, row: WorkflowTemplateFieldDefinition) => (
+                    <Button type="link" style={{ paddingInline: 0 }} onClick={() => openEditModal(row)}>
+                      {value}
+                    </Button>
+                  ),
+                },
+                { title: '字段类型', dataIndex: 'fieldType', width: 120, render: (value: string) => <Tag>{value}</Tag> },
+                { title: '分组', dataIndex: 'groupKey', width: 160, ellipsis: true, render: (value?: string | null) => value || '-' },
+                { title: '排序值', dataIndex: 'displayOrder', width: 100 },
+                { title: '敏感字段', dataIndex: 'sensitive', width: 100, render: (value: boolean) => (value ? '是' : '否') },
+                { title: '状态', dataIndex: 'enabled', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '启用' : '停用'}</Tag> },
+                { title: '说明', dataIndex: 'description', width: 320, ellipsis: true, render: (value?: string | null) => value || '-' },
+                {
+                  title: '操作',
+                  key: 'action',
+                  width: 220,
+                  fixed: 'right',
+                  render: (_: unknown, row: WorkflowTemplateFieldDefinition) => (
+                    <Space wrap>
+                      <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
+                        编辑
+                      </Button>
+                      <Popconfirm
+                        title="删除字段定义"
+                        description={`确定删除“${row.name}”吗？`}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => void handleDelete(row)}
+                      >
+                        <Button type="link" danger icon={<DeleteOutlined />}>
+                          删除
+                        </Button>
+                      </Popconfirm>
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          }
+          pagination={
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={pageSize}
+              total={filteredRecords.length}
+              showSizeChanger
+              showQuickJumper
+              pageSizeOptions={['10', '20', '50', '100']}
+              showTotal={formatPaginationTotal}
+              onChange={(page, size) => {
+                setCurrent(page);
+                setPageSize(size);
+              }}
+            />
+          }
         />
       </Card>
 
@@ -430,6 +469,6 @@ export default function AdminWorkflowTemplateFieldDefinitionPage() {
           ) : null}
         </Form>
       </Modal>
-    </Space>
+    </div>
   );
 }
