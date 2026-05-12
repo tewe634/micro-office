@@ -167,7 +167,7 @@ export default function AdminWorkflowNodeDesignPage() {
               pagination={false}
               dataSource={pagedRecords}
               tableLayout="fixed"
-              scroll={{ x: 1320, y: 'calc(100dvh - 360px)' }}
+              scroll={{ x: 980, y: 'calc(100dvh - 360px)' }}
               columns={[
                 {
                   title: '序号',
@@ -189,8 +189,6 @@ export default function AdminWorkflowNodeDesignPage() {
                 },
                 { title: '节点编码', dataIndex: 'code', width: 180 },
                 { title: '节点类型', dataIndex: 'nodeType', width: 140, render: (value: string) => formatWorkflowNodeTypeLabel(value) },
-                { title: '模块定义 ID', dataIndex: 'moduleDefinitionId', width: 220, ellipsis: true, render: (value?: string | null) => value || '-' },
-                { title: '版本号', dataIndex: 'version', width: 100, render: (value?: number) => value ?? 1 },
                 { title: '状态', dataIndex: 'status', width: 100, render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value === 'ACTIVE' ? '启用' : '停用'}</Tag> },
                 {
                   title: '操作',
