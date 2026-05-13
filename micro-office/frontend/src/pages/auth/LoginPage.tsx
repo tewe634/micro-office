@@ -79,7 +79,7 @@ export default function LoginPage() {
   return (
     <div className="auth-shell auth-shell--with-footer">
       <Card className="auth-card">
-        <h2 className="auth-title">东华微办公</h2>
+        <h2 className="auth-title">东华办公自动化系统</h2>
         <Tabs centered items={[
           { key: 'login', label: '登录', children: (
             <Form form={loginForm} onFinish={onLogin} layout="vertical">
