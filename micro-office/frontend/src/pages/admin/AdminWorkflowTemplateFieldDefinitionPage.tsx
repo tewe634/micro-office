@@ -88,10 +88,10 @@ export default function AdminWorkflowTemplateFieldDefinitionPage() {
   }, [current, filteredRecords.length, pageSize]);
 
   useEffect(() => {
-    if (fieldType !== 'list' && listChildFields.length > 0) {
+    if (modalOpen && fieldType && fieldType !== 'list' && listChildFields.length > 0) {
       setListChildFields([]);
     }
-  }, [fieldType, listChildFields.length]);
+  }, [fieldType, listChildFields.length, modalOpen]);
 
   const closeModal = () => {
     setModalOpen(false);
