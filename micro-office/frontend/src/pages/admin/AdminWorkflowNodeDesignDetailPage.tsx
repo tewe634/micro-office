@@ -9,6 +9,7 @@ import type {
   WorkflowTemplatePackageSummary,
 } from '../../api';
 import { workflowNodeDesignApi, workflowTemplateApi } from '../../api';
+import { formatWorkflowNodeTypeLabel, workflowNodeTypeOptions } from '../../constants/ui';
 
 function normalizeRecommendation(item: Partial<WorkflowTemplateNodeRecommendationPayload>): WorkflowTemplateNodeRecommendationPayload {
   return {
@@ -63,7 +64,6 @@ export default function AdminWorkflowNodeDesignDetailPage() {
         name: next?.name,
         code: next?.code,
         nodeType: next?.nodeType,
-        version: next?.version ?? 1,
       });
     } catch (error: any) {
       message.error(error?.response?.data?.message || '节点详情加载失败');
@@ -100,7 +100,6 @@ export default function AdminWorkflowNodeDesignDetailPage() {
         name: values.name,
         code: values.code,
         nodeType: values.nodeType,
-        version: values.version ?? detail.version ?? 1,
       });
       message.success('节点基础信息已保存');
       setEditMode(false);
@@ -204,7 +203,6 @@ export default function AdminWorkflowNodeDesignDetailPage() {
                     name: detail?.name,
                     code: detail?.code,
                     nodeType: detail?.nodeType,
-                    version: detail?.version ?? 1,
                   });
                 }}
                 >
@@ -239,17 +237,15 @@ export default function AdminWorkflowNodeDesignDetailPage() {
                     <Form.Item name="code" label="节点编码" rules={[{ required: true, message: '请输入节点编码' }]}>
                       <Input maxLength={64} />
                     </Form.Item>
-                    <Form.Item name="nodeType" label="节点类型" rules={[{ required: true, message: '请输入节点类型' }]}>
-                      <Input maxLength={64} />
-                    </Form.Item>
-                    <Form.Item name="version" label="版本号">
-                      <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+                    <Form.Item name="nodeType" label="节点类型" rules={[{ required: true, message: '请选择节点类型' }]}>
+                      <Select options={workflowNodeTypeOptions} placeholder="请选择节点类型" disabled={!editMode} />
                     </Form.Item>
                     <Space wrap>
                       <Tag color={detail.status === 'ACTIVE' ? 'green' : 'default'}>
                         {detail.status === 'ACTIVE' ? '启用' : '停用'}
                       </Tag>
                       <Tag>{detail.code}</Tag>
+                      <Tag color="blue">类型：{formatWorkflowNodeTypeLabel(detail.nodeType)}</Tag>
                     </Space>
                   </Form>
                 ),
@@ -338,7 +334,7 @@ function FieldConfigEditor({
                 precision={0}
                 style={{ width: '100%' }}
                 value={row.sortOrder}
-                onChange={(value) => setFields((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, sortOrder: Number(value || 1) } : item))}
+                onChange={(value: number | null) => setFields((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, sortOrder: Number(value || 1) } : item))}
               />
             ),
           },
@@ -441,7 +437,7 @@ function RecommendationEditor({
                 precision={0}
                 style={{ width: '100%' }}
                 value={row.displayOrder}
-                onChange={(value) => setItems((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, displayOrder: Number(value || 0) } : item))}
+                onChange={(value: number | null) => setItems((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, displayOrder: Number(value || 0) } : item))}
               />
             ),
           },

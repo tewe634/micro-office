@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { WorkflowNodeDesignSummary, WorkflowTemplateStatus } from '../../api';
 import { workflowNodeDesignApi } from '../../api';
 import FixedTablePage from '../../components/FixedTablePage';
-import { formatPaginationTotal, formatWorkflowNodeTypeLabel, paginationLocale } from '../../constants/ui';
+import { formatPaginationTotal, formatWorkflowNodeTypeLabel, paginationLocale, workflowNodeTypeOptions } from '../../constants/ui';
 
 export default function AdminWorkflowNodeDesignPage() {
   const nav = useNavigate();
@@ -63,7 +63,7 @@ export default function AdminWorkflowNodeDesignPage() {
   const openCreateModal = () => {
     setEditingRecord(null);
     form.resetFields();
-    form.setFieldsValue({ nodeType: 'TASK', version: 1 });
+    form.setFieldsValue({ nodeType: 'TASK' });
     setModalOpen(true);
   };
 
@@ -76,7 +76,6 @@ export default function AdminWorkflowNodeDesignPage() {
         name: values.name,
         code: values.code,
         nodeType: values.nodeType,
-        version: values.version ?? 1,
       };
       if (editingRecord) {
         await workflowNodeDesignApi.update(editingRecord.id, payload);
@@ -256,11 +255,8 @@ export default function AdminWorkflowNodeDesignPage() {
           <Form.Item name="code" label="节点编码" rules={[{ required: true, message: '请输入节点编码' }]}> 
             <Input maxLength={64} />
           </Form.Item>
-          <Form.Item name="nodeType" label="节点类型" rules={[{ required: true, message: '请输入节点类型' }]}> 
-            <Input maxLength={64} />
-          </Form.Item>
-          <Form.Item name="version" label="版本号">
-            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          <Form.Item name="nodeType" label="节点类型" rules={[{ required: true, message: '请选择节点类型' }]}> 
+            <Select options={workflowNodeTypeOptions} placeholder="请选择节点类型" />
           </Form.Item>
         </Form>
       </Modal>
