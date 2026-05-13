@@ -26,15 +26,15 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/${POSTGRES_DB:-micro_office}?stringtype=unspecified}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.server}
-      SPRING_DATA_REDIS_HOST: redis
-      JWT_SECRET: ${JWT_SECRET:?set in .env.server}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/${POSTGRES_DB:-micro_office}?stringtype=unspecified}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-${POSTGRES_USER:-postgres}}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD:?set in .env.server}}
+      SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST:-redis}
+      JWT_SECRET: ${JWT_SECRET:?set in .env.server}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-0}
     depends_on:
       postgres:
         condition: service_healthy
