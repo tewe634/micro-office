@@ -187,7 +187,7 @@ verify_deploy() {
   run_ssh "set -e
 docker compose -p '$COMPOSE_PROJECT' -f '$REMOTE_STAGE_DIR/$COMPOSE_FILE' --env-file '$REMOTE_STAGE_DIR/.env.server' ps
 echo '---'
-ACTUAL_DB_URL=\$(docker exec ${COMPOSE_PROJECT}-backend-1 env | awk -F= '/^SPRING_DATASOURCE_URL=/{print substr(\$0, index(\$0, "=") + 1)}')
+ACTUAL_DB_URL=\$(docker exec ${COMPOSE_PROJECT}-backend-1 env | grep '^SPRING_DATASOURCE_URL=' | sed 's/^SPRING_DATASOURCE_URL=//')
 echo \"SPRING_DATASOURCE_URL=\$ACTUAL_DB_URL\"
 if [[ \"\$ACTUAL_DB_URL\" != jdbc:postgresql://$EXPECTED_DB_HOST:$EXPECTED_DB_PORT/* ]]; then
   echo 'ERROR: backend 实际数据源不是期望的真实线上库地址' >&2
