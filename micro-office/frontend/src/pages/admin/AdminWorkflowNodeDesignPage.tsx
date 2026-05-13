@@ -154,7 +154,6 @@ export default function AdminWorkflowNodeDesignPage() {
                     { label: '停用', value: 'DISABLED' },
                   ]}
                 />
-                <Button onClick={() => void loadList()}>刷新列表</Button>
               </Space>
             </div>
           }
