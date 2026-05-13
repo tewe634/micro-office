@@ -99,7 +99,9 @@ export default function LoginPage() {
           )},
         ]} />
       </Card>
-      <div className="auth-footer-record">备案号：浙ICP备17052976号</div>
+      <div className="auth-footer-record">
+        <a href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">备案号：浙ICP备17052976号</a>
+      </div>
     </div>
   );
 }

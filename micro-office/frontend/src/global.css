@@ -1553,6 +1553,16 @@ body {
   white-space: nowrap;
 }
 
+.auth-footer-record a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth-footer-record a:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
 .product-page__toolbar {
   align-items: flex-start;
 }
