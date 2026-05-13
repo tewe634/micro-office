@@ -195,7 +195,6 @@ export default function AdminWorkflowNodeDesignPage() {
                   fixed: 'right',
                   render: (_: unknown, row: WorkflowNodeDesignSummary) => (
                     <Space wrap>
-                      <Button type="link" onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>查看</Button>
                       <Button type="link" icon={<EditOutlined />} onClick={() => nav(`/admin/workflow-node-designs/${row.id}`)}>编辑</Button>
                       {row.status === 'ACTIVE' ? (
                         <Button type="link" danger onClick={() => void handleUpdateStatus(row, 'DISABLED')}>停用</Button>

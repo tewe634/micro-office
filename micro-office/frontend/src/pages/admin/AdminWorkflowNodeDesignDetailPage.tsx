@@ -40,7 +40,6 @@ export default function AdminWorkflowNodeDesignDetailPage() {
   const [detail, setDetail] = useState<any | null>(null);
   const [fieldDefinitions, setFieldDefinitions] = useState<WorkflowTemplateFieldDefinition[]>([]);
   const [workflowTemplateOptions, setWorkflowTemplateOptions] = useState<WorkflowTemplatePackageSummary[]>([]);
-  const [editMode, setEditMode] = useState(false);
   const [form] = Form.useForm();
 
   const loadSharedOptions = async () => {
@@ -102,7 +101,6 @@ export default function AdminWorkflowNodeDesignDetailPage() {
         nodeType: values.nodeType,
       });
       message.success('节点基础信息已保存');
-      setEditMode(false);
       await loadDetail();
     } catch (error: any) {
       if (error?.errorFields) return;
@@ -194,29 +192,9 @@ export default function AdminWorkflowNodeDesignDetailPage() {
             <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/admin/workflow-node-designs')}>
               返回列表
             </Button>
-            {editMode ? (
-              <>
-                <Button onClick={() => {
-                  setEditMode(false);
-                  form.setFieldsValue({
-                    moduleDefinitionId: detail?.moduleDefinitionId,
-                    name: detail?.name,
-                    code: detail?.code,
-                    nodeType: detail?.nodeType,
-                  });
-                }}
-                >
-                  取消
-                </Button>
-                <Button type="primary" loading={saving} onClick={() => void handleSaveBase()}>
-                  保存基础信息
-                </Button>
-              </>
-            ) : (
-              <Button type="primary" onClick={() => setEditMode(true)}>
-                编辑基础信息
-              </Button>
-            )}
+            <Button type="primary" loading={saving} onClick={() => void handleSaveBase()}>
+              保存基础信息
+            </Button>
           </Space>
         }
       >
@@ -227,7 +205,7 @@ export default function AdminWorkflowNodeDesignDetailPage() {
                 key: 'base',
                 label: '基础信息',
                 children: (
-                  <Form form={form} layout="vertical" disabled={!editMode}>
+                  <Form form={form} layout="vertical">
                     <Form.Item name="moduleDefinitionId" label="模块定义 ID">
                       <Input maxLength={64} placeholder="可选" />
                     </Form.Item>
@@ -238,7 +216,7 @@ export default function AdminWorkflowNodeDesignDetailPage() {
                       <Input maxLength={64} />
                     </Form.Item>
                     <Form.Item name="nodeType" label="节点类型" rules={[{ required: true, message: '请选择节点类型' }]}>
-                      <Select options={workflowNodeTypeOptions} placeholder="请选择节点类型" disabled={!editMode} />
+                      <Select options={workflowNodeTypeOptions} placeholder="请选择节点类型" />
                     </Form.Item>
                     <Space wrap>
                       <Tag color={detail.status === 'ACTIVE' ? 'green' : 'default'}>
