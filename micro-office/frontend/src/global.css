@@ -1515,8 +1515,15 @@ body {
     radial-gradient(circle at top, rgba(255, 255, 255, 1) 0%, rgba(246, 247, 251, 0.98) 48%, rgba(239, 244, 255, 0.96) 100%);
 }
 
+.auth-shell--with-footer {
+  position: relative;
+  min-height: 100vh;
+  padding: 24px 24px 72px;
+}
+
 .auth-card.ant-card {
   width: 420px;
+  max-width: 100%;
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
@@ -1532,6 +1539,18 @@ body {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.auth-footer-record {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .product-page__toolbar {

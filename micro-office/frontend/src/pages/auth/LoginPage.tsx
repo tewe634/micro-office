@@ -77,7 +77,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-shell">
+    <div className="auth-shell auth-shell--with-footer">
       <Card className="auth-card">
         <h2 className="auth-title">东华微办公</h2>
         <Tabs centered items={[
@@ -99,6 +99,7 @@ export default function LoginPage() {
           )},
         ]} />
       </Card>
+      <div className="auth-footer-record">备案号：浙ICP备17052976号</div>
     </div>
   );
 }
