@@ -84,7 +84,7 @@ function resolvePageTitle(pathname: string) {
   if (pathname === '/admin/workflow-node-designs') return '节点设计';
   if (pathname === '/admin/workflow-template-fields') return '流程字段字典';
   if (/^\/admin\/workflow-templates\/[^/]+$/.test(pathname)) return '流程管理';
-  return pageTitles[pathname] || '东华微办公';
+  return pageTitles[pathname] || '东华办公自动化系统';
 }
 
 export default function MainLayout() {
@@ -193,7 +193,7 @@ export default function MainLayout() {
               overflow: 'hidden',
             }}
           >
-            {collapsed ? '东华' : '东华微办公'}
+            {collapsed ? '东华OA' : '东华办公自动化系统'}
           </div>
 
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>

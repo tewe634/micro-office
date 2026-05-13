@@ -7,7 +7,7 @@ import './global.css';
 
 dayjs.locale('zh-cn');
 document.documentElement.lang = 'zh-CN';
-document.title = '东华微办公';
+document.title = '东华办公自动化系统';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
