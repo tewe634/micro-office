@@ -312,6 +312,7 @@ function FieldConfigEditor({
               <Select
                 showSearch
                 allowClear
+                style={{ width: '100%' }}
                 optionFilterProp="label"
                 value={row.fieldKey || undefined}
                 options={fieldOptions}
