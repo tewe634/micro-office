@@ -196,13 +196,32 @@ fi
 echo '---'
 docker exec ${COMPOSE_PROJECT}-backend-1 getent hosts '$EXPECTED_DB_HOST'
 echo '---'
-curl -I -sS http://127.0.0.1/ | head -n 5
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  FRONT_CODE=\$(curl -sS -o /tmp/micro-office-home.out -w '%{http_code}' http://127.0.0.1/ || true)
+  if [[ \"\$FRONT_CODE\" == '200' ]]; then
+    break
+  fi
+  sleep 2
+done
+echo \"HOME_HTTP_CODE=\$FRONT_CODE\"
+head -c 200 /tmp/micro-office-home.out 2>/dev/null || true; echo
 echo '---'
-HTTP_CODE=\$(curl -sS -o /tmp/micro-office-login.out -w '%{http_code}' http://127.0.0.1/api/auth/login \
-  -X POST -H 'Content-Type: application/json' \
-  -d '{\"login\":\"$SMOKE_LOGIN\",\"password\":\"$SMOKE_PASSWORD\"}')
+HTTP_CODE=''
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  HTTP_CODE=\$(curl -sS -o /tmp/micro-office-login.out -w '%{http_code}' http://127.0.0.1/api/auth/login \
+    -X POST -H 'Content-Type: application/json' \
+    -d '{\"login\":\"$SMOKE_LOGIN\",\"password\":\"$SMOKE_PASSWORD\"}' || true)
+  if [[ \"\$HTTP_CODE\" == '200' ]]; then
+    break
+  fi
+  sleep 2
+done
 echo \"LOGIN_HTTP_CODE=\$HTTP_CODE\"
-head -c 400 /tmp/micro-office-login.out; echo
+head -c 400 /tmp/micro-office-login.out 2>/dev/null || true; echo
+if [[ \"\$FRONT_CODE\" != '200' ]]; then
+  echo 'ERROR: 前端首页探活失败' >&2
+  exit 1
+fi
 if [[ \"\$HTTP_CODE\" != '200' ]]; then
   echo 'ERROR: 登录接口探活失败' >&2
   exit 1
