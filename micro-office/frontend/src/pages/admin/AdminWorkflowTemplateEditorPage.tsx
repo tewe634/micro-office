@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Col,
@@ -267,14 +266,6 @@ export default function AdminWorkflowTemplateEditorPage() {
                 </Space>
               </div>
 
-              <Alert
-                style={{ marginTop: 12 }}
-                type="info"
-                showIcon
-                message="当前工作流页只负责引用节点并编辑 nodeGraph。"
-                description="外层数组表示串行层级，内层数组表示同层并行节点；读取与保存均走 /node-graph 专用接口，工作流页不再提交节点定义字段。"
-              />
-
               <Row gutter={12} align="stretch" style={{ marginTop: 12 }}>
                 <Col xs={24} lg={16}>
                   <Card
@@ -365,12 +356,6 @@ export default function AdminWorkflowTemplateEditorPage() {
                   {selectedLayer ? (
                     <Card title={`层级详情：第 ${Number(selectedLayerIndex) + 1} 层`}>
                       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                        <Alert
-                          type="info"
-                          showIcon
-                          message={selectedLayer.length > 1 ? '当前层为并行组' : '当前层为串行节点'}
-                          description={selectedLayer.length > 1 ? '这一层中的多个节点会并行渲染。' : '单元素层级表示一个串行节点。'}
-                        />
                         {selectedLayer.map((nodeId) => {
                           const node = nodeLookup[nodeId];
                           return (
@@ -420,16 +405,6 @@ export default function AdminWorkflowTemplateEditorPage() {
         destroyOnClose
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert
-            type="info"
-            showIcon
-            message={insertMode === 'parallel' ? '将当前选择写入同一层' : '将每个选择按顺序写成独立层'}
-            description={
-              insertMode === 'parallel'
-                ? '例如选择 2 个节点，会形成 [[A,B]] 这样的并行组。'
-                : '例如选择 2 个节点，会形成 [[A],[B]] 这样的串行结构。'
-            }
-          />
           <Select
             mode="multiple"
             style={{ width: '100%' }}
