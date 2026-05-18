@@ -231,6 +231,60 @@ export interface WorkflowTemplateFieldDefinition {
   updatedAt?: string;
 }
 
+export type WorkflowTemplateInputMappingTargetType = 'NODE_INPUT' | 'SUBFLOW_INPUT';
+
+export interface WorkflowTemplateInputMapping {
+  id?: string;
+  packageId?: string;
+  targetType: WorkflowTemplateInputMappingTargetType;
+  targetRef: string;
+  targetPath: string;
+  sourcePath: string;
+  sortOrder?: number;
+  status?: WorkflowTemplateStatus;
+  meta?: Record<string, any>;
+  version?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkflowTemplateInputMappingOptionNode {
+  fieldKey?: string;
+  label?: string;
+  path: string;
+  labelPath?: string;
+  fieldType?: string;
+  fieldDomain?: string;
+  children?: WorkflowTemplateInputMappingOptionNode[];
+}
+
+export interface WorkflowTemplateInputMappingFieldTree {
+  treeType?: string;
+  nodes: WorkflowTemplateInputMappingOptionNode[];
+}
+
+export interface WorkflowTemplateInputMappingNodeOption {
+  nodeId: string;
+  nodeName?: string;
+  nodeCode?: string;
+  nodeType?: string;
+  currentNodeInputFieldTree?: WorkflowTemplateInputMappingFieldTree;
+  currentNodeInputOutputFieldTree?: WorkflowTemplateInputMappingFieldTree;
+  subflowInputFieldTrees?: Array<{
+    templateId: string;
+    templateName?: string;
+    templateCode?: string;
+    fieldTree?: WorkflowTemplateInputMappingFieldTree;
+  }>;
+}
+
+export interface WorkflowTemplateInputMappingOptionsResponse {
+  templateId: string;
+  nodeGraph?: string[][];
+  workflowContextFieldTree?: WorkflowTemplateInputMappingFieldTree;
+  nodeOptions?: WorkflowTemplateInputMappingNodeOption[];
+}
+
 export interface WorkflowNodeDesignSummary {
   id: string;
   moduleDefinitionId?: string | null;
@@ -238,6 +292,9 @@ export interface WorkflowNodeDesignSummary {
   code: string;
   nodeType: string;
   status: WorkflowTemplateStatus;
+  inputFields?: WorkflowTemplateNodeFieldConfigPayload[];
+  outputFields?: WorkflowTemplateNodeFieldConfigPayload[];
+  recommendedTemplates?: WorkflowTemplateNodeRecommendationPayload[];
   version?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -450,6 +507,9 @@ export const workflowTemplateApi = {
   listAvailablePackages: (params?: { positionId?: string }) => api.get('/workflows/template-packages', { params }),
   getNodeGraph: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/node-graph`),
   saveNodeGraph: (id: string | number, nodeGraph: WorkflowTemplateNodeGraph) => api.put(`/admin/workflow-templates/packages/${id}/node-graph`, { nodeGraph }),
+  listInputMappings: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/input-mappings`),
+  getInputMappingOptions: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/input-mapping-options`),
+  saveInputMappings: (id: string | number, mappings: WorkflowTemplateInputMapping[]) => api.put(`/admin/workflow-templates/packages/${id}/input-mappings`, mappings),
   listNodes: (id: string | number) => api.get(`/admin/workflow-templates/packages/${id}/nodes`),
   saveNodes: (id: string | number, nodes: WorkflowTemplateNodeReferencePayload[]) => api.put(`/admin/workflow-templates/packages/${id}/nodes`, { nodes }),
   listFieldDefinitions: (params?: { enabled?: boolean; keyword?: string }) => api.get('/admin/workflow-templates/field-definitions', { params }),
