@@ -1,6 +1,7 @@
 package com.microoffice.controller;
 
 import com.microoffice.dto.request.WorkflowTemplateFieldDefinitionSaveRequest;
+import com.microoffice.dto.request.WorkflowTemplateInputMappingSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateNodeGraphSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplatePackageSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateStatusUpdateRequest;
@@ -119,6 +120,26 @@ public class AdminWorkflowTemplateController {
                                                                  Authentication auth) {
         String userId = requireAdmin(auth);
         return ApiResponse.ok(workflowTemplateService.savePackageNodeGraph(id, body, userId));
+    }
+
+    @GetMapping("/packages/{id}/input-mappings")
+    public ApiResponse<List<Map<String, Object>>> listInputMappings(@PathVariable String id, Authentication auth) {
+        requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.listInputMappings(id));
+    }
+
+    @GetMapping("/packages/{id}/input-mapping-options")
+    public ApiResponse<Map<String, Object>> getInputMappingOptions(@PathVariable String id, Authentication auth) {
+        requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.getInputMappingOptions(id));
+    }
+
+    @PutMapping("/packages/{id}/input-mappings")
+    public ApiResponse<List<Map<String, Object>>> saveInputMappings(@PathVariable String id,
+                                                                    @RequestBody List<WorkflowTemplateInputMappingSaveRequest> body,
+                                                                    Authentication auth) {
+        String userId = requireAdmin(auth);
+        return ApiResponse.ok(workflowTemplateService.saveInputMappings(id, body, userId));
     }
 
     /**

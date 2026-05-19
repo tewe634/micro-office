@@ -8,6 +8,7 @@ import com.microoffice.dto.request.WorkflowNodeDesignSaveRequest;
 import com.microoffice.dto.request.WorkflowNodeFieldSaveRequest;
 import com.microoffice.dto.request.WorkflowNodeFieldsSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateFieldDefinitionSaveRequest;
+import com.microoffice.dto.request.WorkflowTemplateInputMappingSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateNodeFieldConfigSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateNodeGraphSaveRequest;
 import com.microoffice.dto.request.WorkflowTemplateNodeRecommendationSaveRequest;
@@ -230,6 +231,62 @@ public class WorkflowTemplateService {
             packageId
         );
         return getPackageNodeGraph(packageId);
+    }
+
+    public List<Map<String, Object>> listInputMappings(String packageId) {
+        Map<String, Object> pkg = loadPackageOrThrow(packageId);
+        return extractInputMappings(asMap(pkg.get("meta")).get("inputMappings"));
+    }
+
+    public Map<String, Object> getInputMappingOptions(String packageId) {
+        Map<String, Object> pkg = loadPackageOrThrow(packageId);
+        List<List<String>> nodeGraph = asNodeGraph(pkg.get("nodeGraph"));
+        List<Map<String, Object>> fieldDefinitions = listFieldDefinitions(true, null);
+        Map<String, Map<String, Object>> nodeDefinitionMap = loadNodeDefinitionsByIds(flattenNodeGraph(nodeGraph));
+
+        List<Map<String, Object>> nodeOptions = new ArrayList<>();
+        for (String nodeId : flattenNodeGraph(nodeGraph)) {
+            Map<String, Object> nodeDefinition = nodeDefinitionMap.get(nodeId);
+            if (nodeDefinition == null) {
+                continue;
+            }
+            Map<String, Object> nodeOption = new LinkedHashMap<>();
+            nodeOption.put("nodeId", nodeId);
+            nodeOption.put("nodeName", asString(nodeDefinition.get("name")));
+            nodeOption.put("nodeCode", asString(nodeDefinition.get("code")));
+            nodeOption.put("nodeType", asString(nodeDefinition.get("nodeType")));
+            nodeOption.put("currentNodeInputFieldTree", buildFieldTreeFromConfiguredFields(nodeDefinition.get("inputFields"), fieldDefinitions, null, null));
+            nodeOption.put("currentNodeInputOutputFieldTree", buildCurrentNodeInputOutputFieldTree(nodeDefinition, fieldDefinitions));
+            nodeOption.put("subflowInputFieldTrees", buildSubflowInputFieldTrees(nodeDefinition));
+            nodeOptions.add(nodeOption);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("templateId", packageId);
+        result.put("nodeGraph", nodeGraph);
+        result.put("workflowContextFieldTree", buildWorkflowContextFieldTree(fieldDefinitions));
+        result.put("nodeOptions", nodeOptions);
+        return result;
+    }
+
+    @Transactional
+    public List<Map<String, Object>> saveInputMappings(String packageId,
+                                                       List<WorkflowTemplateInputMappingSaveRequest> request,
+                                                       String userId) {
+        Map<String, Object> pkg = loadPackageOrThrow(packageId);
+        List<List<String>> nodeGraph = asNodeGraph(pkg.get("nodeGraph"));
+        List<Map<String, Object>> fieldDefinitions = listFieldDefinitions(true, null);
+        Map<String, Map<String, Object>> nodeDefinitionMap = loadNodeDefinitionsByIds(flattenNodeGraph(nodeGraph));
+        List<Map<String, Object>> mappings = validateInputMappings(packageId, request, fieldDefinitions, nodeDefinitionMap);
+        jdbc.update(
+            "UPDATE mo_workflow_recommendation_packages " +
+                "SET meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{inputMappings}', ?::jsonb, TRUE), updated_at = NOW(), updated_by = ? " +
+                "WHERE id = ?",
+            serializeInputMappings(mappings),
+            userId,
+            packageId
+        );
+        return listInputMappings(packageId);
     }
 
     public List<Map<String, Object>> listFieldDefinitions(Boolean enabled, String keyword) {
@@ -885,6 +942,27 @@ public class WorkflowTemplateService {
         }
     }
 
+    private List<Map<String, Object>> extractInputMappings(Object value) {
+        List<Map<String, Object>> rows = asMapList(value);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", hasText(asString(row.get("id"))) ? asString(row.get("id")) : UUID.randomUUID().toString());
+            item.put("packageId", asString(row.get("packageId")));
+            item.put("targetType", normalizeInputMappingTargetType(asString(row.get("targetType"))));
+            item.put("targetRef", asString(row.get("targetRef")));
+            item.put("targetPath", asString(row.get("targetPath")));
+            item.put("sourcePath", asString(row.get("sourcePath")));
+            item.put("sortOrder", asInt(row.get("sortOrder"), 100));
+            item.put("status", hasText(asString(row.get("status"))) ? normalizeStatus(asString(row.get("status"))) : "ACTIVE");
+            item.put("meta", asMap(row.get("meta")));
+            item.put("version", normalizePositiveInt(asInt(row.get("version"), 1), "version 必须大于 0"));
+            result.add(item);
+        }
+        result.sort((a, b) -> Integer.compare(asInt(a.get("sortOrder"), 100), asInt(b.get("sortOrder"), 100)));
+        return result;
+    }
+
     private List<List<String>> extractNodeGraph(String rawMeta) {
         Map<String, Object> meta = parseMeta(rawMeta);
         return asNodeGraph(meta.get("nodeGraph"));
@@ -910,7 +988,7 @@ public class WorkflowTemplateService {
     }
 
     private String emptyNodeGraphMetaJson() {
-        return "{\"nodeGraph\":[]}";
+        return "{\"nodeGraph\":[],\"inputMappings\":[]}";
     }
 
     private String serializeNodeGraph(List<List<String>> nodeGraph) {
@@ -925,9 +1003,18 @@ public class WorkflowTemplateService {
         try {
             Map<String, Object> meta = new LinkedHashMap<>();
             meta.put("nodeGraph", nodeGraph == null ? List.of() : nodeGraph);
+            meta.put("inputMappings", List.of());
             return objectMapper.writeValueAsString(meta);
         } catch (JsonProcessingException ex) {
             throw new ResponseStatusException(BAD_REQUEST, "模板 meta 序列化失败");
+        }
+    }
+
+    private String serializeInputMappings(List<Map<String, Object>> mappings) {
+        try {
+            return objectMapper.writeValueAsString(mappings == null ? List.of() : mappings);
+        } catch (JsonProcessingException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "inputMappings 序列化失败");
         }
     }
 
@@ -940,7 +1027,7 @@ public class WorkflowTemplateService {
             return Map.of();
         }
         StringBuilder sql = new StringBuilder(
-            "SELECT id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, created_at, updated_at " +
+            "SELECT id, field_key, name, field_type, description, enabled, sensitive, group_key, display_order, meta, created_at, updated_at " +
                 "FROM mo_workflow_template_field_definitions WHERE field_key IN ("
         );
         appendPlaceholders(sql, normalized.size());
@@ -949,6 +1036,189 @@ public class WorkflowTemplateService {
         for (Map<String, Object> row : jdbc.queryForList(sql.toString(), normalized.toArray())) {
             result.put(asString(row.get("field_key")), toFieldDefinitionMap(row));
         }
+        return result;
+    }
+
+    private Map<String, Object> buildWorkflowContextFieldTree(List<Map<String, Object>> fieldDefinitions) {
+        return buildFieldTreeFromDefinitions(fieldDefinitions, null, null);
+    }
+
+    private Map<String, Object> buildCurrentNodeInputOutputFieldTree(Map<String, Object> nodeDefinition,
+                                                                     List<Map<String, Object>> fieldDefinitions) {
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        Map<String, Object> inputTree = buildFieldTreeFromConfiguredFields(nodeDefinition.get("inputFields"), fieldDefinitions, "当前节点输入", "CURRENT_NODE_INPUT");
+        Map<String, Object> outputTree = buildFieldTreeFromConfiguredFields(nodeDefinition.get("outputFields"), fieldDefinitions, "当前节点输出", "CURRENT_NODE_OUTPUT");
+        nodes.addAll(asMapList(inputTree.get("nodes")));
+        nodes.addAll(asMapList(outputTree.get("nodes")));
+        Map<String, Object> tree = new LinkedHashMap<>();
+        tree.put("treeType", "CURRENT_NODE_INPUT_OUTPUT");
+        tree.put("nodes", nodes);
+        return tree;
+    }
+
+    private List<Map<String, Object>> buildSubflowInputFieldTrees(Map<String, Object> nodeDefinition) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<Map<String, Object>> recommendations = asMapList(nodeDefinition.get("recommendedTemplates"));
+        for (Map<String, Object> recommendation : recommendations) {
+            if (!asBoolean(recommendation.get("enabled"), true)) {
+                continue;
+            }
+            String templateId = requireText(recommendation.get("recommendedWorkflowTemplateId"), "recommendedWorkflowTemplateId 不能为空");
+            Map<String, Object> template = loadPackageOrThrow(templateId);
+            List<Map<String, Object>> fields = listFieldDefinitions(true, null);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("templateId", templateId);
+            item.put("templateName", asString(recommendation.get("recommendedWorkflowTemplateName")));
+            item.put("templateCode", asString(recommendation.get("recommendedWorkflowTemplateCode")));
+            item.put("fieldTree", buildFieldTreeFromDefinitions(fields, null, null));
+            result.add(item);
+        }
+        return result;
+    }
+
+    private Map<String, Object> buildFieldTreeFromConfiguredFields(Object configuredFields,
+                                                                   List<Map<String, Object>> fieldDefinitions,
+                                                                   String labelPrefix,
+                                                                   String treeType) {
+        Map<String, Map<String, Object>> definitionMap = new LinkedHashMap<>();
+        for (Map<String, Object> fieldDefinition : fieldDefinitions) {
+            definitionMap.put(asString(fieldDefinition.get("fieldKey")), fieldDefinition);
+        }
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        for (Map<String, Object> configuredField : asMapList(configuredFields)) {
+            String fieldKey = asString(configuredField.get("fieldKey"));
+            if (!hasText(fieldKey)) {
+                continue;
+            }
+            Map<String, Object> fieldDefinition = definitionMap.get(fieldKey);
+            if (fieldDefinition != null) {
+                nodes.add(buildFieldTreeNode(fieldDefinition, labelPrefix, null));
+                continue;
+            }
+            nodes.add(buildFallbackFieldTreeNode(fieldKey, asString(configuredField.get("displayName")), labelPrefix));
+        }
+        Map<String, Object> tree = new LinkedHashMap<>();
+        tree.put("treeType", treeType);
+        tree.put("nodes", nodes);
+        return tree;
+    }
+
+    private Map<String, Object> buildFieldTreeFromDefinitions(List<Map<String, Object>> fieldDefinitions,
+                                                              String labelPrefix,
+                                                              String treeType) {
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        for (Map<String, Object> fieldDefinition : fieldDefinitions) {
+            if (!asBoolean(fieldDefinition.get("enabled"), true)) {
+                continue;
+            }
+            nodes.add(buildFieldTreeNode(fieldDefinition, labelPrefix, null));
+        }
+        Map<String, Object> tree = new LinkedHashMap<>();
+        tree.put("treeType", treeType);
+        tree.put("nodes", nodes);
+        return tree;
+    }
+
+    private Map<String, Object> buildFieldTreeNode(Map<String, Object> fieldDefinition,
+                                                   String labelPrefix,
+                                                   String pathPrefix) {
+        String fieldKey = asString(fieldDefinition.get("fieldKey"));
+        String fieldName = hasText(asString(fieldDefinition.get("name"))) ? asString(fieldDefinition.get("name")) : fieldKey;
+        String path = hasText(pathPrefix) ? pathPrefix + "." + fieldKey : fieldKey;
+        String labelPath = hasText(labelPrefix) ? labelPrefix + " / " + fieldName : fieldName;
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("fieldKey", fieldKey);
+        node.put("label", fieldName);
+        node.put("path", path);
+        node.put("labelPath", labelPath);
+        node.put("fieldType", asString(fieldDefinition.get("fieldType")));
+        node.put("fieldDomain", hasText(labelPrefix) ? labelPrefix : "WORKFLOW_CONTEXT");
+
+        List<Map<String, Object>> children = new ArrayList<>();
+        if ("json".equals(asString(fieldDefinition.get("fieldType")))) {
+            Map<String, Object> child = new LinkedHashMap<>();
+            child.put("fieldKey", "key");
+            child.put("label", "子字段");
+            child.put("path", path + ".key");
+            child.put("labelPath", labelPath + " / 子字段");
+            child.put("fieldType", "json");
+            child.put("fieldDomain", hasText(labelPrefix) ? labelPrefix : "WORKFLOW_CONTEXT");
+            child.put("children", List.of());
+            children.add(child);
+        }
+        if ("list".equals(asString(fieldDefinition.get("fieldType")))) {
+            for (Map<String, Object> subField : asMapList(asMap(fieldDefinition.get("meta")).get("listSubFields"))) {
+                String subFieldKey = asString(subField.get("fieldKey"));
+                if (!hasText(subFieldKey)) {
+                    continue;
+                }
+                Map<String, Object> child = new LinkedHashMap<>();
+                child.put("fieldKey", subFieldKey);
+                child.put("label", hasText(asString(subField.get("name"))) ? asString(subField.get("name")) : subFieldKey);
+                child.put("path", path + "[]." + subFieldKey);
+                child.put("labelPath", labelPath + " / " + (hasText(asString(subField.get("name"))) ? asString(subField.get("name")) : subFieldKey));
+                child.put("fieldType", asString(subField.get("fieldType")));
+                child.put("fieldDomain", hasText(labelPrefix) ? labelPrefix : "WORKFLOW_CONTEXT");
+                child.put("children", List.of());
+                children.add(child);
+            }
+        }
+        node.put("children", children);
+        return node;
+    }
+
+    private Map<String, Object> buildFallbackFieldTreeNode(String fieldKey, String displayName, String labelPrefix) {
+        String label = hasText(displayName) ? displayName : fieldKey;
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("fieldKey", fieldKey);
+        node.put("label", label);
+        node.put("path", fieldKey);
+        node.put("labelPath", hasText(labelPrefix) ? labelPrefix + " / " + label : label);
+        node.put("fieldType", "string");
+        node.put("fieldDomain", hasText(labelPrefix) ? labelPrefix : "WORKFLOW_CONTEXT");
+        node.put("children", List.of());
+        return node;
+    }
+
+    private List<Map<String, Object>> validateInputMappings(String packageId,
+                                                            List<WorkflowTemplateInputMappingSaveRequest> request,
+                                                            List<Map<String, Object>> fieldDefinitions,
+                                                            Map<String, Map<String, Object>> nodeDefinitionMap) {
+        Set<String> validNodeIds = nodeDefinitionMap.keySet();
+        List<Map<String, Object>> result = new ArrayList<>();
+        Set<String> dedup = new LinkedHashSet<>();
+        int fallbackOrder = 10;
+        for (WorkflowTemplateInputMappingSaveRequest item : request == null ? List.<WorkflowTemplateInputMappingSaveRequest>of() : request) {
+            if (item == null) {
+                continue;
+            }
+            String targetType = normalizeInputMappingTargetType(item.getTargetType());
+            String targetRef = requireText(item.getTargetRef(), "targetRef 不能为空");
+            if (!validNodeIds.contains(targetRef)) {
+                throw new ResponseStatusException(BAD_REQUEST, "targetRef 对应节点不存在于当前工作流 nodeGraph 中: " + targetRef);
+            }
+            String targetPath = requireText(item.getTargetPath(), "targetPath 不能为空");
+            String sourcePath = requireText(item.getSourcePath(), "sourcePath 不能为空");
+            String dedupKey = targetType + "|" + targetRef + "|" + targetPath + "|" + sourcePath;
+            if (!dedup.add(dedupKey)) {
+                throw new ResponseStatusException(BAD_REQUEST, "输入映射重复: " + dedupKey);
+            }
+            int sortOrder = item.getSortOrder() == null ? fallbackOrder : normalizeSortOrder(item.getSortOrder());
+            fallbackOrder = sortOrder + 10;
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            normalized.put("id", hasText(item.getId()) ? item.getId().trim() : UUID.randomUUID().toString());
+            normalized.put("packageId", packageId);
+            normalized.put("targetType", targetType);
+            normalized.put("targetRef", targetRef);
+            normalized.put("targetPath", targetPath);
+            normalized.put("sourcePath", sourcePath);
+            normalized.put("sortOrder", sortOrder);
+            normalized.put("status", item.getStatus() == null ? "ACTIVE" : normalizeStatus(item.getStatus()));
+            normalized.put("meta", item.getMeta() == null ? Map.of() : item.getMeta());
+            normalized.put("version", normalizePositiveInt(item.getVersion(), "version 必须大于 0"));
+            result.add(normalized);
+        }
+        result.sort((a, b) -> Integer.compare(asInt(a.get("sortOrder"), 100), asInt(b.get("sortOrder"), 100)));
         return result;
     }
 
@@ -1364,6 +1634,14 @@ public class WorkflowTemplateService {
         return normalized;
     }
 
+    private String normalizeInputMappingTargetType(String value) {
+        String normalized = hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : "NODE_INPUT";
+        if (!"NODE_INPUT".equals(normalized) && !"SUBFLOW_INPUT".equals(normalized)) {
+            throw new ResponseStatusException(BAD_REQUEST, "targetType 仅支持 NODE_INPUT 或 SUBFLOW_INPUT");
+        }
+        return normalized;
+    }
+
     private int normalizeVersion(Integer value) {
         int version = value == null ? 1 : value;
         if (version <= 0) {
@@ -1463,6 +1741,16 @@ public class WorkflowTemplateService {
                 }
             }
         }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return new LinkedHashMap<>();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        map.forEach((key, itemValue) -> result.put(String.valueOf(key), itemValue));
         return result;
     }
 
