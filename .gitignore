@@ -2,5 +2,6 @@
 node_modules/
 **/node_modules/
 **/target/
+.android/
 micro-office.backup-*/
 micro-office.gitee-shell-*/
