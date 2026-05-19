@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { WorkflowTemplatePackageSummary, WorkflowTemplatePositionOption, WorkflowTemplateStatus } from '../../api';
 import { workflowTemplateApi } from '../../api';
+import FixedTablePage from '../../components/FixedTablePage';
 import { formatPaginationTotal, paginationLocale } from '../../constants/ui';
 
 const positionLabel = (record: WorkflowTemplatePackageSummary) => {
@@ -166,129 +167,140 @@ export default function AdminWorkflowTemplatePage() {
   };
 
   return (
-    <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+    <div className="page-fill" style={{ gap: 16, overflow: 'hidden' }}>
       <Card
+        className="page-card"
         title="流程管理"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
             新建工作流模板
           </Button>
         }
+        bodyStyle={{ minHeight: 0, display: 'flex', flexDirection: 'column', padding: 12 }}
       >
-        <Space style={{ marginBottom: 16 }} wrap>
-          <Select
-            allowClear
-            placeholder="按岗位筛选"
-            style={{ width: 220 }}
-            value={positionId}
-            onChange={(value) => {
-              setPositionId(value);
-              setCurrent(1);
-            }}
-            options={positionOptions.map((item) => ({ value: item.id, label: item.name }))}
-          />
-          <Select
-            allowClear
-            placeholder="按状态筛选"
-            style={{ width: 180 }}
-            value={status}
-            onChange={(value) => {
-              setStatus(value);
-              setCurrent(1);
-            }}
-            options={[
-              { label: '启用', value: 'ACTIVE' },
-              { label: '停用', value: 'DISABLED' },
-            ]}
-          />
-        </Space>
-
-        <Table
-          rowKey="id"
-          loading={loading}
-          dataSource={pagedPackages}
-          pagination={{
-            current,
-            pageSize,
-            total: filteredPackages.length,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: formatPaginationTotal,
-            locale: paginationLocale,
-            onChange: (page, size) => {
-              setCurrent(page);
-              setPageSize(size);
-            },
-            onShowSizeChange: (page, size) => {
-              setCurrent(page);
-              setPageSize(size);
-            },
-          }}
-          scroll={{ x: 1280 }}
-          columns={[
-            { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true },
-            {
-              title: '关联岗位',
-              dataIndex: 'positionNames',
-              width: 260,
-              render: (_: any, row: WorkflowTemplatePackageSummary) => positionLabel(row),
-            },
-            {
-              title: '创建方式',
-              key: 'createModes',
-              width: 180,
-              render: (_: any, row: WorkflowTemplatePackageSummary) => (
-                <Space wrap>
-                  {row.allowCreateAsNormal ? <Tag color="blue">普通流程</Tag> : null}
-                  {row.allowCreateAsSubflow ? <Tag color="gold">子流程</Tag> : null}
-                </Space>
-              ),
-            },
-            {
-              title: '状态',
-              dataIndex: 'status',
-              width: 110,
-              render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value === 'ACTIVE' ? '启用' : '停用'}</Tag>,
-            },
-            { title: '排序值', dataIndex: 'sortOrder', width: 100 },
-            {
-              title: '操作',
-              key: 'action',
-              width: 360,
-              fixed: 'right',
-              render: (_: any, row: WorkflowTemplatePackageSummary) => (
-                <Space wrap>
-                  <Button type="link" onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>
-                    编排工作流
-                  </Button>
-                  <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
-                    编辑模板
-                  </Button>
-                  <Popconfirm
-                    title="删除工作流模板"
-                    description={`确定删除“${row.name}”吗？对应节点配置也会一起删除。`}
-                    okText="删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => void handleDelete(row)}
-                  >
-                    <Button type="link" danger icon={<DeleteOutlined />}>
-                      删除
-                    </Button>
-                  </Popconfirm>
-                  {row.status === 'ACTIVE' ? (
-                    <Button type="link" danger onClick={() => void handleUpdateStatus(row, 'DISABLED')}>
-                      停用
-                    </Button>
-                  ) : (
-                    <Button type="link" onClick={() => void handleUpdateStatus(row, 'ACTIVE')}>
-                      启用
-                    </Button>
-                  )}
-                </Space>
-              ),
-            },
-          ]}
+        <FixedTablePage
+          top={
+            <div className="page-toolbar">
+              <Space wrap>
+                <Select
+                  allowClear
+                  placeholder="按岗位筛选"
+                  style={{ width: 220 }}
+                  value={positionId}
+                  onChange={(value) => {
+                    setPositionId(value);
+                    setCurrent(1);
+                  }}
+                  options={positionOptions.map((item) => ({ value: item.id, label: item.name }))}
+                />
+                <Select
+                  allowClear
+                  placeholder="按状态筛选"
+                  style={{ width: 180 }}
+                  value={status}
+                  onChange={(value) => {
+                    setStatus(value);
+                    setCurrent(1);
+                  }}
+                  options={[
+                    { label: '启用', value: 'ACTIVE' },
+                    { label: '停用', value: 'DISABLED' },
+                  ]}
+                />
+              </Space>
+            </div>
+          }
+          table={
+            <Table
+              rowKey="id"
+              loading={loading}
+              size="small"
+              pagination={false}
+              dataSource={pagedPackages}
+              tableLayout="fixed"
+              scroll={{ x: 1280, y: 'calc(100dvh - 360px)' }}
+              columns={[
+                { title: '模板名称', dataIndex: 'name', width: 220, ellipsis: true, fixed: 'left' },
+                {
+                  title: '关联岗位',
+                  dataIndex: 'positionNames',
+                  width: 260,
+                  render: (_: any, row: WorkflowTemplatePackageSummary) => positionLabel(row),
+                },
+                {
+                  title: '创建方式',
+                  key: 'createModes',
+                  width: 180,
+                  render: (_: any, row: WorkflowTemplatePackageSummary) => (
+                    <Space wrap>
+                      {row.allowCreateAsNormal ? <Tag color="blue">普通流程</Tag> : null}
+                      {row.allowCreateAsSubflow ? <Tag color="gold">子流程</Tag> : null}
+                    </Space>
+                  ),
+                },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 110,
+                  render: (value: WorkflowTemplateStatus) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value === 'ACTIVE' ? '启用' : '停用'}</Tag>,
+                },
+                { title: '排序值', dataIndex: 'sortOrder', width: 100 },
+                {
+                  title: '操作',
+                  key: 'action',
+                  width: 360,
+                  fixed: 'right',
+                  render: (_: any, row: WorkflowTemplatePackageSummary) => (
+                    <Space wrap>
+                      <Button type="link" onClick={() => nav(`/admin/workflow-templates/${row.id}`)}>
+                        编排工作流
+                      </Button>
+                      <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(row)}>
+                        编辑模板
+                      </Button>
+                      <Popconfirm
+                        title="删除工作流模板"
+                        description={`确定删除“${row.name}”吗？对应节点配置也会一起删除。`}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => void handleDelete(row)}
+                      >
+                        <Button type="link" danger icon={<DeleteOutlined />}>
+                          删除
+                        </Button>
+                      </Popconfirm>
+                      {row.status === 'ACTIVE' ? (
+                        <Button type="link" danger onClick={() => void handleUpdateStatus(row, 'DISABLED')}>
+                          停用
+                        </Button>
+                      ) : (
+                        <Button type="link" onClick={() => void handleUpdateStatus(row, 'ACTIVE')}>
+                          启用
+                        </Button>
+                      )}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          }
+          pagination={
+            <Pagination
+              locale={paginationLocale}
+              current={current}
+              pageSize={pageSize}
+              total={filteredPackages.length}
+              showSizeChanger
+              showQuickJumper
+              pageSizeOptions={['10', '20', '50', '100']}
+              showTotal={formatPaginationTotal}
+              onChange={(page, size) => {
+                setCurrent(page);
+                setPageSize(size);
+              }}
+            />
+          }
         />
       </Card>
 
@@ -333,6 +345,6 @@ export default function AdminWorkflowTemplatePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </Space>
+    </div>
   );
 }
