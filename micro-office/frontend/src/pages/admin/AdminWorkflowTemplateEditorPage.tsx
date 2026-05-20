@@ -286,9 +286,19 @@ export default function AdminWorkflowTemplateEditorPage() {
     return nodeOptions.find((item) => item.nodeId === selectedNodeId) || null;
   }, [inputMappingOptions, selectedNodeId]);
   const workflowFieldPathOptions = useMemo(() => {
-    const backendOptions = normalizeFieldTree(inputMappingOptions?.workflowContextFieldTree);
+    // Use upstream node output fields instead of global field dictionary
+    const upstreamTrees = Array.isArray(selectedNodeMappingOptions?.upstreamNodeOutputFieldTrees)
+      ? selectedNodeMappingOptions?.upstreamNodeOutputFieldTrees
+      : [];
+    const backendOptions = upstreamTrees.flatMap((item) => {
+      const treeOptions = normalizeFieldTree(item.fieldTree);
+      return treeOptions.map((option) => ({
+        ...option,
+        label: item.nodeName ? `${item.nodeName} / ${option.label}` : option.label,
+      }));
+    });
     return backendOptions.length ? backendOptions : buildFieldPathOptions(fieldDefinitions);
-  }, [fieldDefinitions, inputMappingOptions]);
+  }, [fieldDefinitions, selectedNodeMappingOptions]);
   const currentNodeFieldPathOptions = useMemo(() => {
     const backendOptions = normalizeFieldTree(selectedNodeMappingOptions?.currentNodeInputOutputFieldTree);
     return backendOptions.length ? backendOptions : buildCurrentNodeFieldDomainPathOptions(selectedNode, fieldDefinitions);
