@@ -270,6 +270,12 @@ export interface WorkflowTemplateInputMappingNodeOption {
   nodeType?: string;
   currentNodeInputFieldTree?: WorkflowTemplateInputMappingFieldTree;
   currentNodeInputOutputFieldTree?: WorkflowTemplateInputMappingFieldTree;
+  upstreamNodeOutputFieldTrees?: Array<{
+    nodeId: string;
+    nodeName?: string;
+    nodeCode?: string;
+    fieldTree?: WorkflowTemplateInputMappingFieldTree;
+  }>;
   subflowInputFieldTrees?: Array<{
     templateId: string;
     templateName?: string;
