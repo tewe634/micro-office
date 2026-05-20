@@ -1282,7 +1282,10 @@ public class WorkflowTemplateService {
         item.put("allowCreateAsNormal", Boolean.TRUE.equals(row.get("allow_create_as_normal")));
         item.put("allowCreateAsSubflow", Boolean.TRUE.equals(row.get("allow_create_as_subflow")));
         item.put("version", asInt(row.get("version"), 1));
-        item.put("meta", parseMeta(asString(row.get("meta"))));
+        // Parse meta but exclude inputMappings (use dedicated table mo_workflow_template_input_mappings instead)
+        Map<String, Object> meta = parseMeta(asString(row.get("meta")));
+        meta.remove("inputMappings");
+        item.put("meta", meta);
         item.put("nodeGraph", extractNodeGraph(asString(row.get("meta"))));
         item.put("createdAt", row.get("created_at"));
         item.put("createdBy", asString(row.get("created_by")));
