@@ -243,6 +243,7 @@ public class WorkflowTemplateService {
         List<List<String>> nodeGraph = asNodeGraph(pkg.get("nodeGraph"));
         List<Map<String, Object>> fieldDefinitions = listFieldDefinitions(true, null);
         Map<String, Map<String, Object>> nodeDefinitionMap = loadNodeDefinitionsByIds(flattenNodeGraph(nodeGraph));
+        Map<String, List<String>> upstreamNodesMap = buildUpstreamNodesMap(nodeGraph);
 
         List<Map<String, Object>> nodeOptions = new ArrayList<>();
         for (String nodeId : flattenNodeGraph(nodeGraph)) {
@@ -257,6 +258,7 @@ public class WorkflowTemplateService {
             nodeOption.put("nodeType", asString(nodeDefinition.get("nodeType")));
             nodeOption.put("currentNodeInputFieldTree", buildFieldTreeFromConfiguredFields(nodeDefinition.get("inputFields"), fieldDefinitions, null, null));
             nodeOption.put("currentNodeInputOutputFieldTree", buildCurrentNodeInputOutputFieldTree(nodeDefinition, fieldDefinitions));
+            nodeOption.put("upstreamNodeOutputFieldTrees", buildUpstreamNodeOutputFieldTrees(nodeId, upstreamNodesMap, nodeDefinitionMap, fieldDefinitions));
             nodeOption.put("subflowInputFieldTrees", buildSubflowInputFieldTrees(nodeDefinition));
             nodeOptions.add(nodeOption);
         }
@@ -1073,6 +1075,78 @@ public class WorkflowTemplateService {
             item.put("fieldTree", buildFieldTreeFromDefinitions(fields, null, null));
             result.add(item);
         }
+        return result;
+    }
+
+    /**
+     * Build upstream nodes map: for each node, return list of its upstream node IDs
+     */
+    private Map<String, List<String>> buildUpstreamNodesMap(List<List<String>> nodeGraph) {
+        Map<String, List<String>> upstreamMap = new LinkedHashMap<>();
+        
+        // Initialize all nodes with empty upstream list
+        for (List<String> layer : nodeGraph) {
+            for (String nodeId : layer) {
+                upstreamMap.put(nodeId, new ArrayList<>());
+            }
+        }
+        
+        // For each node, add all nodes from previous layers as upstream
+        for (int layerIndex = 0; layerIndex < nodeGraph.size(); layerIndex++) {
+            List<String> currentLayer = nodeGraph.get(layerIndex);
+            
+            // Collect all upstream nodes (from all previous layers)
+            List<String> allUpstreamNodes = new ArrayList<>();
+            for (int prevLayerIndex = 0; prevLayerIndex < layerIndex; prevLayerIndex++) {
+                allUpstreamNodes.addAll(nodeGraph.get(prevLayerIndex));
+            }
+            
+            // Assign upstream nodes to each node in current layer
+            for (String nodeId : currentLayer) {
+                upstreamMap.put(nodeId, new ArrayList<>(allUpstreamNodes));
+            }
+        }
+        
+        return upstreamMap;
+    }
+
+    /**
+     * Build upstream node output field trees for a given node
+     */
+    private List<Map<String, Object>> buildUpstreamNodeOutputFieldTrees(
+            String nodeId,
+            Map<String, List<String>> upstreamNodesMap,
+            Map<String, Map<String, Object>> nodeDefinitionMap,
+            List<Map<String, Object>> fieldDefinitions) {
+        
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<String> upstreamNodeIds = upstreamNodesMap.getOrDefault(nodeId, List.of());
+        
+        for (String upstreamNodeId : upstreamNodeIds) {
+            Map<String, Object> upstreamNodeDef = nodeDefinitionMap.get(upstreamNodeId);
+            if (upstreamNodeDef == null) {
+                continue;
+            }
+            
+            String upstreamNodeName = asString(upstreamNodeDef.get("name"));
+            String upstreamNodeCode = asString(upstreamNodeDef.get("code"));
+            
+            // Build field tree from upstream node's output fields
+            Map<String, Object> fieldTree = buildFieldTreeFromConfiguredFields(
+                upstreamNodeDef.get("outputFields"),
+                fieldDefinitions,
+                upstreamNodeName,
+                null
+            );
+            
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("nodeId", upstreamNodeId);
+            item.put("nodeName", upstreamNodeName);
+            item.put("nodeCode", upstreamNodeCode);
+            item.put("fieldTree", fieldTree);
+            result.add(item);
+        }
+        
         return result;
     }
 
