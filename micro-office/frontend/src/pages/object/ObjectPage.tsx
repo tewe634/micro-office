@@ -271,9 +271,6 @@ function ObjectTable({
         { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
         { title: '角色', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
         { title: '规模', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
-        { title: '开户行', dataIndex: 'bankName', width: 180, ellipsis: true },
-        { title: '银行账户', dataIndex: 'accountNo', width: 180, ellipsis: true },
-        { title: '税号', dataIndex: 'subjectCode', width: 180, ellipsis: true },
       );
     }
 
