@@ -186,6 +186,9 @@ function ObjectTable({
       customerScale: isCustomerType ? values.customerScale ?? null : null,
       parentObjectId: isCustomerType ? values.parentObjectId ?? null : null,
       customerHealth: isCustomerType ? values.customerHealth ?? null : null,
+      bankName: isCustomerType ? values.bankName ?? null : null,
+      accountNo: isCustomerType ? values.accountNo ?? null : null,
+      subjectCode: isCustomerType ? values.subjectCode ?? null : null,
     };
     if (edit) {
       await objectApi.update(edit.id, payload);
@@ -268,6 +271,9 @@ function ObjectTable({
         { title: '行业', dataIndex: 'industry', width: 140, ellipsis: true },
         { title: '角色', dataIndex: 'customerRole', width: 120, render: (v: string) => v ? <Tag color="cyan">{v}</Tag> : '-' },
         { title: '规模', dataIndex: 'customerScale', width: 160, render: (v: string) => v ? <Tag color="gold">{v}</Tag> : '-' },
+        { title: '开户行', dataIndex: 'bankName', width: 180, ellipsis: true },
+        { title: '银行账户', dataIndex: 'accountNo', width: 180, ellipsis: true },
+        { title: '税号', dataIndex: 'subjectCode', width: 180, ellipsis: true },
       );
     }
 
@@ -424,6 +430,21 @@ function ObjectTable({
                     extra="直接保存原始导入值，例如：大客户-M、普通客户-N、OEM客户-X、项目客户-P、非注册"
                   >
                     <Input allowClear placeholder="请输入原始规模/客户属性" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="bankName" label="开户行">
+                    <Input allowClear placeholder="请输入开户行" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="accountNo" label="银行账户">
+                    <Input allowClear placeholder="请输入银行账户" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="subjectCode" label="税号">
+                    <Input allowClear placeholder="请输入税号" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>

@@ -51,7 +51,7 @@ public class ExternalObjectService {
             "UPDATE external_object SET " +
                 "type = ?::object_type, " +
                 "name = ?, contact = ?, phone = ?, address = ?, remark = ?, " +
-                "account_no = ?, subject_code = ?, org_id = ?, dept_id = ?, owner_id = ?, industry = ?, customer_role = ?, customer_scale = ?, parent_object_id = ?, customer_health = ?, updated_at = NOW() " +
+                "account_no = ?, subject_code = ?, bank_name = ?, org_id = ?, dept_id = ?, owner_id = ?, industry = ?, customer_role = ?, customer_scale = ?, parent_object_id = ?, customer_health = ?, updated_at = NOW() " +
             "WHERE id = ?",
             obj.getType() == null ? null : obj.getType().name(),
             obj.getName(),
@@ -61,6 +61,7 @@ public class ExternalObjectService {
             obj.getRemark(),
             obj.getAccountNo(),
             obj.getSubjectCode(),
+            obj.getBankName(),
             obj.getOrgId(),
             obj.getDeptId(),
             obj.getOwnerId(),

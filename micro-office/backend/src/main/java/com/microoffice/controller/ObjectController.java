@@ -103,6 +103,7 @@ public class ObjectController {
         obj.setRemark(trimToNull(obj.getRemark()));
         obj.setAccountNo(trimToNull(obj.getAccountNo()));
         obj.setSubjectCode(trimToNull(obj.getSubjectCode()));
+        obj.setBankName(trimToNull(obj.getBankName()));
         obj.setIndustry(trimToNull(obj.getIndustry()));
         obj.setCustomerRole(trimToNull(obj.getCustomerRole()));
         obj.setCustomerScale(trimToNull(obj.getCustomerScale()));
@@ -333,6 +334,7 @@ public class ObjectController {
         if (body.containsKey("remark")) target.setRemark(asString(body.get("remark")));
         if (body.containsKey("accountNo")) target.setAccountNo(asString(body.get("accountNo")));
         if (body.containsKey("subjectCode")) target.setSubjectCode(asString(body.get("subjectCode")));
+        if (body.containsKey("bankName")) target.setBankName(asString(body.get("bankName")));
         if (body.containsKey("orgId")) target.setOrgId(asString(body.get("orgId")));
         if (body.containsKey("deptId")) target.setDeptId(asString(body.get("deptId")));
         if (body.containsKey("ownerId")) target.setOwnerId(asString(body.get("ownerId")));
