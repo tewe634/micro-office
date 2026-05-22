@@ -18,6 +18,7 @@ public class ExternalObject {
     private String remark;
     private String accountNo;
     private String subjectCode;
+    private String bankName;
     private String orgId;
     private String deptId;
     private String ownerId;
